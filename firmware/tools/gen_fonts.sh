@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Regenerates src/fonts/*.c: Montserrat with Latin-1, Latin Extended-A and
-# Romanian letters, plus the Font Awesome icons the UI uses.
+# Regenerates src/fonts/*.c: Montserrat with English letters and common
+# punctuation, plus the Font Awesome icons the UI uses.
 # Needs Node.js. Run from the firmware folder: tools/gen_fonts.sh
 set -euo pipefail
 WORK=$(mktemp -d)
@@ -10,8 +10,7 @@ MONTSERRAT="$WORK/node_modules/@fontsource/montserrat/files"
 FA="$WORK/lvgl/scripts/built_in_font/FontAwesome5-Solid+Brands+Regular.woff"
 CONV="$WORK/node_modules/.bin/lv_font_conv"
 
-TEXT_LATIN="0x20-0x7E,0xA0-0xFF,0x2013-0x2014,0x2018-0x2019,0x201C-0x201D,0x2022,0x2026,0x20AC"
-TEXT_EXT="0x100-0x17F,0x218-0x21B"
+TEXT="0x20-0x7E,0xA0,0xB0,0xB7,0x2013-0x2014,0x2018-0x2019,0x201C-0x201D,0x2022,0x2026,0x20AC"
 # Keep in sync with src/icons.h
 ICONS="0xF015,0xF133,0xF14A,0xF1DE,0xF1EB,0xF00D,0xF00C,0xF0F3,0xF053,0xF054,0xF021,0xF1F8,0xF06E,0xF0C0,0xF3C5,0xF017,0xF023,0xF240-0xF244,0xF0E7,0xF7C2,0xF093,0xF55A,0xF062,0xF029,0xF067,0xF186,0xF028,0xF53F,0xF0C2,0xF071"
 
@@ -19,8 +18,7 @@ gen() {  # name size weight [icons]
   local extra=()
   [ "${4:-}" = icons ] && extra=(--font "$FA" -r "$ICONS")
   "$CONV" --no-compress --no-prefilter --bpp 4 --size "$2" --format lvgl --lv-include lvgl.h \
-    --font "$MONTSERRAT/montserrat-latin-$3-normal.woff" -r "$TEXT_LATIN" \
-    --font "$MONTSERRAT/montserrat-latin-ext-$3-normal.woff" -r "$TEXT_EXT" \
+    --font "$MONTSERRAT/montserrat-latin-$3-normal.woff" -r "$TEXT" \
     "${extra[@]}" -o "src/fonts/$1.c"
 }
 

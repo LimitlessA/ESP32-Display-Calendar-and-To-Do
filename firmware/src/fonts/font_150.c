@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 150 px
  * Bpp: 4
- * Opts: --no-compress --no-prefilter --bpp 4 --size 150 --format lvgl --lv-include lvgl.h --font /tmp/tmp.9O6nkaE4aj/node_modules/@fontsource/montserrat/files/montserrat-latin-500-normal.woff -r 0x20,0x2D,0x30-0x3A -o src/fonts/font_150.c
+ * Opts: --no-compress --no-prefilter --bpp 4 --size 150 --format lvgl --lv-include lvgl.h --font /tmp/tmp.kNPCWS19nc/node_modules/@fontsource/montserrat/files/montserrat-latin-500-normal.woff -r 0x20,0x2D,0x30-0x3A -o src/fonts/font_150.c
  ******************************************************************************/
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE

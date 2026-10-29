@@ -157,7 +157,7 @@ For a big change, raise the major or minor number of `FIRMWARE_VERSION` in
 apps-script/      Google Apps Script backend (one copy per account)
 firmware/         PlatformIO project for the display
   src/            display, Wi-Fi, sync, SD cache, audio, OTA, setup page, UI
-  src/fonts/      Montserrat with Romanian letters and icons (tools/gen_fonts.sh)
+  src/fonts/      Montserrat (English characters) and icons (tools/gen_fonts.sh)
   sim/            desktop build of the UI that renders screenshots (sim/build.sh)
 .github/workflows GitHub build: factory image, OTA image, releases
 ```
