@@ -21,7 +21,7 @@ lv_obj_t *wifiName, *wifiInfo;
 lv_obj_t *accCount, *accProblem, *accEvery;
 lv_obj_t *sdInfo, *batInfo;
 lv_obj_t *syncLast, *syncNext;
-lv_obj_t *swNight, *swChime, *swDim, *fmt24, *fmt12, *themeName;
+lv_obj_t *swNight, *swChime, *swDim, *swAuto, *fmt24, *fmt12, *themeName;
 
 lv_obj_t *card(lv_obj_t *scr, int x, int y, int w, int h, const char *heading, bool clickable) {
   const Theme &t = theme();
@@ -93,6 +93,7 @@ void toggled(lv_event_t *e) {
   if (sw == swNight) s.nightMode = on;
   if (sw == swChime) s.chime = on;
   if (sw == swDim) s.dimIdle = on;
+  if (sw == swAuto) s.autoUpdate = on;
   ui_save_settings(s);
 }
 
@@ -214,6 +215,8 @@ lv_obj_t *settings_create() {
   lv_obj_t *spacer = mk_box(sync, 0, 0);
   lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(spacer, 1);
+  swAuto = mk_switch(controlRow(sync, "Auto-update", "new firmware, when idle"), g_settings.autoUpdate,
+                     toggled);
   lv_obj_t *now = mk_text_button(sync, "Sync now", true, inner);
   on_click(now, [](lv_event_t *) {
     sync_refresh();
@@ -286,6 +289,7 @@ void settings_refresh() {
     else lv_obj_clear_state(sw, LV_STATE_CHECKED);
   };
   setSwitch(swNight, g_settings.nightMode);
+  setSwitch(swAuto, g_settings.autoUpdate);
   setSwitch(swChime, g_settings.chime);
   setSwitch(swDim, g_settings.dimIdle);
   lv_obj_set_style_bg_opa(fmt24, g_settings.use24h ? LV_OPA_COVER : LV_OPA_TRANSP, 0);

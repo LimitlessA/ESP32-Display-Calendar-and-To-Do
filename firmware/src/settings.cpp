@@ -37,6 +37,7 @@ String toJson(const Settings &s) {
   doc["refreshMinutes"] = s.refreshMinutes;
   doc["theme"] = s.theme;
   doc["updateUrl"] = s.updateUrl;
+  doc["autoUpdate"] = s.autoUpdate;
   String out;
   serializeJson(doc, out);
   return out;
@@ -64,7 +65,8 @@ bool fromJson(const String &json, Settings &s) {
   s.use24h = doc["use24h"] | d.use24h;
   s.refreshMinutes = max<uint8_t>(1, doc["refreshMinutes"] | d.refreshMinutes);
   s.theme = doc["theme"] | d.theme;
-  s.updateUrl = doc["updateUrl"] | "";
+  s.updateUrl = doc["updateUrl"] | d.updateUrl;
+  s.autoUpdate = doc["autoUpdate"] | d.autoUpdate;
   return true;
 }
 

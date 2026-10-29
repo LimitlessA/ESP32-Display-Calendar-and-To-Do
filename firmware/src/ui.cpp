@@ -6,6 +6,7 @@
 #include "ota.h"
 #include "ui.h"
 #include "ui_internal.h"
+#include "wifi_mgr.h"
 
 Snapshot g_snap;
 Settings g_settings;
@@ -15,6 +16,9 @@ namespace {
 constexpr uint32_t kNightIdleMs = 30000;  // back to the night clock after a tap
 constexpr uint8_t kNightBacklight = 6;
 constexpr uint8_t kDimBacklight = 20;
+constexpr uint32_t kAutoCheckMs = 3 * 3600000UL;  // look for new firmware every 3 hours
+constexpr uint32_t kAutoIdleMs = 15 * 60000UL;    // ...and install it after 15 min without touch
+constexpr time_t kAutoMeetingGap = 15 * 60;        // but not right before a meeting
 
 lv_obj_t *screens[(int)Screen::Count];
 bool dirty[(int)Screen::Count];
@@ -33,6 +37,7 @@ std::map<String, time_t> snoozedUntil;
 std::map<String, int> reminderOverride;
 
 bool dimmed = false;
+uint32_t lastAutoCheck = 0;
 uint8_t appliedTheme = 255;
 uint32_t seenSettings = 0;
 
@@ -150,6 +155,28 @@ void checkNightAndDim() {
   }
 }
 
+// Automatic updates: check now and then, and install when nobody is using the
+// display (at night, or after a long time without touch) and no meeting is close.
+void autoUpdate() {
+  if (!g_settings.autoUpdate || wifi_state() != WifiState::Connected) return;
+  const OtaStatus st = ota_status();
+  if (st.state == OtaState::Checking || st.state == OtaState::Installing || st.state == OtaState::Done) return;
+  const uint32_t ms = millis();
+  if (ms > 60000 && (lastAutoCheck == 0 || ms - lastAutoCheck > kAutoCheckMs)) {
+    lastAutoCheck = ms;
+    ota_check();
+    return;
+  }
+  if (st.state != OtaState::Available || reminder_visible()) return;
+  if (!inNightWindow() && lv_disp_get_inactive_time(nullptr) < kAutoIdleMs) return;
+  const time_t now = ui_now();
+  for (const Event &e : g_snap.events) {
+    const time_t start = e.start / 1000;
+    if (!e.allDay && start > now && start - now < kAutoMeetingGap) return;
+  }
+  ota_install();  // the update dialog opens by itself and shows progress
+}
+
 void hideToast(lv_timer_t *) {
   if (toastBox) lv_obj_del(toastBox);
   toastBox = nullptr;
@@ -204,6 +231,7 @@ void ui_tick() {
   ota_dialog_tick();
   checkReminders();
   checkNightAndDim();
+  autoUpdate();
 }
 
 // ---- Navigation and shared helpers ----------------------------------------

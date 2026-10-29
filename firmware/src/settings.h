@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <vector>
 
+#include "config.h"
+
 struct Account {
   String label;      // "Personal", "Work"
   String url;        // Apps Script web app URL ending in /exec
@@ -27,7 +29,8 @@ struct Settings {
   bool use24h = true;
   uint8_t refreshMinutes = 5;
   uint8_t theme = 0;            // index into the theme table in theme.h
-  String updateUrl;             // manifest for one-tap updates, empty = upload only
+  String updateUrl = DEFAULT_UPDATE_URL;  // manifest for updates, empty = upload only
+  bool autoUpdate = true;       // install new firmware by itself while nobody uses the display
 };
 
 // Loads from flash (or the SD card backup after a full erase). Call once.

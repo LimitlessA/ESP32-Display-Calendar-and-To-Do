@@ -2,7 +2,14 @@
 // set on the device itself and stored in flash, so nothing here is secret.
 #pragma once
 
+// The GitHub build sets this to "<major>.<minor>.<build number>"; raise the
+// major.minor here by hand for big changes.
+#ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION "1.0.0"
+#endif
+// Every push to main publishes a GitHub release; this always points at the newest one.
+#define DEFAULT_UPDATE_URL \
+  "https://github.com/LimitlessA/ESP32-Display-Calendar-and-To-Do/releases/latest/download/manifest.json"
 #define HOSTNAME         "calendar"   // setup page at http://calendar.local
 
 // CrowPanel 5.0": TF card on SPI

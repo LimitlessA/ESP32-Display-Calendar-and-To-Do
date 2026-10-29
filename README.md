@@ -116,26 +116,27 @@ contrast in every theme.
 
 ## Firmware updates over Wi-Fi (no PC)
 
+**Automatic, on every push to main.** Each push to `main` builds the firmware
+with a new version number (`1.0.<build number>`) and publishes it as the
+latest GitHub release. The display looks for a new release every 3 hours and
+installs it by itself when nobody is using it: during night mode, or after 15
+minutes without a touch, and never in the 15 minutes before a meeting. The
+update dialog shows the progress, the display restarts, and settings and
+accounts are kept. Turn this off with Settings › Sync › *Auto-update*; you can
+still install by hand with Settings › *Check for update*.
+
+> The display downloads releases without signing in, so the repository must
+> be **public** (it contains no passwords: tokens live only on the display).
+> To change the update source, set another `manifest.json` address under
+> *Update link* on the setup page; the format is
+> `{"version":"1.1.0","url":"https://…/firmware.bin"}`.
+
 **From the setup page.** Download the **firmware** artifact from the Actions
-tab as above, open the display's setup page, choose `firmware.bin` (not
-`factory.bin`) under *Firmware update*, and enter the PIN shown on the display.
-The display installs it and restarts. Settings and accounts are kept.
+tab, open the display's setup page, choose `firmware.bin` (not `factory.bin`)
+under *Firmware update*, and enter the PIN shown on the display.
 
-**One tap on the display.** Pushing a tag such as `v1.1.0` publishes a GitHub
-release with `firmware.bin` and `manifest.json`. Paste the address of a
-`manifest.json` on the setup page under *Update link*; from then on Settings ›
-*Check for update* finds new versions and installs them with one tap.
-
-> This repository is private, and the display can't sign in to GitHub, so it
-> can't download from private releases. For one-tap updates, either make the
-> repository public (it contains no passwords: tokens live only on the
-> display), or put `firmware.bin` and a `manifest.json` like
-> `{"version":"1.1.0","url":"https://…/firmware.bin"}` on any public HTTPS
-> host. The setup page upload works either way.
-
-Before tagging a release, raise `FIRMWARE_VERSION` in
-`firmware/include/config.h`; the display only offers versions newer than its
-own.
+For a big change, raise the major or minor number of `FIRMWARE_VERSION` in
+`firmware/include/config.h`; the build number is added automatically.
 
 ## Why it feels fast
 
