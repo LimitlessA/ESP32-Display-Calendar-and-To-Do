@@ -6,6 +6,8 @@
 
 #include "display.h"
 
+#include "config.h"
+
 // Pin map and timings for the CrowPanel 5.0" (from Elecrow's reference sketches).
 class LGFX : public lgfx::LGFX_Device {
 public:
@@ -87,7 +89,7 @@ public:
       cfg.pin_rst = -1;
       cfg.bus_shared = false;
       cfg.offset_rotation = 0;
-      cfg.i2c_port = I2C_NUM_1;
+      cfg.i2c_port = I2C_PORT;
       cfg.pin_sda = GPIO_NUM_19;
       cfg.pin_scl = GPIO_NUM_20;
       cfg.freq = 400000;

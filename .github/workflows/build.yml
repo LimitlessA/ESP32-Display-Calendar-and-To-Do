@@ -35,6 +35,8 @@ jobs:
           BASE=$(sed -n 's/#define FIRMWARE_VERSION "\([0-9]*\.[0-9]*\).*"/\1/p' firmware/include/config.h)
           echo "VERSION=$BASE.${{ github.run_number }}" >> "$GITHUB_ENV"
       - name: Build
+        env:
+          SCONSFLAGS: -k  # report every compile error in one run, not just the first
         run: |
           export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION=\\\"$VERSION\\\""
           pio run -d firmware
