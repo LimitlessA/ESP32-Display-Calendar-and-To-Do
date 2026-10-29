@@ -34,6 +34,14 @@ enum class Screen { Home, Detail, Week, Tasks, Night, Wifi, Accounts, Settings, 
 extern Snapshot g_snap;
 extern Settings g_settings;
 
+// Words used on several screens (defined at the top of ui_common.cpp).
+extern const char *const kToday;
+extern const char *const kTomorrow;
+extern const char *const kAllDay;
+
+// printf-style formatting into a String, for the text templates at the top of each file.
+String strf(const char *fmt, ...);
+
 // Provided by the platform (main.cpp on the device, the simulator on a PC).
 time_t ui_now();
 

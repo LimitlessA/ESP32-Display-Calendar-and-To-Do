@@ -4,16 +4,25 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+const char *kDayNames[] = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
+constexpr const char *kThisWeek = "This week";
+constexpr const char *kLoading = "Loading the week...";
+constexpr const char *kFree = "Free";  // day without meetings
+
 constexpr int DAY_GAP = 6;
 constexpr int DAY_W = (SCREEN_W - 2 * PAD - 6 * DAY_GAP) / 7;
 constexpr int BAR_Y = HEADER_H + 8;
 constexpr int COLS_Y = BAR_Y + TOUCH + 8;
 constexpr int COLS_H = SCREEN_H - COLS_Y - PAD;
 
-const char *kDayNames[] = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
+// ---- State -------------------------------------------------------------------
 
 time_t viewWeek = 0;
 lv_obj_t *rangeLabel, *cols, *loading;
+
+// ---- Code --------------------------------------------------------------------
 
 time_t addDays(time_t day, int n) {
   struct tm tm;
@@ -66,7 +75,7 @@ lv_obj_t *week_create() {
   lv_obj_t *thisWeek = mk_button(bar, t.card, TOUCH / 2);
   lv_obj_set_size(thisWeek, LV_SIZE_CONTENT, TOUCH);
   lv_obj_set_style_pad_hor(thisWeek, 16, 0);
-  lv_obj_center(mk_label(thisWeek, &font_14b, t.text, "This week"));
+  lv_obj_center(mk_label(thisWeek, &font_14b, t.text, kThisWeek));
   on_click(thisWeek, [](lv_event_t *) { request(mondayOf(ui_now())); });
   on_click(roundButton(bar, ICON_RIGHT), [](lv_event_t *) { request(addDays(viewWeek, 7)); });
 
@@ -76,7 +85,7 @@ lv_obj_t *week_create() {
   lv_obj_set_size(cols, SCREEN_W - 2 * PAD, COLS_H);
   set_flex(cols, LV_FLEX_FLOW_ROW, DAY_GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-  loading = mk_label(scr, &font_16, t.muted, "Loading the week...");
+  loading = mk_label(scr, &font_16, t.muted, kLoading);
   lv_obj_align(loading, LV_ALIGN_CENTER, 0, 60);
   return scr;
 }
@@ -142,14 +151,14 @@ void week_refresh() {
       lv_obj_set_style_bg_opa(top, LV_OPA_TRANSP, 0);
       set_flex(top, LV_FLEX_FLOW_ROW, 5);
       mk_dot(top, ev.color, 7);
-      mk_label(top, &font_12, t.muted, ev.allDay || s != dn ? "All day" : fmt_time(ev.start / 1000).c_str());
+      mk_label(top, &font_12, t.muted, ev.allDay || s != dn ? kAllDay : fmt_time(ev.start / 1000).c_str());
       lv_obj_t *title = mk_label(b, &font_12, t.text, ev.title.c_str());
       lv_obj_set_width(title, DAY_W - 24);
       lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
       on_click(b, openEvent, attach(b, ev));
     }
     if (!n) {
-      lv_obj_t *none = mk_label(list, &font_12, t.muted, "Free");
+      lv_obj_t *none = mk_label(list, &font_12, t.muted, kFree);
       lv_obj_set_width(none, DAY_W - 12);
       lv_obj_set_style_text_align(none, LV_TEXT_ALIGN_CENTER, 0);
     }

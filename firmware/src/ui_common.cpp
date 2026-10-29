@@ -1,12 +1,37 @@
+#include <stdarg.h>
 #include <time.h>
 
 #include "ui_internal.h"
+
+// ---- Texts and settings ------------------------------------------------------
+
+// Shared with other screens through ui_internal.h
+const char *const kToday = "Today";
+const char *const kTomorrow = "Tomorrow";
+const char *const kAllDay = "All day";
 
 namespace {
 
 const char *kDays[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const char *kMonths[] = {"January", "February", "March", "April", "May", "June",
                          "July", "August", "September", "October", "November", "December"};
+constexpr const char *kTabHome = "Home";
+constexpr const char *kTabWeek = "Week";
+constexpr const char *kTabTasks = "Tasks";
+constexpr const char *kAm = " AM";
+constexpr const char *kPm = " PM";
+constexpr const char *kNoClock = "--:--";  // before the clock is set
+constexpr const char *kTodayHeading = "TODAY";
+constexpr const char *kTomorrowHeading = "TOMORROW";
+constexpr const char *kDaysSpan = ", %d days";  // all-day event over several days
+constexpr const char *kAllDaySuffix = ", all day";
+constexpr const char *kNow = "now";
+constexpr const char *kInMinutes = "in %d min";
+constexpr const char *kInHours = "in %d h";
+constexpr const char *kInHoursMinutes = "in %d h %d min";
+constexpr const char *kInDays = "in %d days";
+constexpr const char *kOverdue = "Overdue";
+constexpr time_t kClockValidAfter = 1700000000;  // NTP has set the clock once it is past this
 
 struct tm local(time_t t) {
   struct tm tm;
@@ -36,6 +61,15 @@ lv_color_t pressed(uint32_t base) {
 }
 
 }  // namespace
+
+String strf(const char *fmt, ...) {
+  char buf[256];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  return buf;
+}
 
 // ---- Building blocks -------------------------------------------------------
 
@@ -152,9 +186,9 @@ struct Tab {
 };
 
 const Tab kTabs[] = {
-    {Screen::Home, ICON_HOME, "Home"},
-    {Screen::Week, ICON_CALENDAR, "Week"},
-    {Screen::Tasks, ICON_TASKS, "Tasks"},
+    {Screen::Home, ICON_HOME, kTabHome},
+    {Screen::Week, ICON_CALENDAR, kTabWeek},
+    {Screen::Tasks, ICON_TASKS, kTabTasks},
     {Screen::Settings, ICON_SLIDERS, nullptr},
 };
 
@@ -222,18 +256,18 @@ lv_obj_t *mk_back_header(lv_obj_t *scr, const char *title, Screen back) {
 // ---- Formatting ------------------------------------------------------------
 
 bool clock_valid() {
-  return ui_now() > 1700000000;  // NTP has set the clock
+  return ui_now() > kClockValidAfter;
 }
 
 String fmt_time(time_t t) {
   const struct tm tm = local(t);
   if (g_settings.use24h) return two(tm.tm_hour) + ":" + two(tm.tm_min);
   const int h = tm.tm_hour % 12 == 0 ? 12 : tm.tm_hour % 12;
-  return num(h) + ":" + two(tm.tm_min) + (tm.tm_hour < 12 ? " AM" : " PM");
+  return num(h) + ":" + two(tm.tm_min) + (tm.tm_hour < 12 ? kAm : kPm);
 }
 
 String fmt_clock() {
-  return clock_valid() ? fmt_time(ui_now()) : String("--:--");
+  return clock_valid() ? fmt_time(ui_now()) : String(kNoClock);
 }
 
 String fmt_date_short(time_t t) {
@@ -268,8 +302,8 @@ long day_number(time_t t) {
 
 String day_heading(time_t t) {
   const long diff = day_number(t) - day_number(ui_now());
-  if (diff == 0) return "TODAY";
-  if (diff == 1) return "TOMORROW";
+  if (diff == 0) return kTodayHeading;
+  if (diff == 1) return kTomorrowHeading;
   const struct tm tm = local(t);
   return upper(String(kDays[tm.tm_wday]) + " " + num(tm.tm_mday) + " " + String(kMonths[tm.tm_mon]).substring(0, 3));
 }
@@ -277,10 +311,10 @@ String day_heading(time_t t) {
 String event_when(const Event &ev) {
   const time_t s = ev.start / 1000, e = ev.end / 1000;
   const long diff = day_number(s) - day_number(ui_now());
-  String day = diff == 0 ? String("Today") : diff == 1 ? String("Tomorrow") : fmt_date_short(s);
+  String day = diff == 0 ? String(kToday) : diff == 1 ? String(kTomorrow) : fmt_date_short(s);
   if (ev.allDay) {
     const long days = day_number(e - 1) - day_number(s) + 1;
-    return day + (days > 1 ? ", " + num(days) + " days" : String(", all day"));
+    return day + (days > 1 ? strf(kDaysSpan, (int)days) : String(kAllDaySuffix));
   }
   return day + ", " + fmt_time(s) + " - " + fmt_time(e);
 }
@@ -288,12 +322,12 @@ String event_when(const Event &ev) {
 String until_text(int64_t start_ms) {
   const long mins = (long)((start_ms / 1000 - ui_now()) / 60);
   if (mins < 0) return "";
-  if (mins == 0) return "now";
-  if (mins < 60) return "in " + num(mins) + " min";
+  if (mins == 0) return kNow;
+  if (mins < 60) return strf(kInMinutes, (int)mins);
   if (mins < 24 * 60) {
-    return "in " + num(mins / 60) + " h" + (mins % 60 ? " " + num(mins % 60) + " min" : String(""));
+    return mins % 60 ? strf(kInHoursMinutes, (int)(mins / 60), (int)(mins % 60)) : strf(kInHours, (int)(mins / 60));
   }
-  return "in " + num((mins + 12 * 60) / (24 * 60)) + " days";
+  return strf(kInDays, (int)((mins + 12 * 60) / (24 * 60)));
 }
 
 String due_text(const String &due_key, Tone &tone) {
@@ -309,13 +343,13 @@ String due_text(const String &due_key, Tone &tone) {
   const long diff = day_number(due) - day_number(ui_now());
   if (diff < 0) {
     tone = Tone::Bad;
-    return "Overdue";
+    return kOverdue;
   }
   if (diff == 0) {
     tone = Tone::Warn;
-    return "Today";
+    return kToday;
   }
-  if (diff == 1) return "Tomorrow";
+  if (diff == 1) return kTomorrow;
   return fmt_date_short(due);
 }
 

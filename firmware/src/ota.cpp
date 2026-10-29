@@ -11,12 +11,26 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr const char *kErrNoLink = "No update link set. Upload a file at http://" HOSTNAME ".local";
+constexpr const char *kErrRead = "Could not read the update link";
+constexpr const char *kErrManifest = "Update link is not a valid manifest";
+constexpr const char *kErrCheckFirst = "Check for updates first";
+constexpr uint32_t kTimeoutMs = 15000;
+constexpr uint32_t kRestartDelayMs = 2500;  // lets the screen show "Restarting"
+constexpr uint32_t kTaskStack = 12288;
+
+// ---- State -------------------------------------------------------------------
+
 SemaphoreHandle_t lock;
 TaskHandle_t task;
 OtaStatus status;
 String binUrl;
 size_t uploadSize = 0;
 size_t uploadDone = 0;
+
+// ---- Code --------------------------------------------------------------------
 
 enum : uint32_t { kCheck = 1, kInstall = 2, kReboot = 4 };
 
@@ -46,7 +60,7 @@ bool newer(const String &a, const String &b) {
 void check() {
   const String url = settings_get().updateUrl;
   if (!url.length()) {
-    set(OtaState::Failed, "No update link set. Upload a file at http://" HOSTNAME ".local");
+    set(OtaState::Failed, kErrNoLink);
     return;
   }
   set(OtaState::Checking);
@@ -54,9 +68,9 @@ void check() {
   client.setCACert(OTA_ROOT_CAS);
   HTTPClient http;
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.setTimeout(15000);
+  http.setTimeout(kTimeoutMs);
   if (!http.begin(client, url) || http.GET() != HTTP_CODE_OK) {
-    set(OtaState::Failed, "Could not read the update link");
+    set(OtaState::Failed, kErrRead);
     http.end();
     return;
   }
@@ -64,7 +78,7 @@ void check() {
   const bool ok = !deserializeJson(doc, http.getString());
   http.end();
   if (!ok || !doc["version"].is<const char *>() || !doc["url"].is<const char *>()) {
-    set(OtaState::Failed, "Update link is not a valid manifest");
+    set(OtaState::Failed, kErrManifest);
     return;
   }
   const String latest = doc["version"].as<String>();
@@ -81,7 +95,7 @@ void install() {
   url = binUrl;
   xSemaphoreGive(lock);
   if (!url.length()) {
-    set(OtaState::Failed, "Check for updates first");
+    set(OtaState::Failed, kErrCheckFirst);
     return;
   }
   set(OtaState::Installing, "", 0);
@@ -109,7 +123,7 @@ void otaTask(void *) {
     if (bits & kCheck) check();
     if (bits & kInstall) install();
     if (bits & kReboot) {
-      delay(2500);  // let the screen show "Restarting"
+      delay(kRestartDelayMs);
       ESP.restart();
     }
   }
@@ -119,7 +133,7 @@ void otaTask(void *) {
 
 void ota_begin() {
   lock = xSemaphoreCreateMutex();
-  xTaskCreatePinnedToCore(otaTask, "ota", 12288, nullptr, 1, &task, 0);
+  xTaskCreatePinnedToCore(otaTask, "ota", kTaskStack, nullptr, 1, &task, 0);
 }
 
 OtaStatus ota_status() {

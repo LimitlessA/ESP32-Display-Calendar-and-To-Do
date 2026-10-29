@@ -4,9 +4,26 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr const char *kBack = "Back";
+constexpr const char *kReminderOn = "Reminder on (%d min before)";
+constexpr const char *kReminderOff = "Remind me before";
+constexpr const char *kDismiss = "Dismiss from display";
+constexpr const char *kDismissed = "Hidden from the display. Your calendar is unchanged.";
+constexpr const char *kDismissNote = "Dismiss only hides it here. Your Google Calendar is not changed.";
+constexpr const char *kSeparator = " \xC2\xB7 ";  // " · " between calendar and account
+constexpr const char *kOrganizer = "%s (organizer)";
+constexpr const char *kAndOthers = " and %d others";
+constexpr const char *kOthers = "%d others";
+
+// ---- State -------------------------------------------------------------------
+
 Event shown;
 lv_obj_t *dot, *calLabel, *untilLabel, *title, *whenLabel, *locRow, *locLabel;
 lv_obj_t *peopleRow, *peopleLabel, *descLabel, *remindBtn, *remindLabel;
+
+// ---- Code --------------------------------------------------------------------
 
 lv_obj_t *infoRow(lv_obj_t *parent, const char *icon, lv_obj_t **label) {
   const Theme &t = theme();
@@ -25,7 +42,7 @@ lv_obj_t *infoRow(lv_obj_t *parent, const char *icon, lv_obj_t **label) {
 void updateRemind() {
   const int o = ui_reminder_override(shown.key);
   const bool on = o == 1 || (o < 0 && g_settings.chime);
-  String text = on ? "Reminder on (" + String((int)g_settings.remindMinutes) + " min before)" : String("Remind me before");
+  String text = on ? strf(kReminderOn, (int)g_settings.remindMinutes) : String(kReminderOff);
   lv_label_set_text(remindLabel, text.c_str());
   lv_obj_set_style_text_color(remindLabel, c(on ? theme().onAccent : theme().text), 0);
   lv_obj_set_style_bg_color(remindBtn, c(on ? theme().accent : theme().raised), 0);
@@ -36,7 +53,7 @@ void updateRemind() {
 lv_obj_t *detail_create() {
   const Theme &t = theme();
   lv_obj_t *scr = mk_screen();
-  mk_back_header(scr, "Back", Screen::Home);
+  mk_back_header(scr, kBack, Screen::Home);
 
   lv_obj_t *card = mk_box(scr, t.card, 18);
   lv_obj_set_pos(card, PAD, HEADER_H + PAD);
@@ -95,14 +112,14 @@ lv_obj_t *detail_create() {
   lv_obj_set_style_border_width(dismiss, 2, 0);
   set_flex(dismiss, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   mk_label(dismiss, &font_14, t.text, ICON_CLOSE);
-  mk_label(dismiss, &font_14b, t.text, "Dismiss from display");
+  mk_label(dismiss, &font_14b, t.text, kDismiss);
   on_click(dismiss, [](lv_event_t *) {
     sync_dismiss_event(shown);
     ui_show(Screen::Home);
-    toast("Hidden from the display. Your calendar is unchanged.");
+    toast(kDismissed);
   });
 
-  lv_obj_t *note = mk_label(side, &font_12, t.muted, "Dismiss only hides it here. Your Google Calendar is not changed.");
+  lv_obj_t *note = mk_label(side, &font_12, t.muted, kDismissNote);
   lv_obj_set_width(note, 212);
   lv_obj_set_style_pad_left(note, 4, 0);
   lv_label_set_long_mode(note, LV_LABEL_LONG_WRAP);
@@ -114,7 +131,7 @@ void detail_show(const Event &ev) {
   const String accountName = ev.account < g_settings.accounts.size() ? g_settings.accounts[ev.account].label : String("");
   lv_obj_set_style_bg_color(dot, c(ev.color), 0);
   String cal = ev.calendar;
-  if (accountName.length()) cal += " · " + accountName;
+  if (accountName.length()) cal += kSeparator + accountName;
   lv_label_set_text(calLabel, cal.c_str());
   lv_label_set_text(title, ev.title.c_str());
   lv_label_set_text(whenLabel, event_when(ev).c_str());
@@ -127,8 +144,8 @@ void detail_show(const Event &ev) {
   }
   if (ev.guests || ev.organizer.length()) {
     lv_obj_clear_flag(peopleRow, LV_OBJ_FLAG_HIDDEN);
-    String people = ev.organizer.length() ? ev.organizer + " (organizer)" : String("");
-    if (ev.guests > 1) people += (people.length() ? " and " : "") + String((int)ev.guests - 1) + " others";
+    String people = ev.organizer.length() ? strf(kOrganizer, ev.organizer.c_str()) : String("");
+    if (ev.guests > 1) people += strf(people.length() ? kAndOthers : kOthers, (int)ev.guests - 1);
     lv_label_set_text(peopleLabel, people.c_str());
   } else {
     lv_obj_add_flag(peopleRow, LV_OBJ_FLAG_HIDDEN);

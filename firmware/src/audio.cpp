@@ -10,18 +10,20 @@ constexpr i2s_port_t kPort = I2S_NUM_0;
 constexpr int kRate = 16000;
 
 struct Note {
-  float freq;
+  float freq;  // Hz
   uint16_t ms;
 };
+
+// Sounds: change the notes here
+const Note kChime[] = {{880.0f, 220}, {1318.5f, 420}};  // meeting reminder: A5 then E6
+const Note kTick[] = {{2000.0f, 18}};
+constexpr float kMaxGain = 0.6f;  // loudness at 100% volume
 
 struct Sound {
   const Note *notes;
   uint8_t count;
   uint8_t volume;
 };
-
-const Note kChime[] = {{880.0f, 220}, {1318.5f, 420}};
-const Note kTick[] = {{2000.0f, 18}};
 
 QueueHandle_t queue;
 
@@ -50,7 +52,7 @@ void audioTask(void *) {
   for (;;) {
     if (xQueueReceive(queue, &s, portMAX_DELAY) != pdTRUE) continue;
     // Perceived loudness is roughly logarithmic, so square the slider value.
-    const float gain = 0.6f * (s.volume / 100.0f) * (s.volume / 100.0f);
+    const float gain = kMaxGain * (s.volume / 100.0f) * (s.volume / 100.0f);
     for (uint8_t i = 0; i < s.count; i++) playNote(s.notes[i], gain);
     i2s_zero_dma_buffer(kPort);
   }

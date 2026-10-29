@@ -8,6 +8,7 @@ namespace {
 constexpr uint8_t kRegSoc = 0x04;    // state of charge, high byte = percent
 constexpr uint8_t kRegCrate = 0x16;  // charge rate, signed, 0.208 %/h per bit
 constexpr uint32_t kFreq = 400000;
+constexpr uint32_t kReadEveryMs = 30000;  // the level changes slowly
 
 bool present = false;
 int percent = -1;
@@ -44,7 +45,7 @@ bool battery_present() {
 
 int battery_percent() {
   if (!present) return -1;
-  if (millis() - lastRead > 30000) refresh();
+  if (millis() - lastRead > kReadEveryMs) refresh();
   return percent;
 }
 

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <stdarg.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
@@ -14,6 +15,34 @@
 #include "wifi_mgr.h"
 
 namespace {
+
+// ---- Texts and settings ------------------------------------------------------
+
+// Error texts shown on the display
+constexpr const char *kErrBadUrl = "bad URL";
+constexpr const char *kErrHttp = "HTTP %d";
+constexpr const char *kErrBadReply = "bad reply: %s";
+constexpr const char *kErrAccount = "%s: %s";  // account name, error
+constexpr const char *kErrJoin = "; ";
+constexpr const char *kErrAction = "%s failed: %s";  // action name, error
+constexpr const char *kErrNoWifiSetup = "Wi-Fi is not set up";
+constexpr const char *kErrNoWifi = "No Wi-Fi connection";
+constexpr const char *kActDismiss = "Dismiss";
+constexpr const char *kActComplete = "Complete";
+constexpr const char *kActUndo = "Undo";
+constexpr const char *kActCalendar = "Calendar change";
+constexpr const char *kActOther = "Action";
+
+constexpr const char *kCachePath = "/calendar/cache_%08lx.json";  // offline copy on the SD card, per account list
+constexpr const char *kNtpServer1 = "time.google.com";
+constexpr const char *kNtpServer2 = "pool.ntp.org";
+constexpr uint32_t kConnectTimeoutMs = 10000;
+constexpr uint32_t kReplyTimeoutMs = 25000;  // Apps Script can take a while on a cold start
+constexpr uint32_t kIdleLoopMs = 1000;       // how often the worker wakes when online
+constexpr uint32_t kOfflineLoopMs = 5000;    // ...and when offline
+constexpr uint32_t kTaskStack = 16384;
+
+// ---- State -------------------------------------------------------------------
 
 enum class ActionType { Dismiss, Complete, Uncomplete, ShowCalendar };
 
@@ -34,6 +63,17 @@ std::map<String, bool> hidden;
 volatile bool refreshRequested = true;
 volatile time_t weekRequested = 0;
 String timezone;  // POSIX TZ built from the feed's UTC offset
+
+// ---- Code --------------------------------------------------------------------
+
+String strf(const char *fmt, ...) {
+  char buf[200];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  return buf;
+}
 
 struct Guard {
   Guard() { xSemaphoreTake(lock, portMAX_DELAY); }
@@ -64,7 +104,7 @@ String cachePath(const Account &a) {
   uint32_t h = 5381;
   for (size_t i = 0; i < a.url.length(); i++) h = h * 33 + a.url[i];
   char buf[40];
-  snprintf(buf, sizeof(buf), "/calendar/cache_%08lx.json", (unsigned long)h);
+  snprintf(buf, sizeof(buf), kCachePath, (unsigned long)h);
   return buf;
 }
 
@@ -81,15 +121,15 @@ bool httpGet(const String &url, String &body, String &err) {
   client.setCACert(GOOGLE_ROOT_CAS);
   HTTPClient http;
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.setConnectTimeout(10000);
-  http.setTimeout(25000);
+  http.setConnectTimeout(kConnectTimeoutMs);
+  http.setTimeout(kReplyTimeoutMs);
   if (!http.begin(client, url)) {
-    err = "bad URL";
+    err = kErrBadUrl;
     return false;
   }
   const int code = http.GET();
   if (code != HTTP_CODE_OK) {
-    err = code < 0 ? HTTPClient::errorToString(code) : "HTTP " + String(code);
+    err = code < 0 ? HTTPClient::errorToString(code) : strf(kErrHttp, code);
     http.end();
     return false;
   }
@@ -101,7 +141,7 @@ bool httpGet(const String &url, String &body, String &err) {
 bool parseResponse(const String &body, JsonDocument &doc, String &err) {
   const DeserializationError jerr = deserializeJson(doc, body);
   if (jerr) {
-    err = String("bad reply: ") + jerr.c_str();
+    err = strf(kErrBadReply, jerr.c_str());
     return false;
   }
   if (doc["error"].is<const char *>()) {
@@ -249,8 +289,8 @@ void fetchAll(const Settings &s) {
       storage_write(cachePath(s.accounts[i]).c_str(), body);
     } else {
       status.error = err;
-      if (errors.length()) errors += "; ";
-      errors += s.accounts[i].label + ": " + err;
+      if (errors.length()) errors += kErrJoin;
+      errors += strf(kErrAccount, s.accounts[i].label.c_str(), err.c_str());
       log_w("account %s failed: %s", s.accounts[i].label.c_str(), err.c_str());
     }
     accounts[i] = status;
@@ -293,8 +333,8 @@ void fetchWeek(const Settings &s, time_t weekStart) {
     if (httpGet(accountUrl(s.accounts[i], query), body, err) && parseResponse(body, doc, err)) {
       parseEvents(doc["events"].as<JsonArray>(), i, events);
     } else {
-      if (errors.length()) errors += "; ";
-      errors += s.accounts[i].label + ": " + err;
+      if (errors.length()) errors += kErrJoin;
+      errors += strf(kErrAccount, s.accounts[i].label.c_str(), err.c_str());
     }
   }
   std::vector<Task> none;
@@ -310,12 +350,12 @@ void fetchWeek(const Settings &s, time_t weekStart) {
 
 const char *actionName(ActionType t) {
   switch (t) {
-    case ActionType::Dismiss: return "Dismiss";
-    case ActionType::Complete: return "Complete";
-    case ActionType::Uncomplete: return "Undo";
-    case ActionType::ShowCalendar: return "Calendar change";
+    case ActionType::Dismiss: return kActDismiss;
+    case ActionType::Complete: return kActComplete;
+    case ActionType::Uncomplete: return kActUndo;
+    case ActionType::ShowCalendar: return kActCalendar;
   }
-  return "Action";
+  return kActOther;
 }
 
 // Returns true if any action was sent, so the caller re-syncs.
@@ -345,7 +385,7 @@ bool runPendingActions(const Settings &s) {
       }
     }
     if (!ok) {
-      snapshot.error = String(actionName(a.type)) + " failed: " + err;
+      snapshot.error = strf(kErrAction, actionName(a.type), err.c_str());
       snapshot.version++;
       log_w("action failed: %s", err.c_str());
     }
@@ -356,8 +396,8 @@ bool runPendingActions(const Settings &s) {
 void setWifiError(bool up, WifiState st) {
   Guard g;
   const char *msg = nullptr;
-  if (st == WifiState::NotConfigured) msg = "Wi-Fi is not set up";
-  else if (!up) msg = "No Wi-Fi connection";
+  if (st == WifiState::NotConfigured) msg = kErrNoWifiSetup;
+  else if (!up) msg = kErrNoWifi;
   if (msg && snapshot.error != msg) {
     snapshot.error = msg;
     snapshot.version++;
@@ -398,7 +438,7 @@ void workerLoop(void *) {
     setWifiError(up, wifi_state());
     if (up) {
       if (!clockSet) {
-        configTime(0, 0, "time.google.com", "pool.ntp.org");
+        configTime(0, 0, kNtpServer1, kNtpServer2);
         if (timezone.length()) {
           setenv("TZ", timezone.c_str(), 1);
           tzset();
@@ -420,7 +460,7 @@ void workerLoop(void *) {
       }
       if (needWeek) fetchWeek(s, week);
     }
-    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(up ? 1000 : 5000));
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(up ? kIdleLoopMs : kOfflineLoopMs));
   }
 }
 
@@ -434,7 +474,7 @@ void sync_start() {
   lock = xSemaphoreCreateMutex();
   snapshot.accounts.resize(settings_get().accounts.size());
   // Core 0 alongside the Wi-Fi stack; LVGL runs in loop() on core 1.
-  xTaskCreatePinnedToCore(workerLoop, "sync", 16384, nullptr, 1, &worker, 0);
+  xTaskCreatePinnedToCore(workerLoop, "sync", kTaskStack, nullptr, 1, &worker, 0);
 }
 
 bool sync_get_if_newer(uint32_t version, Snapshot &out) {

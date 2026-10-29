@@ -9,6 +9,33 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr const char *kStartingNow = "STARTING NOW";
+constexpr const char *kStartsInMinute = "STARTS IN %d MINUTE";
+constexpr const char *kStartsInMinutes = "STARTS IN %d MINUTES";
+constexpr const char *kSnooze = "Snooze %d min";
+constexpr int kSnoozeMinutes = 5;
+constexpr const char *kDetails = "Details";
+constexpr const char *kGotIt = "Got it";
+
+constexpr const char *kOtaTitle = "Firmware update";
+constexpr const char *kOtaChecking = "Checking for updates...";
+constexpr const char *kOtaUpToDate = "You have the latest version (%s).";
+constexpr const char *kOtaAvailable = "Version %s is available. You have %s. The display restarts when it is done.";
+constexpr const char *kOtaInstalling = "Installing... %d%%  Keep the display powered.";
+constexpr const char *kOtaDone = "Installed. Restarting...";
+constexpr const char *kOtaFailed = "%s\n\nYou can also upload a firmware file at %s (PIN %s).";  // error, address, PIN
+constexpr const char *kClose = "Close";
+constexpr const char *kInstall = "Install";
+
+constexpr const char *kThemeTitle = "Theme";
+constexpr const char *kDone = "Done";
+constexpr const char *kCalendarsTitle = "Calendars: %s";  // account name
+constexpr const char *kSyncFirst = "Sync this account first.";
+
+// ---- State -------------------------------------------------------------------
+
 lv_obj_t *reminderLayer = nullptr;
 Event reminderEvent;
 
@@ -16,6 +43,12 @@ lv_obj_t *otaLayer = nullptr;
 lv_obj_t *otaTitle, *otaText, *otaBar, *otaButtons;
 OtaState otaShownState = OtaState::Idle;
 int otaShownProgress = -1;
+
+lv_obj_t *themeLayer = nullptr;
+lv_obj_t *calLayer = nullptr;
+uint8_t calAccount;  // account whose calendars are being chosen
+
+// ---- Code --------------------------------------------------------------------
 
 lv_obj_t *mk_layer() {
   lv_obj_t *layer = mk_box(lv_layer_top(), theme().dark ? 0x07090B : theme().bg, 0);
@@ -62,7 +95,7 @@ void reminder_show(const Event &ev) {
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   const long mins = (long)((ev.start / 1000 - ui_now() + 30) / 60);
-  String when = mins <= 0 ? String("STARTING NOW") : "STARTS IN " + String(mins) + (mins == 1 ? " MINUTE" : " MINUTES");
+  String when = mins <= 0 ? String(kStartingNow) : strf(mins == 1 ? kStartsInMinute : kStartsInMinutes, (int)mins);
   lv_obj_t *w = mk_label(col, &font_14b, t.accent, when.c_str());
   lv_obj_set_style_text_letter_space(w, 1, 0);
   mk_label(col, &font_14, t.muted, ev.calendar.c_str());
@@ -81,19 +114,19 @@ void reminder_show(const Event &ev) {
   lv_obj_set_width(row, 504);
   lv_obj_set_style_pad_top(row, 6, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 10);
-  lv_obj_t *snooze = mk_text_button(row, "Snooze 5 min", false, 160);
+  lv_obj_t *snooze = mk_text_button(row, strf(kSnooze, kSnoozeMinutes).c_str(), false, 160);
   lv_obj_set_height(snooze, 56);
   on_click(snooze, [](lv_event_t *) {
-    ui_snooze_reminder(reminderEvent.key, 5);
+    ui_snooze_reminder(reminderEvent.key, kSnoozeMinutes);
     reminder_hide();
   });
-  lv_obj_t *details = mk_text_button(row, "Details", false, 160);
+  lv_obj_t *details = mk_text_button(row, kDetails, false, 160);
   lv_obj_set_height(details, 56);
   on_click(details, [](lv_event_t *) {
     reminder_hide();
     ui_open_event(reminderEvent);
   });
-  lv_obj_t *ok = mk_text_button(row, "Got it", true, 164);
+  lv_obj_t *ok = mk_text_button(row, kGotIt, true, 164);
   lv_obj_set_height(ok, 56);
   on_click(ok, [](lv_event_t *) { reminder_hide(); });
 }
@@ -113,7 +146,7 @@ void ota_dialog_show() {
   const Theme &t = theme();
   otaLayer = mk_layer();
   lv_obj_t *card = mk_dialog(otaLayer, 520);
-  otaTitle = mk_label(card, &font_20b, t.text, "Firmware update");
+  otaTitle = mk_label(card, &font_20b, t.text, kOtaTitle);
   otaText = mk_label(card, &font_16, t.muted, "");
   lv_obj_set_width(otaText, 464);
   lv_label_set_long_mode(otaText, LV_LABEL_LONG_WRAP);
@@ -144,20 +177,20 @@ void ota_dialog_tick() {
   bool bar = false, closable = true, install = false;
   switch (st.state) {
     case OtaState::Idle:
-    case OtaState::Checking: text = "Checking for updates..."; break;
-    case OtaState::UpToDate: text = "You have the latest version (" FIRMWARE_VERSION ")."; break;
+    case OtaState::Checking: text = kOtaChecking; break;
+    case OtaState::UpToDate: text = strf(kOtaUpToDate, FIRMWARE_VERSION); break;
     case OtaState::Available:
-      text = "Version " + st.latest + " is available. You have " FIRMWARE_VERSION ". The display restarts when it is done.";
+      text = strf(kOtaAvailable, st.latest.c_str(), FIRMWARE_VERSION);
       install = true;
       break;
     case OtaState::Installing:
-      text = "Installing... " + String(st.progress) + "%  Keep the display powered.";
+      text = strf(kOtaInstalling, st.progress);
       bar = true;
       closable = false;
       break;
-    case OtaState::Done: text = "Installed. Restarting..."; bar = true; closable = false; break;
+    case OtaState::Done: text = kOtaDone; bar = true; closable = false; break;
     case OtaState::Failed:
-      text = st.message + "\n\nYou can also upload a firmware file at " + web_url() + " (PIN " + web_pin() + ").";
+      text = strf(kOtaFailed, st.message.c_str(), web_url().c_str(), web_pin().c_str());
       break;
   }
   lv_label_set_text(otaText, text.c_str());
@@ -169,26 +202,25 @@ void ota_dialog_tick() {
   }
   lv_obj_clean(otaButtons);
   if (closable) {
-    on_click(mk_text_button(otaButtons, "Close", false, 120), [](lv_event_t *) { closeLayer(&otaLayer); });
+    on_click(mk_text_button(otaButtons, kClose, false, 120), [](lv_event_t *) { closeLayer(&otaLayer); });
   }
   if (install) {
-    on_click(mk_text_button(otaButtons, "Install", true, 140), [](lv_event_t *) { ota_install(); });
+    on_click(mk_text_button(otaButtons, kInstall, true, 140), [](lv_event_t *) { ota_install(); });
   }
 }
 
 // ---- Theme picker ----------------------------------------------------------------
 
 void theme_picker_show() {
-  static lv_obj_t *layer = nullptr;
   const Theme &t = theme();
-  layer = mk_layer();
-  lv_obj_t *card = mk_dialog(layer, 720);
+  themeLayer = mk_layer();
+  lv_obj_t *card = mk_dialog(themeLayer, 720);
   lv_obj_t *head = mk_box(card, 0, 0);
   lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
   lv_obj_set_width(head, 664);
   set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
-  mk_label(head, &font_20b, t.text, "Theme");
-  on_click(mk_text_button(head, "Done", false, 100), [](lv_event_t *) { closeLayer(&layer); });
+  mk_label(head, &font_20b, t.text, kThemeTitle);
+  on_click(mk_text_button(head, kDone, false, 100), [](lv_event_t *) { closeLayer(&themeLayer); });
 
   lv_obj_t *grid = mk_box(card, 0, 0);
   lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
@@ -228,7 +260,7 @@ void theme_picker_show() {
     on_click(tile, [](lv_event_t *e) {
       const uint8_t idx = (uint8_t)(intptr_t)lv_event_get_user_data(e);
       lv_async_call([](void *p) {
-        closeLayer(&layer);
+        closeLayer(&themeLayer);
         Settings s = g_settings;
         s.theme = (uint8_t)(intptr_t)p;
         ui_save_settings(s);  // rebuilds every screen in the new colors
@@ -241,21 +273,19 @@ void theme_picker_show() {
 // ---- Calendar chooser ---------------------------------------------------------
 
 void calendars_dialog_show(uint8_t account) {
-  static lv_obj_t *layer = nullptr;
-  static uint8_t acc;
-  acc = account;
+  calAccount = account;
   const Theme &t = theme();
-  layer = mk_layer();
-  lv_obj_t *card = mk_dialog(layer, 560);
+  calLayer = mk_layer();
+  lv_obj_t *card = mk_dialog(calLayer, 560);
   lv_obj_set_height(card, SCREEN_H - 60);
   lv_obj_t *head = mk_box(card, 0, 0);
   lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
   lv_obj_set_width(head, 504);
   set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
   const String name = account < g_settings.accounts.size() ? g_settings.accounts[account].label : String("");
-  mk_label(head, &font_20b, t.text, ("Calendars: " + name).c_str());
-  on_click(mk_text_button(head, "Done", true, 100), [](lv_event_t *) {
-    closeLayer(&layer);
+  mk_label(head, &font_20b, t.text, strf(kCalendarsTitle, name.c_str()).c_str());
+  on_click(mk_text_button(head, kDone, true, 100), [](lv_event_t *) {
+    closeLayer(&calLayer);
     sync_refresh();
   });
 
@@ -263,7 +293,7 @@ void calendars_dialog_show(uint8_t account) {
   lv_obj_set_width(list, 504);
   lv_obj_set_flex_grow(list, 1);
   if (account >= g_snap.accounts.size() || g_snap.accounts[account].calendars.empty()) {
-    mk_label(list, &font_16, t.muted, "Sync this account first.");
+    mk_label(list, &font_16, t.muted, kSyncFirst);
     return;
   }
   for (const CalendarInfo &cal : g_snap.accounts[account].calendars) {
@@ -278,7 +308,7 @@ void calendars_dialog_show(uint8_t account) {
     // The id lives on the row, which outlives its switch.
     mk_switch(row, cal.shown, [](lv_event_t *e) {
       const String *id = static_cast<String *>(lv_event_get_user_data(e));
-      sync_show_calendar(acc, *id, lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+      sync_show_calendar(calAccount, *id, lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
     }, attach(row, cal.id));
   }
 }

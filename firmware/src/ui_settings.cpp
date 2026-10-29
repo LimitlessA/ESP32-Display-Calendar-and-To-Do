@@ -9,6 +9,61 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr const char *kCardWifi = "WI-FI";
+constexpr const char *kChangeNetwork = "Change network  " ICON_RIGHT;
+constexpr const char *kWifiNotSetUp = "Not set up";
+constexpr const char *kStrong = "Strong signal";
+constexpr const char *kGood = "Good signal";
+constexpr const char *kWeak = "Weak signal";
+constexpr int kStrongRssi = -60;  // dBm
+constexpr int kGoodRssi = -72;
+constexpr const char *kSignalAndIp = "%s \xC2\xB7 %s";
+constexpr const char *kConnecting = "Connecting...";
+constexpr const char *kNotConnected = "Not connected";
+
+constexpr const char *kCardAccounts = "GOOGLE ACCOUNTS";
+constexpr const char *kManageAccounts = "Manage accounts  " ICON_RIGHT;
+constexpr const char *kConnectedCount = "%d connected";
+constexpr const char *kNeedsAttention = "%s needs attention";
+constexpr const char *kAllSynced = "All synced";
+constexpr const char *kSyncsEvery = "Syncs every %d min";
+
+constexpr const char *kCardDevice = "DEVICE";
+constexpr const char *kSdFree = ICON_SD "  SD card: %.1f GB free";
+constexpr const char *kNoSd = ICON_SD "  No SD card";
+constexpr const char *kBattery = "%s  Battery: %d%%%s";  // icon, percent, ", charging"
+constexpr const char *kCharging = ", charging";
+constexpr const char *kNoBattery = ICON_BAT_EMPTY "  No battery gauge";
+constexpr const char *kFirmware = "Firmware %s";
+constexpr const char *kCheckUpdate = "Check for update";
+
+constexpr const char *kCardDisplay = "DISPLAY AND SOUND";
+constexpr const char *kBrightness = "Brightness";
+constexpr int kMinBrightness = 10;  // percent; lower is hard to read
+constexpr const char *kVolume = "Reminder volume";
+constexpr const char *kTheme = "Theme";
+constexpr const char *kNightMode = "Night mode";
+constexpr const char *kNightModeSub = "%02d:%02d - %02d:%02d, dim clock";
+constexpr const char *kChime = "Meeting chime";
+constexpr const char *kChimeSub = "%d min before each meeting";
+constexpr const char *kDim = "Dim when idle";
+constexpr const char *kDimSub = "after %d minutes";
+constexpr const char *kTimeFormat = "Time format";
+constexpr const char *k24h = "24 h";
+constexpr const char *k12h = "12 h";
+
+constexpr const char *kCardSync = "SYNC";
+constexpr const char *kLastSynced = "Last synced %s";
+constexpr const char *kNextSync = "Next sync in %d min";
+constexpr const char *kSavedCopy = "Showing saved copy";
+constexpr const char *kNotSynced = "Not synced yet";
+constexpr const char *kAutoUpdate = "Auto-update";
+constexpr const char *kAutoUpdateSub = "new firmware, when idle";
+constexpr const char *kSyncNow = "Sync now";
+constexpr const char *kSyncing = "Syncing...";
+
 constexpr int BODY_Y = HEADER_H + GAP;
 constexpr int CARD_GAP = 11;
 constexpr int CARD_W = (SCREEN_W - 2 * PAD - 2 * CARD_GAP) / 3;
@@ -17,11 +72,15 @@ constexpr int ROW2_Y = BODY_Y + ROW1_H + 10;
 constexpr int ROW2_H = SCREEN_H - ROW2_Y - PAD;
 constexpr int WIDE_W = 2 * CARD_W + CARD_GAP;
 
+// ---- State -------------------------------------------------------------------
+
 lv_obj_t *wifiName, *wifiInfo;
 lv_obj_t *accCount, *accProblem, *accEvery;
 lv_obj_t *sdInfo, *batInfo;
 lv_obj_t *syncLast, *syncNext;
 lv_obj_t *swNight, *swChime, *swDim, *swAuto, *fmt24, *fmt12, *themeName;
+
+// ---- Code --------------------------------------------------------------------
 
 lv_obj_t *card(lv_obj_t *scr, int x, int y, int w, int h, const char *heading, bool clickable) {
   const Theme &t = theme();
@@ -112,33 +171,33 @@ lv_obj_t *settings_create() {
   mk_nav_header(scr, Screen::Settings);
   const int inner = CARD_W - 32;
 
-  lv_obj_t *wifi = card(scr, PAD, BODY_Y, CARD_W, ROW1_H, "WI-FI", true);
+  lv_obj_t *wifi = card(scr, PAD, BODY_Y, CARD_W, ROW1_H, kCardWifi, true);
   wifiName = line(wifi, &font_20b, t.text, inner);
   wifiInfo = line(wifi, &font_14, t.muted, inner);
-  link(wifi, "Change network  " ICON_RIGHT);
+  link(wifi, kChangeNetwork);
   on_click(wifi, [](lv_event_t *) { ui_show(Screen::Wifi); });
 
-  lv_obj_t *acc = card(scr, PAD + CARD_W + CARD_GAP, BODY_Y, CARD_W, ROW1_H, "GOOGLE ACCOUNTS", true);
+  lv_obj_t *acc = card(scr, PAD + CARD_W + CARD_GAP, BODY_Y, CARD_W, ROW1_H, kCardAccounts, true);
   accCount = line(acc, &font_20b, t.text, inner);
   accProblem = line(acc, &font_14, t.badFg, inner);
   accEvery = line(acc, &font_14, t.muted, inner);
-  link(acc, "Manage accounts  " ICON_RIGHT);
+  link(acc, kManageAccounts);
   on_click(acc, [](lv_event_t *) { ui_show(Screen::Accounts); });
 
-  lv_obj_t *dev = card(scr, PAD + 2 * (CARD_W + CARD_GAP), BODY_Y, CARD_W, ROW1_H, "DEVICE", false);
+  lv_obj_t *dev = card(scr, PAD + 2 * (CARD_W + CARD_GAP), BODY_Y, CARD_W, ROW1_H, kCardDevice, false);
   lv_obj_set_style_pad_row(dev, 4, 0);
   sdInfo = line(dev, &font_12, t.muted, inner);
   batInfo = line(dev, &font_12, t.muted, inner);
   lv_obj_t *fw = line(dev, &font_12, t.muted, inner);
-  lv_label_set_text(fw, "Firmware " FIRMWARE_VERSION);
+  lv_label_set_text(fw, strf(kFirmware, FIRMWARE_VERSION).c_str());
   lv_obj_t *devSpacer = mk_box(dev, 0, 0);
   lv_obj_set_style_bg_opa(devSpacer, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(devSpacer, 1);
-  lv_obj_t *upd = mk_text_button(dev, "Check for update", false, inner);
+  lv_obj_t *upd = mk_text_button(dev, kCheckUpdate, false, inner);
   lv_obj_set_height(upd, 40);
   on_click(upd, [](lv_event_t *) { ota_dialog_show(); });
 
-  lv_obj_t *ds = card(scr, PAD, ROW2_Y, WIDE_W, ROW2_H, "DISPLAY AND SOUND", false);
+  lv_obj_t *ds = card(scr, PAD, ROW2_Y, WIDE_W, ROW2_H, kCardDisplay, false);
   lv_obj_set_style_pad_row(ds, 2, 0);
   lv_obj_t *grid = mk_box(ds, 0, 0);
   lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
@@ -154,7 +213,7 @@ lv_obj_t *settings_create() {
   lv_obj_set_width(right, half);
   set_flex(right, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-  lv_obj_t *bright = slider(left, "Brightness", g_settings.brightness, 10);
+  lv_obj_t *bright = slider(left, kBrightness, g_settings.brightness, kMinBrightness);
   lv_obj_add_event_cb(bright, [](lv_event_t *e) {
     ui_set_backlight(lv_slider_get_value(lv_event_get_target(e)));
   }, LV_EVENT_VALUE_CHANGED, nullptr);
@@ -164,7 +223,7 @@ lv_obj_t *settings_create() {
     ui_save_settings(s);
   }, LV_EVENT_RELEASED, nullptr);
 
-  lv_obj_t *vol = slider(left, "Reminder volume", g_settings.volume, 0);
+  lv_obj_t *vol = slider(left, kVolume, g_settings.volume, 0);
   lv_obj_add_event_cb(vol, [](lv_event_t *e) {
     Settings s = g_settings;
     s.volume = lv_slider_get_value(lv_event_get_target(e));
@@ -172,7 +231,7 @@ lv_obj_t *settings_create() {
     audio_chime(s.volume);  // preview
   }, LV_EVENT_RELEASED, nullptr);
 
-  lv_obj_t *themeRow = controlRow(left, "Theme", nullptr);
+  lv_obj_t *themeRow = controlRow(left, kTheme, nullptr);
   lv_obj_t *themeBtn = mk_button(themeRow, t.raised, 22);
   lv_obj_set_size(themeBtn, LV_SIZE_CONTENT, 40);
   lv_obj_set_style_pad_hor(themeBtn, 14, 0);
@@ -181,33 +240,30 @@ lv_obj_t *settings_create() {
   themeName = mk_label(themeBtn, &font_14b, t.text, theme().name);
   on_click(themeBtn, [](lv_event_t *) { theme_picker_show(); });
 
-  char night[40];
-  snprintf(night, sizeof(night), "%02d:%02d - %02d:%02d, dim clock", g_settings.nightStart / 60,
-           g_settings.nightStart % 60, g_settings.nightEnd / 60, g_settings.nightEnd % 60);
-  swNight = mk_switch(controlRow(right, "Night mode", night), g_settings.nightMode, toggled);
-  char chime[40];
-  snprintf(chime, sizeof(chime), "%d min before each meeting", g_settings.remindMinutes);
-  swChime = mk_switch(controlRow(right, "Meeting chime", chime), g_settings.chime, toggled);
-  char dim[40];
-  snprintf(dim, sizeof(dim), "after %d minutes", g_settings.dimAfterMinutes);
-  swDim = mk_switch(controlRow(right, "Dim when idle", dim), g_settings.dimIdle, toggled);
+  const String night = strf(kNightModeSub, g_settings.nightStart / 60, g_settings.nightStart % 60,
+                            g_settings.nightEnd / 60, g_settings.nightEnd % 60);
+  swNight = mk_switch(controlRow(right, kNightMode, night.c_str()), g_settings.nightMode, toggled);
+  const String chime = strf(kChimeSub, (int)g_settings.remindMinutes);
+  swChime = mk_switch(controlRow(right, kChime, chime.c_str()), g_settings.chime, toggled);
+  const String dim = strf(kDimSub, (int)g_settings.dimAfterMinutes);
+  swDim = mk_switch(controlRow(right, kDim, dim.c_str()), g_settings.dimIdle, toggled);
 
-  lv_obj_t *fmtRow = controlRow(right, "Time format", nullptr);
+  lv_obj_t *fmtRow = controlRow(right, kTimeFormat, nullptr);
   lv_obj_t *seg = mk_box(fmtRow, t.bg, 22);
   lv_obj_set_style_pad_all(seg, 2, 0);
   set_flex(seg, LV_FLEX_FLOW_ROW, 0);
   fmt24 = mk_button(seg, t.raised, 20);
   lv_obj_set_size(fmt24, 64, 40);
   lv_obj_set_style_min_height(fmt24, 40, 0);
-  lv_obj_center(mk_label(fmt24, &font_14b, t.text, "24 h"));
+  lv_obj_center(mk_label(fmt24, &font_14b, t.text, k24h));
   on_click(fmt24, [](lv_event_t *) { setFormat(true); });
   fmt12 = mk_button(seg, t.raised, 20);
   lv_obj_set_size(fmt12, 64, 40);
   lv_obj_set_style_min_height(fmt12, 40, 0);
-  lv_obj_center(mk_label(fmt12, &font_14b, t.text, "12 h"));
+  lv_obj_center(mk_label(fmt12, &font_14b, t.text, k12h));
   on_click(fmt12, [](lv_event_t *) { setFormat(false); });
 
-  lv_obj_t *sync = card(scr, PAD + WIDE_W + CARD_GAP, ROW2_Y, CARD_W, ROW2_H, "SYNC", false);
+  lv_obj_t *sync = card(scr, PAD + WIDE_W + CARD_GAP, ROW2_Y, CARD_W, ROW2_H, kCardSync, false);
   syncLast = line(sync, &font_20b, t.text, inner);
   syncNext = mk_label(sync, &font_14, t.muted, "");
   lv_obj_set_width(syncNext, inner);
@@ -215,12 +271,12 @@ lv_obj_t *settings_create() {
   lv_obj_t *spacer = mk_box(sync, 0, 0);
   lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(spacer, 1);
-  swAuto = mk_switch(controlRow(sync, "Auto-update", "new firmware, when idle"), g_settings.autoUpdate,
+  swAuto = mk_switch(controlRow(sync, kAutoUpdate, kAutoUpdateSub), g_settings.autoUpdate,
                      toggled);
-  lv_obj_t *now = mk_text_button(sync, "Sync now", true, inner);
+  lv_obj_t *now = mk_text_button(sync, kSyncNow, true, inner);
   on_click(now, [](lv_event_t *) {
     sync_refresh();
-    toast("Syncing...");
+    toast(kSyncing);
   });
   return scr;
 }
@@ -230,51 +286,49 @@ void settings_refresh() {
 
   const WifiState ws = wifi_state();
   const String ssid = wifi_ssid();
-  lv_label_set_text(wifiName, ssid.length() ? ssid.c_str() : "Not set up");
+  lv_label_set_text(wifiName, ssid.length() ? ssid.c_str() : kWifiNotSetUp);
   if (ws == WifiState::Connected) {
     const int rssi = wifi_rssi();
-    const char *q = rssi > -60 ? "Strong signal" : rssi > -72 ? "Good signal" : "Weak signal";
-    lv_label_set_text(wifiInfo, (String(q) + " · " + wifi_ip()).c_str());
+    const char *q = rssi > kStrongRssi ? kStrong : rssi > kGoodRssi ? kGood : kWeak;
+    lv_label_set_text(wifiInfo, strf(kSignalAndIp, q, wifi_ip().c_str()).c_str());
   } else {
-    lv_label_set_text(wifiInfo, ws == WifiState::Connecting ? "Connecting..." : "Not connected");
+    lv_label_set_text(wifiInfo, ws == WifiState::Connecting ? kConnecting : kNotConnected);
   }
 
   const size_t n = g_settings.accounts.size();
-  lv_label_set_text_fmt(accCount, "%u connected", (unsigned)n);
+  lv_label_set_text(accCount, strf(kConnectedCount, (int)n).c_str());
   String problem;
   for (size_t i = 0; i < n && i < g_snap.accounts.size(); i++) {
     if (g_snap.accounts[i].error.length()) {
-      problem = g_settings.accounts[i].label + " needs attention";
+      problem = strf(kNeedsAttention, g_settings.accounts[i].label.c_str());
       break;
     }
   }
   lv_label_set_text(accProblem, problem.c_str());
   lv_obj_set_style_text_color(accProblem, c(problem.length() ? t.badFg : t.good), 0);
-  if (!problem.length() && n) lv_label_set_text(accProblem, "All synced");
-  lv_label_set_text_fmt(accEvery, "Syncs every %d min", g_settings.refreshMinutes);
+  if (!problem.length() && n) lv_label_set_text(accProblem, kAllSynced);
+  lv_label_set_text(accEvery, strf(kSyncsEvery, (int)g_settings.refreshMinutes).c_str());
 
   if (storage_ok()) {
     const double gb = storage_free_bytes() / 1e9;
-    char buf[64];
-    snprintf(buf, sizeof(buf), ICON_SD "  SD card: %.1f GB free", gb);
-    lv_label_set_text(sdInfo, buf);
+    lv_label_set_text(sdInfo, strf(kSdFree, gb).c_str());
   } else {
-    lv_label_set_text(sdInfo, ICON_SD "  No SD card");
+    lv_label_set_text(sdInfo, kNoSd);
   }
   const int pct = battery_percent();
   if (pct >= 0) {
     const char *icon = pct > 80 ? ICON_BAT_FULL : pct > 55 ? ICON_BAT_3 : pct > 30 ? ICON_BAT_2 : pct > 10 ? ICON_BAT_1 : ICON_BAT_EMPTY;
-    lv_label_set_text_fmt(batInfo, "%s  Battery: %d%%%s", icon, pct, battery_charging() ? ", charging" : "");
+    lv_label_set_text(batInfo, strf(kBattery, icon, pct, battery_charging() ? kCharging : "").c_str());
   } else {
-    lv_label_set_text(batInfo, ICON_BAT_EMPTY "  No battery gauge");
+    lv_label_set_text(batInfo, kNoBattery);
   }
 
   if (g_snap.syncedAt) {
-    lv_label_set_text(syncLast, ("Last synced " + fmt_time(g_snap.syncedAt)).c_str());
+    lv_label_set_text(syncLast, strf(kLastSynced, fmt_time(g_snap.syncedAt).c_str()).c_str());
     const long left = (long)(g_snap.syncedAt + g_settings.refreshMinutes * 60 - ui_now()) / 60;
-    lv_label_set_text_fmt(syncNext, "Next sync in %ld min", left > 0 ? left : 0);
+    lv_label_set_text(syncNext, strf(kNextSync, (int)(left > 0 ? left : 0)).c_str());
   } else {
-    lv_label_set_text(syncLast, g_snap.offline ? "Showing saved copy" : "Not synced yet");
+    lv_label_set_text(syncLast, g_snap.offline ? kSavedCopy : kNotSynced);
     lv_label_set_text(syncNext, "");
   }
   if (g_snap.error.length()) {

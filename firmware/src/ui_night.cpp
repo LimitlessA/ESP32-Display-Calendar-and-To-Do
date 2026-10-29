@@ -3,6 +3,18 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr const char *kNextMeeting = ICON_CALENDAR "  %s %s \xC2\xB7 %s";  // day, time, title
+constexpr const char *kNoMeetings = ICON_CALENDAR "  No upcoming meetings";
+constexpr const char *kTaskToday = ICON_TASKS "  %d task due today";
+constexpr const char *kTasksToday = ICON_TASKS "  %d tasks due today";
+constexpr const char *kTaskTomorrow = ICON_TASKS "  %d task due tomorrow";
+constexpr const char *kTasksTomorrow = ICON_TASKS "  %d tasks due tomorrow";
+constexpr const char *kFooter = "Night mode until %02d:%02d \xC2\xB7 tap to wake";
+
+// ---- State -------------------------------------------------------------------
+
 lv_obj_t *clockLabel, *dateLabel, *nextLabel, *tasksLabel, *footLabel;
 
 }  // namespace
@@ -51,10 +63,10 @@ void night_refresh() {
   if (next) {
     const time_t s = next->start / 1000;
     const long diff = day_number(s) - day_number(now);
-    const String day = diff == 0 ? String("Today") : diff == 1 ? String("Tomorrow") : fmt_date_short(s);
-    lv_label_set_text(nextLabel, (String(ICON_CALENDAR "  ") + day + " " + fmt_time(s) + " · " + next->title).c_str());
+    const String day = diff == 0 ? String(kToday) : diff == 1 ? String(kTomorrow) : fmt_date_short(s);
+    lv_label_set_text(nextLabel, strf(kNextMeeting, day.c_str(), fmt_time(s).c_str(), next->title.c_str()).c_str());
   } else {
-    lv_label_set_text(nextLabel, ICON_CALENDAR "  No upcoming meetings");
+    lv_label_set_text(nextLabel, kNoMeetings);
   }
 
   int dueTomorrow = 0, dueToday = 0;
@@ -62,15 +74,12 @@ void night_refresh() {
     Tone tone;
     const String due = due_text(t.dueKey, tone);
     dueToday += tone != Tone::None;
-    dueTomorrow += due == "Tomorrow";
+    dueTomorrow += due == kTomorrow;
   }
-  String tasks = ICON_TASKS "  ";
-  if (dueToday) tasks += String(dueToday) + (dueToday == 1 ? " task due today" : " tasks due today");
-  else tasks += String(dueTomorrow) + (dueTomorrow == 1 ? " task due tomorrow" : " tasks due tomorrow");
+  const String tasks = dueToday ? strf(dueToday == 1 ? kTaskToday : kTasksToday, dueToday)
+                                : strf(dueTomorrow == 1 ? kTaskTomorrow : kTasksTomorrow, dueTomorrow);
   lv_label_set_text(tasksLabel, tasks.c_str());
 
   const int end = g_settings.nightEnd;
-  char buf[64];
-  snprintf(buf, sizeof(buf), "Night mode until %02d:%02d · tap to wake", end / 60, end % 60);
-  lv_label_set_text(footLabel, buf);
+  lv_label_set_text(footLabel, strf(kFooter, end / 60, end % 60).c_str());
 }

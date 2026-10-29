@@ -6,20 +6,23 @@
 
 namespace {
 
-constexpr int LIST_W = 290;
-constexpr int BODY_Y = HEADER_H + GAP;
-constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
-constexpr int RIGHT_X = PAD + LIST_W + GAP;
-constexpr int RIGHT_W = SCREEN_W - RIGHT_X - PAD;
+// ---- Texts and settings ------------------------------------------------------
 
-lv_obj_t *list, *formTitle, *password, *eye, *status, *keyboard, *connectOpen;
-bool scanning = false;
-String selected;
-bool selectedLocked = true;
-WifiState lastState = WifiState::NotConfigured;
-bool connectRequested = false;
-std::vector<WifiNetwork> lastScan;
+constexpr const char *kTitle = "Wi-Fi";
+constexpr const char *kScanAgain = "Scan again";
+constexpr const char *kNearby = "NETWORKS NEARBY";
+constexpr const char *kScanning = "Scanning...";
+constexpr const char *kNoNetworks = "No networks found";
+constexpr const char *kConnected = "Connected";
+constexpr const char *kPickNetwork = "Pick a network";
+constexpr const char *kConnectTo = "Connect to %s";
+constexpr const char *kPassword = "Password";
+constexpr const char *kConnect = "Connect";
+constexpr const char *kConnecting = "Connecting...";
+constexpr const char *kConnectedTo = ICON_CHECK "  Connected to %s  %s";  // network, IP address
+constexpr const char *kFailed = "Could not connect. Check the password and try again.";
 
+// On-screen keyboard layouts
 #define BKSP LV_SYMBOL_BACKSPACE
 #define OK LV_SYMBOL_OK
 const char *kLower[] = {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p", BKSP, "\n",
@@ -43,10 +46,28 @@ const lv_btnmatrix_ctrl_t kCtrl[] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6 | F,
                                      6 | F, 4, 4, 4, 4, 4, 4, 4, 4, 4,
                                      3 | F, 10, 4 | F};
 
+constexpr int LIST_W = 290;
+constexpr int BODY_Y = HEADER_H + GAP;
+constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
+constexpr int RIGHT_X = PAD + LIST_W + GAP;
+constexpr int RIGHT_W = SCREEN_W - RIGHT_X - PAD;
+
+// ---- State -------------------------------------------------------------------
+
+lv_obj_t *list, *formTitle, *password, *eye, *status, *keyboard, *connectOpen;
+bool scanning = false;
+String selected;
+bool selectedLocked = true;
+WifiState lastState = WifiState::NotConfigured;
+bool connectRequested = false;
+std::vector<WifiNetwork> lastScan;
+
+// ---- Code --------------------------------------------------------------------
+
 void selectNetwork(const String &ssid, bool locked) {
   selected = ssid;
   selectedLocked = locked;
-  lv_label_set_text(formTitle, ("Connect to " + ssid).c_str());
+  lv_label_set_text(formTitle, strf(kConnectTo, ssid.c_str()).c_str());
   lv_textarea_set_text(password, "");
   lv_label_set_text(status, "");
   if (locked) {
@@ -76,7 +97,7 @@ void buildList(const std::vector<WifiNetwork> &nets) {
   const Theme &t = theme();
   if (&nets != &lastScan) lastScan = nets;
   lv_obj_clean(list);
-  lv_obj_t *h = mk_label(list, &font_12, t.muted, "NETWORKS NEARBY");
+  lv_obj_t *h = mk_label(list, &font_12, t.muted, kNearby);
   lv_obj_set_style_text_letter_space(h, 1, 0);
   lv_obj_set_style_pad_left(h, 10, 0);
   lv_obj_set_style_pad_ver(h, 6, 0);
@@ -96,7 +117,7 @@ void buildList(const std::vector<WifiNetwork> &nets) {
     lv_obj_t *name = mk_label(col, &font_14b, t.text, n.ssid.c_str());
     lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
     lv_obj_set_width(name, LIST_W - 110);
-    if (n.ssid == current && wifi_state() == WifiState::Connected) mk_label(col, &font_12, t.good, "Connected");
+    if (n.ssid == current && wifi_state() == WifiState::Connected) mk_label(col, &font_12, t.good, kConnected);
     if (n.locked) mk_label(b, &font_14, t.muted, ICON_LOCK);
     on_click(b, [](lv_event_t *e) {
       const Net *n = static_cast<Net *>(lv_event_get_user_data(e));
@@ -105,14 +126,14 @@ void buildList(const std::vector<WifiNetwork> &nets) {
       lv_async_call([](void *) { buildList(lastScan); }, nullptr);
     }, attach(b, Net{n.ssid, n.locked}));
   }
-  if (nets.empty()) mk_label(list, &font_14, t.muted, "No networks found");
+  if (nets.empty()) mk_label(list, &font_14, t.muted, kNoNetworks);
 }
 
 void startScan() {
   scanning = true;
   wifi_scan_start();
   lv_obj_clean(list);
-  lv_obj_t *l = mk_label(list, &font_14, theme().muted, "Scanning...");
+  lv_obj_t *l = mk_label(list, &font_14, theme().muted, kScanning);
   lv_obj_set_style_pad_all(l, 10, 0);
 }
 
@@ -121,13 +142,13 @@ void startScan() {
 lv_obj_t *wifi_create() {
   const Theme &t = theme();
   lv_obj_t *scr = mk_screen();
-  lv_obj_t *h = mk_back_header(scr, "Wi-Fi", Screen::Settings);
+  lv_obj_t *h = mk_back_header(scr, kTitle, Screen::Settings);
   lv_obj_t *scan = mk_button(h, t.card, TOUCH / 2);
   lv_obj_set_size(scan, LV_SIZE_CONTENT, TOUCH);
   lv_obj_set_style_pad_hor(scan, 16, 0);
   set_flex(scan, LV_FLEX_FLOW_ROW, 8);
   mk_label(scan, &font_14, t.text, ICON_REFRESH);
-  mk_label(scan, &font_14b, t.text, "Scan again");
+  mk_label(scan, &font_14b, t.text, kScanAgain);
   on_click(scan, [](lv_event_t *) { startScan(); });
 
   list = mk_scroll_column(scr, 2);
@@ -144,7 +165,7 @@ lv_obj_t *wifi_create() {
   lv_obj_set_style_pad_hor(form, 16, 0);
   lv_obj_set_style_pad_ver(form, 14, 0);
   set_flex(form, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  formTitle = mk_label(form, &font_16s, t.text, "Pick a network");
+  formTitle = mk_label(form, &font_16s, t.text, kPickNetwork);
   lv_obj_t *row = mk_box(form, 0, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_width(row, RIGHT_W - 32);
@@ -152,7 +173,7 @@ lv_obj_t *wifi_create() {
   password = lv_textarea_create(row);
   lv_textarea_set_one_line(password, true);
   lv_textarea_set_password_mode(password, true);
-  lv_textarea_set_placeholder_text(password, "Password");
+  lv_textarea_set_placeholder_text(password, kPassword);
   lv_obj_set_height(password, 48);
   lv_obj_set_flex_grow(password, 1);
   lv_obj_set_style_text_font(password, &font_16, 0);
@@ -169,7 +190,7 @@ lv_obj_t *wifi_create() {
   on_click(eye, [](lv_event_t *) {
     lv_textarea_set_password_mode(password, !lv_textarea_get_password_mode(password));
   });
-  connectOpen = mk_text_button(form, "Connect", true, 140);
+  connectOpen = mk_text_button(form, kConnect, true, 140);
   lv_obj_add_flag(connectOpen, LV_OBJ_FLAG_HIDDEN);
   on_click(connectOpen, [](lv_event_t *) { connect(); });
   status = mk_label(form, &font_14, t.muted, "");
@@ -221,11 +242,11 @@ void wifi_tick() {
   const Theme &t = theme();
   switch (st) {
     case WifiState::Connecting:
-      lv_label_set_text(status, "Connecting...");
+      lv_label_set_text(status, kConnecting);
       lv_obj_set_style_text_color(status, c(t.muted), 0);
       break;
     case WifiState::Connected:
-      lv_label_set_text(status, (String(ICON_CHECK "  Connected to ") + wifi_ssid() + "  " + wifi_ip()).c_str());
+      lv_label_set_text(status, strf(kConnectedTo, wifi_ssid().c_str(), wifi_ip().c_str()).c_str());
       lv_obj_set_style_text_color(status, c(t.good), 0);
       if (connectRequested) {
         connectRequested = false;
@@ -233,7 +254,7 @@ void wifi_tick() {
       }
       break;
     case WifiState::Failed:
-      lv_label_set_text(status, "Could not connect. Check the password and try again.");
+      lv_label_set_text(status, kFailed);
       lv_obj_set_style_text_color(status, c(t.badFg), 0);
       connectRequested = false;
       break;

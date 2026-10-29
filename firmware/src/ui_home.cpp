@@ -4,13 +4,35 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr const char *kColToday = "Today";
+constexpr const char *kColComingUp = "Coming up";
+constexpr const char *kColTodo = "To-do";
+constexpr const char *kNowUntil = "Now, until %s";
+constexpr const char *kUntil = "Until %s";
+constexpr const char *kNoMoreToday = "No more meetings today";
+constexpr const char *kWaitingClock = "Waiting for the clock...";
+constexpr const char *kNothingUpcoming = "Nothing in the next 7 days";
+constexpr const char *kNoAccounts = "Add an account in Settings";
+constexpr const char *kAllDone = "All done!";
+constexpr const char *kDismissed = "Hidden from the display. Your calendar is unchanged.";
+constexpr const char *kDone = "Done: %s";  // toast after ticking a task
+constexpr const char *kUndo = "Undo";
+constexpr uint32_t kCompleteDelayMs = 450;  // show the tick before the task leaves the list
+
 constexpr int COL_W = (SCREEN_W - 2 * PAD - 2 * GAP) / 3;
 constexpr int BODY_H = SCREEN_H - HEADER_H - GAP - PAD;
 constexpr int TITLE_H = 30;
 
+// ---- State -------------------------------------------------------------------
+
 lv_obj_t *todayList, *todayCount;
 lv_obj_t *upcomingList;
 lv_obj_t *taskList, *taskCount;
+Task undoTask;  // the task the Undo button brings back
+
+// ---- Code --------------------------------------------------------------------
 
 lv_obj_t *column(lv_obj_t *body, const char *title, lv_obj_t **count) {
   const Theme &t = theme();
@@ -44,7 +66,7 @@ void dismissEvent(lv_event_t *e) {
   lv_async_call([](void *p) {
     Event *ev = static_cast<Event *>(p);
     sync_dismiss_event(*ev);
-    toast("Hidden from the display. Your calendar is unchanged.");
+    toast(kDismissed);
     delete ev;
   }, new Event(ev));
 }
@@ -67,12 +89,11 @@ void complete_with_undo(lv_obj_t *box, const Task &task) {
   lv_timer_t *timer = lv_timer_create([](lv_timer_t *tm) {
     Task *task = static_cast<Task *>(tm->user_data);
     sync_complete_task(*task);
-    static Task undo;  // the toast outlives this timer
-    undo = *task;
-    toast("Done: " + task->title, "Undo", undoComplete, &undo);
+    undoTask = *task;  // the toast outlives this timer
+    toast(strf(kDone, task->title.c_str()), kUndo, undoComplete, &undoTask);
     delete task;
     lv_timer_del(tm);
-  }, 450, new Task(task));
+  }, kCompleteDelayMs, new Task(task));
   lv_timer_set_repeat_count(timer, 1);
 }
 
@@ -106,8 +127,8 @@ lv_obj_t *home_create() {
   lv_obj_set_pos(body, PAD, HEADER_H + GAP);
   set_flex(body, LV_FLEX_FLOW_ROW, GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-  todayList = list(column(body, "Today", &todayCount), 8);
-  lv_obj_t *mid = column(body, "Coming up", nullptr);
+  todayList = list(column(body, kColToday, &todayCount), 8);
+  lv_obj_t *mid = column(body, kColComingUp, nullptr);
   upcomingList = list(mid, 0);
   lv_obj_set_style_bg_color(upcomingList, c(theme().panel), 0);
   lv_obj_set_style_bg_opa(upcomingList, LV_OPA_COVER, 0);
@@ -116,7 +137,7 @@ lv_obj_t *home_create() {
   lv_obj_set_style_pad_ver(upcomingList, 6, 0);
   lv_obj_set_height(upcomingList, LV_SIZE_CONTENT);
   lv_obj_set_style_max_height(upcomingList, BODY_H - TITLE_H, 0);
-  taskList = list(column(body, "To-do", &taskCount), 8);
+  taskList = list(column(body, kColTodo, &taskCount), 8);
   return scr;
 }
 
@@ -146,7 +167,7 @@ void home_refresh() {
         lv_obj_set_style_border_width(card, 2, 0);
       }
       set_flex(card, LV_FLEX_FLOW_COLUMN, 3, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-      mk_label(card, &font_20b, live ? t.accent : t.text, ev.allDay ? "All day" : fmt_time(start).c_str());
+      mk_label(card, &font_20b, live ? t.accent : t.text, ev.allDay ? kAllDay : fmt_time(start).c_str());
       lv_obj_t *title = mk_label(card, &font_16s, t.text, ev.title.c_str());
       lv_obj_set_width(title, COL_W - 12 - TOUCH - 4);
       lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
@@ -154,7 +175,7 @@ void home_refresh() {
       lv_obj_set_style_bg_opa(meta, LV_OPA_TRANSP, 0);
       set_flex(meta, LV_FLEX_FLOW_ROW, 6);
       mk_dot(meta, ev.color);
-      String m = ev.allDay ? String("All day") : (live ? "Now, until " : "Until ") + fmt_time(end);
+      String m = ev.allDay ? String(kAllDay) : strf(live ? kNowUntil : kUntil, fmt_time(end).c_str());
       lv_obj_t *ml = mk_label(meta, &font_12, t.muted, (m + " · " + ev.calendar).c_str());
       lv_label_set_long_mode(ml, LV_LABEL_LONG_DOT);
       lv_obj_set_width(ml, COL_W - 12 - TOUCH - 4 - 14);
@@ -184,7 +205,7 @@ void home_refresh() {
     lv_obj_set_flex_grow(open, 1);
     set_flex(open, LV_FLEX_FLOW_ROW, 8);
     mk_dot(open, ev.color);
-    lv_obj_t *tl = mk_label(open, &font_14b, t.muted, ev.allDay ? "All day" : fmt_time(start).c_str());
+    lv_obj_t *tl = mk_label(open, &font_14b, t.muted, ev.allDay ? kAllDay : fmt_time(start).c_str());
     lv_obj_set_width(tl, g_settings.use24h ? 44 : 64);
     lv_obj_t *title = mk_label(open, &font_14, t.text, ev.title.c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
@@ -198,10 +219,10 @@ void home_refresh() {
     lv_obj_t *empty = mk_box(todayList, t.card, 12);
     lv_obj_set_width(empty, COL_W);
     lv_obj_set_style_pad_all(empty, 14, 0);
-    mk_label(empty, &font_14, t.muted, clock_valid() ? "No more meetings today" : "Waiting for the clock...");
+    mk_label(empty, &font_14, t.muted, clock_valid() ? kNoMoreToday : kWaitingClock);
   }
   if (lastDay < 0) {
-    lv_obj_t *l = mk_label(upcomingList, &font_14, t.muted, "Nothing in the next 7 days");
+    lv_obj_t *l = mk_label(upcomingList, &font_14, t.muted, kNothingUpcoming);
     lv_obj_set_style_pad_ver(l, 8, 0);
   }
   lv_label_set_text_fmt(todayCount, "%d", todayN);
@@ -235,7 +256,7 @@ void home_refresh() {
     lv_obj_t *empty = mk_box(taskList, t.card, 12);
     lv_obj_set_width(empty, COL_W);
     lv_obj_set_style_pad_all(empty, 14, 0);
-    mk_label(empty, &font_14, t.muted, g_snap.accounts.empty() ? "Add an account in Settings" : "All done!");
+    mk_label(empty, &font_14, t.muted, g_snap.accounts.empty() ? kNoAccounts : kAllDone);
   }
   lv_label_set_text_fmt(taskCount, "%d", open);
 }

@@ -13,12 +13,19 @@ Settings g_settings;
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr uint32_t kToastMs = 4500;        // how long a message stays on screen
+constexpr uint32_t kToastActionMs = 7000;  // ...when it has a button such as Undo
+constexpr uint32_t kAutoFirstCheckMs = 60000;  // first firmware check one minute after start
 constexpr uint32_t kNightIdleMs = 30000;  // back to the night clock after a tap
 constexpr uint8_t kNightBacklight = 6;
 constexpr uint8_t kDimBacklight = 20;
 constexpr uint32_t kAutoCheckMs = 3 * 3600000UL;  // look for new firmware every 3 hours
 constexpr uint32_t kAutoIdleMs = 15 * 60000UL;    // ...and install it after 15 min without touch
 constexpr time_t kAutoMeetingGap = 15 * 60;        // but not right before a meeting
+
+// ---- State -------------------------------------------------------------------
 
 lv_obj_t *screens[(int)Screen::Count];
 bool dirty[(int)Screen::Count];
@@ -43,6 +50,8 @@ uint32_t seenSettings = 0;
 
 lv_obj_t *toastBox = nullptr;
 lv_timer_t *toastTimer = nullptr;
+
+// ---- Code --------------------------------------------------------------------
 
 void refresh(Screen s) {
   dirty[(int)s] = false;
@@ -162,7 +171,7 @@ void autoUpdate() {
   const OtaStatus st = ota_status();
   if (st.state == OtaState::Checking || st.state == OtaState::Installing || st.state == OtaState::Done) return;
   const uint32_t ms = millis();
-  if (ms > 60000 && (lastAutoCheck == 0 || ms - lastAutoCheck > kAutoCheckMs)) {
+  if (ms > kAutoFirstCheckMs && (lastAutoCheck == 0 || ms - lastAutoCheck > kAutoCheckMs)) {
     lastAutoCheck = ms;
     ota_check();
     return;
@@ -308,5 +317,5 @@ void toast(const String &msg, const char *action, lv_event_cb_t cb, void *user) 
                         LV_EVENT_CLICKED, nullptr);
   }
   lv_obj_align(toastBox, LV_ALIGN_BOTTOM_MID, 0, -14);
-  toastTimer = lv_timer_create(hideToast, action ? 7000 : 4500, nullptr);
+  toastTimer = lv_timer_create(hideToast, action ? kToastActionMs : kToastMs, nullptr);
 }

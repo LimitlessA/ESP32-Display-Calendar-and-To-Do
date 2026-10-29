@@ -6,6 +6,15 @@
 
 namespace {
 
+// ---- Texts and settings ------------------------------------------------------
+
+constexpr const char *kAll = "All";
+constexpr const char *kOverdue = "Overdue";
+constexpr const char *kDueToday = "Due today";
+constexpr const char *kAllDone = "All done!";
+constexpr const char *kNothingHere = "Nothing here";
+constexpr const char *kSeparator = " \xC2\xB7 ";  // between list, account and notes
+
 constexpr int NAV_W = 200;
 constexpr int BODY_Y = HEADER_H + GAP;
 constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
@@ -19,8 +28,12 @@ struct Selection {
   String list;
 };
 
+// ---- State -------------------------------------------------------------------
+
 Selection sel;
 lv_obj_t *nav, *panel;
+
+// ---- Code --------------------------------------------------------------------
 
 struct NavItem {
   Selection sel;
@@ -85,8 +98,8 @@ void taskRow(const Task &task, bool sub) {
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   lv_obj_set_width(title, PANEL_W - 24 - 56 - 110 - (sub ? 28 : 0));
   String meta = task.list;
-  if (task.account < g_settings.accounts.size()) meta += " · " + g_settings.accounts[task.account].label;
-  if (task.notes.length()) meta += " · " + task.notes;
+  if (task.account < g_settings.accounts.size()) meta += kSeparator + g_settings.accounts[task.account].label;
+  if (task.notes.length()) meta += kSeparator + task.notes;
   lv_obj_t *m = mk_label(text, &font_12, t.muted, meta.c_str());
   lv_label_set_long_mode(m, LV_LABEL_LONG_DOT);
   lv_obj_set_width(m, PANEL_W - 24 - 56 - 110 - (sub ? 28 : 0));
@@ -134,9 +147,9 @@ void tasks_refresh() {
     overdue += tone == Tone::Bad;
     today += tone == Tone::Warn;
   }
-  navButton("All", g_snap.tasks.size(), t.text, Selection{Filter::All, 0, ""});
-  navButton("Overdue", overdue, t.badFg, Selection{Filter::Overdue, 0, ""});
-  navButton("Due today", today, t.warnFg, Selection{Filter::Today, 0, ""});
+  navButton(kAll, g_snap.tasks.size(), t.text, Selection{Filter::All, 0, ""});
+  navButton(kOverdue, overdue, t.badFg, Selection{Filter::Overdue, 0, ""});
+  navButton(kDueToday, today, t.warnFg, Selection{Filter::Today, 0, ""});
   for (uint8_t a = 0; a < g_settings.accounts.size(); a++) {
     std::vector<String> lists;
     for (const Task &task : g_snap.tasks) {
@@ -177,7 +190,7 @@ void tasks_refresh() {
     }
   }
   if (!shown) {
-    lv_obj_t *l = mk_label(panel, &font_16, t.muted, sel.filter == Filter::All ? "All done!" : "Nothing here");
+    lv_obj_t *l = mk_label(panel, &font_16, t.muted, sel.filter == Filter::All ? kAllDone : kNothingHere);
     lv_obj_set_style_pad_all(l, 16, 0);
   }
 }

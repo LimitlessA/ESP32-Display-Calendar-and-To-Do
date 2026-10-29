@@ -6,6 +6,8 @@
 
 namespace {
 
+constexpr uint32_t kSpiHz = 20000000;  // SD card clock
+
 SemaphoreHandle_t lock;
 bool mounted = false;
 
@@ -27,7 +29,7 @@ void makeParentDirs(const char *path) {
 bool storage_begin() {
   lock = xSemaphoreCreateMutex();
   SPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
-  mounted = SD.begin(SD_CS, SPI, 20000000);
+  mounted = SD.begin(SD_CS, SPI, kSpiHz);
   log_i("SD card %s", mounted ? "mounted" : "not found");
   return mounted;
 }
