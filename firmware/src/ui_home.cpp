@@ -21,15 +21,19 @@ constexpr const char *kDone = "Done: %s";  // toast after ticking a task
 constexpr const char *kUndo = "Undo";
 constexpr uint32_t kCompleteDelayMs = 450;  // show the tick before the task leaves the list
 
-constexpr int COL_W = (SCREEN_W - 2 * PAD - 2 * GAP) / 3;
+constexpr const char *kAddTask = "Add a task";
+constexpr int DATES_W = 170;  // countdown column, layout A
+constexpr int BODY_W = SCREEN_W - 2 * PAD;
 constexpr int BODY_H = SCREEN_H - HEADER_H - GAP - PAD;
 constexpr int TITLE_H = 30;
 
 // ---- State -------------------------------------------------------------------
 
+lv_obj_t *body;
 lv_obj_t *todayList, *todayCount;
 lv_obj_t *upcomingList;
 lv_obj_t *taskList, *taskCount;
+int colW, colH;  // set by each refresh: the strips above and the dates column take space
 Task undoTask;  // the task the Undo button brings back
 
 // ---- Code --------------------------------------------------------------------
@@ -38,20 +42,24 @@ lv_obj_t *column(lv_obj_t *body, const char *title, lv_obj_t **count) {
   const Theme &t = theme();
   lv_obj_t *col = mk_box(body, 0, 0);
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
-  lv_obj_set_size(col, COL_W, BODY_H);
+  lv_obj_set_size(col, colW, colH);
   lv_obj_t *head = mk_box(col, 0, 0);
   lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
-  lv_obj_set_size(head, COL_W, TITLE_H);
+  lv_obj_set_size(head, colW, TITLE_H);
   lv_obj_set_style_pad_hor(head, 2, 0);
   set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START);
-  mk_label(head, &font_14b, t.text, title);
-  if (count) *count = mk_label(head, &font_14, t.muted, "");
+  lv_obj_t *left = mk_box(head, 0, 0);
+  lv_obj_set_style_bg_opa(left, LV_OPA_TRANSP, 0);
+  lv_obj_set_flex_grow(left, 1);  // keeps the title on the left when there is no button
+  set_flex(left, LV_FLEX_FLOW_ROW, 8);
+  mk_label(left, &font_14b, t.text, title);
+  if (count) *count = mk_label(left, &font_14, t.muted, "");
   return col;
 }
 
 lv_obj_t *list(lv_obj_t *col, int gap) {
   lv_obj_t *l = mk_scroll_column(col, gap);
-  lv_obj_set_size(l, COL_W, BODY_H - TITLE_H);
+  lv_obj_set_size(l, colW, colH - TITLE_H);
   lv_obj_set_y(l, TITLE_H);
   return l;
 }
@@ -121,33 +129,70 @@ lv_obj_t *mk_check(lv_obj_t *parent, const Task &task, int size) {
 lv_obj_t *home_create() {
   lv_obj_t *scr = mk_screen();
   mk_nav_header(scr, Screen::Home);
-
-  lv_obj_t *body = mk_box(scr, 0, 0);
+  body = mk_box(scr, 0, 0);
   lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
   lv_obj_set_pos(body, PAD, HEADER_H + GAP);
-  set_flex(body, LV_FLEX_FLOW_ROW, GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_set_size(body, BODY_W, BODY_H);
+  set_flex(body, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  return scr;
+}
 
-  todayList = list(column(body, kColToday, &todayCount), 8);
-  lv_obj_t *mid = column(body, kColComingUp, nullptr);
+// Strips above the columns (dates ribbon, conflict banner) and the dates
+// column come and go with the data, so the body is laid out on every refresh.
+void layoutBody() {
+  const Theme &t = theme();
+  lv_obj_clean(body);
+  colH = BODY_H;
+  if (lv_obj_t *r = mk_dates_ribbon(body, BODY_W)) colH -= lv_obj_get_style_height(r, 0) + 8;
+  if (lv_obj_t *b = mk_conflict_banner(body, BODY_W)) colH -= lv_obj_get_style_height(b, 0) + 8;
+  const bool datesCol = g_settings.layout(Layout::Dates) == 0 && (g_settings.countdowns || g_settings.dates);
+  colW = (BODY_W - 2 * GAP - (datesCol ? DATES_W + GAP : 0)) / 3;
+
+  lv_obj_t *row = mk_box(body, 0, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(row, BODY_W, colH);
+  set_flex(row, LV_FLEX_FLOW_ROW, GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+  todayList = list(column(row, kColToday, &todayCount), 8);
+  lv_obj_t *mid = column(row, kColComingUp, nullptr);
   upcomingList = list(mid, 0);
-  lv_obj_set_style_bg_color(upcomingList, c(theme().panel), 0);
+  lv_obj_set_style_bg_color(upcomingList, c(t.panel), 0);
   lv_obj_set_style_bg_opa(upcomingList, LV_OPA_COVER, 0);
   lv_obj_set_style_radius(upcomingList, 12, 0);
   lv_obj_set_style_pad_left(upcomingList, 12, 0);
   lv_obj_set_style_pad_ver(upcomingList, 6, 0);
   lv_obj_set_height(upcomingList, LV_SIZE_CONTENT);
-  lv_obj_set_style_max_height(upcomingList, BODY_H - TITLE_H, 0);
-  taskList = list(column(body, kColTodo, &taskCount), 8);
-  return scr;
+  lv_obj_set_style_max_height(upcomingList, colH - TITLE_H, 0);
+  lv_obj_t *todo = column(row, kColTodo, &taskCount);
+  taskList = list(todo, 8);
+  if (g_settings.quickAdd) {
+    lv_obj_t *head = lv_obj_get_child(todo, 0);
+    lv_obj_t *add = mk_button(head, t.raised, 14);
+    lv_obj_set_size(add, LV_SIZE_CONTENT, 28);
+    lv_obj_set_style_min_height(add, 28, 0);
+    lv_obj_set_style_pad_hor(add, 10, 0);
+    lv_obj_set_ext_click_area(add, 8);
+    set_flex(add, LV_FLEX_FLOW_ROW, 6);
+    mk_label(add, &font_12, t.text, ICON_PLUS);
+    mk_label(add, &font_12, t.text, kAddTask);
+    on_click(add, [](lv_event_t *) { quick_add_show(); });
+  }
+  if (datesCol) {
+    lv_obj_t *dates = mk_scroll_column(row, 8);
+    lv_obj_set_size(dates, DATES_W, colH);
+    mk_dates_column(dates, DATES_W);
+  }
 }
 
 void home_refresh() {
   const Theme &t = theme();
   const time_t now = ui_now();
   const long today = day_number(now);
+  layoutBody();
+  const std::vector<Conflict> conflicts =
+      g_settings.conflicts ? find_conflicts(g_snap.events, now, now + 7 * 86400) : std::vector<Conflict>();
+  mk_leave_card(todayList, colW);
 
-  lv_obj_clean(todayList);
-  lv_obj_clean(upcomingList);
   int todayN = 0;
   long lastDay = -1;
   for (const Event &ev : g_snap.events) {
@@ -158,18 +203,19 @@ void home_refresh() {
       todayN++;
       const bool live = !ev.allDay && start <= now;
       lv_obj_t *card = mk_button(todayList, t.card, 12);
-      lv_obj_set_width(card, COL_W);
+      lv_obj_set_width(card, colW);
       lv_obj_set_style_pad_left(card, 12, 0);
       lv_obj_set_style_pad_ver(card, 10, 0);
       lv_obj_set_style_pad_right(card, TOUCH + 4, 0);
-      if (live) {
-        lv_obj_set_style_border_color(card, c(t.accent), 0);
+      const bool clash = has_conflict(ev, conflicts);
+      if (live || clash) {
+        lv_obj_set_style_border_color(card, c(clash ? t.badFg : t.accent), 0);
         lv_obj_set_style_border_width(card, 2, 0);
       }
       set_flex(card, LV_FLEX_FLOW_COLUMN, 3, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
       mk_label(card, &font_20b, live ? t.accent : t.text, ev.allDay ? kAllDay : fmt_time(start).c_str());
       lv_obj_t *title = mk_label(card, &font_16s, t.text, ev.title.c_str());
-      lv_obj_set_width(title, COL_W - 12 - TOUCH - 4);
+      lv_obj_set_width(title, colW - 12 - TOUCH - 4);
       lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
       lv_obj_t *meta = mk_box(card, 0, 0);
       lv_obj_set_style_bg_opa(meta, LV_OPA_TRANSP, 0);
@@ -178,7 +224,7 @@ void home_refresh() {
       String m = ev.allDay ? String(kAllDay) : strf(live ? kNowUntil : kUntil, fmt_time(end).c_str());
       lv_obj_t *ml = mk_label(meta, &font_12, t.muted, (m + " · " + ev.calendar).c_str());
       lv_label_set_long_mode(ml, LV_LABEL_LONG_DOT);
-      lv_obj_set_width(ml, COL_W - 12 - TOUCH - 4 - 14);
+      lv_obj_set_width(ml, colW - 12 - TOUCH - 4 - 14);
       Event *copy = attach(card, ev);
       on_click(card, openEvent, copy);
 
@@ -198,15 +244,17 @@ void home_refresh() {
     }
     lv_obj_t *row = mk_box(upcomingList, 0, 0);
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
-    lv_obj_set_size(row, COL_W - 14, TOUCH);
+    lv_obj_set_size(row, colW - 14, TOUCH);
     set_flex(row, LV_FLEX_FLOW_ROW, 0);
     lv_obj_t *open = mk_button(row, t.panel, 8);
     lv_obj_set_height(open, TOUCH);
     lv_obj_set_flex_grow(open, 1);
     set_flex(open, LV_FLEX_FLOW_ROW, 8);
     mk_dot(open, ev.color);
-    lv_obj_t *tl = mk_label(open, &font_14b, t.muted, ev.allDay ? kAllDay : fmt_time(start).c_str());
+    const bool clash = has_conflict(ev, conflicts);
+    lv_obj_t *tl = mk_label(open, &font_14b, clash ? t.badFg : t.muted, ev.allDay ? kAllDay : fmt_time(start).c_str());
     lv_obj_set_width(tl, g_settings.use24h ? 44 : 64);
+    if (clash) mk_label(open, &font_12, t.badFg, ICON_WARNING);
     lv_obj_t *title = mk_label(open, &font_14, t.text, ev.title.c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(title, 1);
@@ -217,7 +265,7 @@ void home_refresh() {
   }
   if (!todayN) {
     lv_obj_t *empty = mk_box(todayList, t.card, 12);
-    lv_obj_set_width(empty, COL_W);
+    lv_obj_set_width(empty, colW);
     lv_obj_set_style_pad_all(empty, 14, 0);
     mk_label(empty, &font_14, t.muted, clock_valid() ? kNoMoreToday : kWaitingClock);
   }
@@ -227,22 +275,22 @@ void home_refresh() {
   }
   lv_label_set_text_fmt(todayCount, "%d", todayN);
 
-  lv_obj_clean(taskList);
   for (const Task &task : g_snap.tasks) {
     if (task.parent.length()) continue;  // subtasks only on the Tasks screen
     lv_obj_t *card = mk_box(taskList, t.card, 12);
-    lv_obj_set_width(card, COL_W);
+    lv_obj_set_width(card, colW);
     lv_obj_set_style_min_height(card, 54, 0);
     lv_obj_set_style_pad_right(card, 10, 0);
     lv_obj_set_style_pad_ver(card, 3, 0);
     set_flex(card, LV_FLEX_FLOW_ROW, 2);
+    focus_hold(card, task);
     mk_check(card, task, 48);
     lv_obj_t *text = mk_box(card, 0, 0);
     lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0);
     lv_obj_set_flex_grow(text, 1);
     set_flex(text, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_t *title = mk_label(text, &font_14b, t.text, task.title.c_str());
-    lv_obj_set_width(title, COL_W - 48 - 14);
+    lv_obj_set_width(title, colW - 48 - 14);
     lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
     Tone tone;
     const String due = due_text(task.dueKey, tone);
@@ -254,7 +302,7 @@ void home_refresh() {
   for (const Task &task : g_snap.tasks) open += task.parent.length() == 0;
   if (!open) {
     lv_obj_t *empty = mk_box(taskList, t.card, 12);
-    lv_obj_set_width(empty, COL_W);
+    lv_obj_set_width(empty, colW);
     lv_obj_set_style_pad_all(empty, 14, 0);
     mk_label(empty, &font_14, t.muted, g_snap.accounts.empty() ? kNoAccounts : kAllDone);
   }

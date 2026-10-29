@@ -14,6 +14,8 @@ constexpr const char *kDueToday = "Due today";
 constexpr const char *kAllDone = "All done!";
 constexpr const char *kNothingHere = "Nothing here";
 constexpr const char *kSeparator = " \xC2\xB7 ";  // between list, account and notes
+constexpr const char *kAddTask = "Add task";
+constexpr const char *kHoldHint = "Hold a task to start the focus timer";
 
 constexpr int NAV_W = 200;
 constexpr int BODY_Y = HEADER_H + GAP;
@@ -88,6 +90,7 @@ void taskRow(const Task &task, bool sub) {
   lv_obj_set_style_min_height(row, 54, 0);
   lv_obj_set_style_pad_left(row, sub ? 28 : 0, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 4);
+  focus_hold(row, task);
   mk_check(row, task, 52);
 
   lv_obj_t *text = mk_box(row, 0, 0);
@@ -147,6 +150,14 @@ void tasks_refresh() {
     overdue += tone == Tone::Bad;
     today += tone == Tone::Warn;
   }
+  if (g_settings.quickAdd) {
+    lv_obj_t *add = mk_button(nav, t.accent, 12);
+    lv_obj_set_size(add, NAV_W, TOUCH);
+    set_flex(add, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_CENTER);
+    mk_label(add, &font_14b, t.onAccent, ICON_PLUS);
+    mk_label(add, &font_14b, t.onAccent, kAddTask);
+    on_click(add, [](lv_event_t *) { quick_add_show(); });
+  }
   navButton(kAll, g_snap.tasks.size(), t.text, Selection{Filter::All, 0, ""});
   navButton(kOverdue, overdue, t.badFg, Selection{Filter::Overdue, 0, ""});
   navButton(kDueToday, today, t.warnFg, Selection{Filter::Today, 0, ""});
@@ -188,6 +199,10 @@ void tasks_refresh() {
       taskRow(g_snap.tasks[j], false);
       shown++;
     }
+  }
+  if (shown && g_settings.focus) {
+    lv_obj_t *hint = mk_label(panel, &font_12, t.muted, kHoldHint);
+    lv_obj_set_style_pad_all(hint, 10, 0);
   }
   if (!shown) {
     lv_obj_t *l = mk_label(panel, &font_16, t.muted, sel.filter == Filter::All ? kAllDone : kNothingHere);

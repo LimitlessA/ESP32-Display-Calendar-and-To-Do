@@ -8,5 +8,11 @@ void audio_begin();
 // Plays the two-note meeting chime in the background. volume: 0-100.
 void audio_chime(uint8_t volume);
 
+// Three notes for a leave-by alert.
+void audio_alert(uint8_t volume);
+
+// Rising notes when the focus timer is over.
+void audio_done(uint8_t volume);
+
 // Short click used as touch feedback and for the volume preview.
 void audio_tick(uint8_t volume);

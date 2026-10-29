@@ -18,6 +18,7 @@ const char *kMonths[] = {"January", "February", "March", "April", "May", "June",
 constexpr const char *kTabHome = "Home";
 constexpr const char *kTabWeek = "Week";
 constexpr const char *kTabTasks = "Tasks";
+constexpr const char *kTabDates = "Dates";  // only with the "Dates tab" layout
 constexpr const char *kAm = " AM";
 constexpr const char *kPm = " PM";
 constexpr const char *kNoClock = "--:--";  // before the clock is set
@@ -32,6 +33,31 @@ constexpr const char *kInHoursMinutes = "in %d h %d min";
 constexpr const char *kInDays = "in %d days";
 constexpr const char *kOverdue = "Overdue";
 constexpr time_t kClockValidAfter = 1700000000;  // NTP has set the clock once it is past this
+constexpr int kPillMaxW = 250;  // focus timer pill in the header
+
+// On-screen keyboard layouts
+#define BKSP LV_SYMBOL_BACKSPACE
+#define OK LV_SYMBOL_OK
+const char *kLower[] = {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p", BKSP, "\n",
+                        "a", "s", "d", "f", "g", "h", "j", "k", "l", "\n",
+                        "ABC", "z", "x", "c", "v", "b", "n", "m", ".", "-", "\n",
+                        "1#", " ", OK, ""};
+const char *kUpper[] = {"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", BKSP, "\n",
+                        "A", "S", "D", "F", "G", "H", "J", "K", "L", "\n",
+                        "abc", "Z", "X", "C", "V", "B", "N", "M", ".", "-", "\n",
+                        "1#", " ", OK, ""};
+const char *kSpecial[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", BKSP, "\n",
+                          "!", "@", "#", "$", "%", "&", "*", "(", ")", "\n",
+                          "abc", "_", "+", "=", "?", "/", ":", ";", ",", "\"", "\n",
+                          "ABC", " ", OK, ""};
+#undef BKSP
+#undef OK
+
+constexpr lv_btnmatrix_ctrl_t F = LV_KEYBOARD_CTRL_BTN_FLAGS;
+const lv_btnmatrix_ctrl_t kCtrl[] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6 | F,
+                                     4, 4, 4, 4, 4, 4, 4, 4, 4,
+                                     6 | F, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+                                     3 | F, 10, 4 | F};
 
 struct tm local(time_t t) {
   struct tm tm;
@@ -175,6 +201,90 @@ lv_obj_t *mk_switch(lv_obj_t *parent, bool on, lv_event_cb_t cb, void *user) {
   return sw;
 }
 
+lv_obj_t *mk_textarea(lv_obj_t *parent, const char *placeholder) {
+  const Theme &t = theme();
+  lv_obj_t *ta = lv_textarea_create(parent);
+  lv_textarea_set_one_line(ta, true);
+  lv_textarea_set_placeholder_text(ta, placeholder);
+  lv_obj_set_height(ta, 48);
+  lv_obj_set_style_text_font(ta, &font_16, 0);
+  lv_obj_set_style_bg_color(ta, c(t.bg), 0);
+  lv_obj_set_style_text_color(ta, c(t.text), 0);
+  lv_obj_set_style_border_color(ta, c(t.accent), 0);
+  lv_obj_set_style_border_width(ta, 2, 0);
+  lv_obj_set_style_radius(ta, 12, 0);
+  lv_obj_set_scrollbar_mode(ta, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_set_style_pad_ver(ta, 12, 0);
+  return ta;
+}
+
+lv_obj_t *mk_keyboard(lv_obj_t *parent, lv_obj_t *textarea) {
+  const Theme &t = theme();
+  lv_obj_t *kb = lv_keyboard_create(parent);
+  lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, kLower, kCtrl);
+  lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_UPPER, kUpper, kCtrl);
+  lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_SPECIAL, kSpecial, kCtrl);
+  lv_keyboard_set_textarea(kb, textarea);
+  lv_obj_set_align(kb, LV_ALIGN_TOP_LEFT);  // the keyboard defaults to bottom-centre
+  lv_obj_set_style_bg_color(kb, c(t.panel), 0);
+  lv_obj_set_style_radius(kb, 16, 0);
+  lv_obj_set_style_pad_all(kb, 8, 0);
+  lv_obj_set_style_pad_gap(kb, 5, 0);
+  lv_obj_set_style_border_width(kb, 0, 0);
+  lv_obj_set_style_bg_color(kb, c(t.raised), LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(kb, c(t.line), LV_PART_ITEMS | LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(kb, c(t.raised), LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_text_color(kb, c(t.text), LV_PART_ITEMS);
+  lv_obj_set_style_text_font(kb, &font_16, LV_PART_ITEMS);
+  lv_obj_set_style_radius(kb, 8, LV_PART_ITEMS);
+  lv_obj_set_style_border_width(kb, 0, LV_PART_ITEMS);
+  lv_obj_set_style_shadow_width(kb, 0, LV_PART_ITEMS);
+  return kb;
+}
+
+lv_obj_t *mk_chip(lv_obj_t *parent, const char *text, bool selected, int h) {
+  lv_obj_t *b = mk_button(parent, theme().raised, h / 2);
+  lv_obj_set_size(b, LV_SIZE_CONTENT, h);
+  lv_obj_set_style_min_height(b, h, 0);
+  lv_obj_set_style_pad_hor(b, 14, 0);
+  lv_obj_t *l = mk_label(b, &font_14b, theme().text, text);
+  lv_obj_center(l);
+  set_chip(b, selected);
+  return b;
+}
+
+void set_chip(lv_obj_t *chip, bool selected) {
+  const Theme &t = theme();
+  lv_obj_set_style_bg_color(chip, c(selected ? t.accent : t.raised), 0);
+  lv_obj_t *l = lv_obj_get_child(chip, 0);
+  if (l) lv_obj_set_style_text_color(l, c(selected ? t.onAccent : t.text), 0);
+}
+
+lv_obj_t *mk_overlay(bool dim, lv_obj_t **owner) {
+  const Theme &t = theme();
+  lv_obj_t *layer = mk_box(lv_layer_top(), t.dark ? 0x07090B : t.bg, 0);
+  lv_obj_set_size(layer, SCREEN_W, SCREEN_H);
+  if (dim) {
+    lv_obj_set_style_bg_color(layer, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(layer, LV_OPA_60, 0);
+  }
+  lv_obj_add_flag(layer, LV_OBJ_FLAG_CLICKABLE);  // swallow taps behind it
+  if (owner) {
+    *owner = layer;
+    // Forget the layer however it goes, unless the owner has moved on to a newer one.
+    lv_obj_add_event_cb(layer, [](lv_event_t *e) {
+      lv_obj_t **ref = static_cast<lv_obj_t **>(lv_event_get_user_data(e));
+      if (*ref == lv_event_get_target(e)) *ref = nullptr;
+    }, LV_EVENT_DELETE, owner);
+  }
+  return layer;
+}
+
+void close_overlay(lv_obj_t **layer) {
+  if (*layer) lv_obj_del_async(*layer);
+  *layer = nullptr;
+}
+
 // ---- Headers ---------------------------------------------------------------
 
 namespace {
@@ -189,8 +299,13 @@ const Tab kTabs[] = {
     {Screen::Home, ICON_HOME, kTabHome},
     {Screen::Week, ICON_CALENDAR, kTabWeek},
     {Screen::Tasks, ICON_TASKS, kTabTasks},
+    {Screen::Dates, ICON_STAR, kTabDates},
     {Screen::Settings, ICON_SLIDERS, nullptr},
 };
+
+bool datesTab() {
+  return g_settings.layout(Layout::Dates) == 2 && (g_settings.countdowns || g_settings.dates);
+}
 
 void go(lv_event_t *e) {
   ui_show(static_cast<Screen>((intptr_t)lv_event_get_user_data(e)));
@@ -209,15 +324,53 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   lv_obj_t *clock = mk_label(h, &font_26b, t.text, "");
   lv_obj_t *date = mk_label(h, &font_16, t.muted, "");
   register_clock(clock, date);
+  lv_obj_t *offline = mk_label(h, &font_16, t.warnFg, ICON_CLOUD);
+  lv_obj_add_flag(offline, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_t *spacer = mk_box(h, 0, 0);
   lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(spacer, 1);
 
+  // Focus timer pill: icon, time, task, with a thin progress line underneath.
+  lv_obj_t *pill = mk_button(h, t.warnBg, 20);
+  lv_obj_set_size(pill, LV_SIZE_CONTENT, 40);
+  lv_obj_set_style_min_height(pill, 40, 0);
+  lv_obj_set_style_max_width(pill, kPillMaxW, 0);
+  lv_obj_set_style_pad_hor(pill, 12, 0);
+  set_flex(pill, LV_FLEX_FLOW_ROW, 8);
+  mk_label(pill, &font_14, t.accent, ICON_TIMER);
+  mk_label(pill, &font_14b, t.accent, "");
+  lv_obj_t *pt = mk_label(pill, &font_14, t.text, "");
+  lv_label_set_long_mode(pt, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_max_width(pt, kPillMaxW - 110, 0);
+  lv_obj_t *bar = mk_box(pill, t.accent, 1);
+  lv_obj_add_flag(bar, LV_OBJ_FLAG_IGNORE_LAYOUT);
+  lv_obj_set_size(bar, 0, 3);
+  lv_obj_align(bar, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  lv_obj_add_flag(pill, LV_OBJ_FLAG_HIDDEN);
+  on_click(pill, [](lv_event_t *) { focus_open(); });
+
+  // Leave-by countdown (layout C)
+  lv_obj_t *leave = mk_button(h, t.accent, 20);
+  lv_obj_set_size(leave, LV_SIZE_CONTENT, 40);
+  lv_obj_set_style_min_height(leave, 40, 0);
+  lv_obj_set_style_pad_hor(leave, 14, 0);
+  set_flex(leave, LV_FLEX_FLOW_ROW, 8);
+  mk_label(leave, &font_14, t.onAccent, ICON_CAR);
+  mk_label(leave, &font_14b, t.onAccent, "");
+  lv_obj_add_flag(leave, LV_OBJ_FLAG_HIDDEN);
+  on_click(leave, [](lv_event_t *) {
+    time_t at;
+    const Event *ev = leave_next(at);
+    if (ev) ui_open_event(*ev);
+  });
+  register_status(pill, leave, offline);
+
   lv_obj_t *nav = mk_box(h, 0, 0);
   lv_obj_set_style_bg_opa(nav, LV_OPA_TRANSP, 0);
   set_flex(nav, LV_FLEX_FLOW_ROW, 4);
   for (const Tab &tab : kTabs) {
+    if (tab.screen == Screen::Dates && !datesTab()) continue;
     const bool on = tab.screen == active;
     lv_obj_t *b = mk_button(nav, on ? t.raised : t.header);
     lv_obj_set_height(b, TOUCH);
@@ -351,6 +504,22 @@ String due_text(const String &due_key, Tone &tone) {
   }
   if (diff == 1) return kTomorrow;
   return fmt_date_short(due);
+}
+
+String day_key(time_t t) {
+  const struct tm tm = local(t);
+  return strf("%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+}
+
+long days_until(const String &key) {
+  if (key.length() < 10) return 0;
+  struct tm tm = {};
+  tm.tm_year = key.substring(0, 4).toInt() - 1900;
+  tm.tm_mon = key.substring(5, 7).toInt() - 1;
+  tm.tm_mday = key.substring(8, 10).toInt();
+  tm.tm_hour = 12;
+  tm.tm_isdst = -1;
+  return day_number(mktime(&tm)) - day_number(ui_now());
 }
 
 String initial_of(const String &s) {

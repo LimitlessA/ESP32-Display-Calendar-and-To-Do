@@ -12,6 +12,10 @@
  *   action=uncomplete&list=L&task=ID   undo that
  *   action=dismiss&event=KEY&until=MS  hide one event occurrence on the display
  *   action=showcal&id=CAL&shown=0|1    choose which calendars the display shows
+ *   action=add&title=T[&list=L][&due=D]  add a task (D = yyyy-MM-dd; no list = default list)
+ *   action=due&list=L&task=ID&due=D    move a task to another day (empty D = no date)
+ *   action=star&event=KEY&on=1|0&title=T&start=MS&allDay=0|1
+ *                                      star an event so the display counts down to it
  *
  * Times are epoch milliseconds; the display formats them itself. Non-Google
  * calendars (Outlook, iCloud, Exchange) show up once you add their ICS link in
@@ -25,10 +29,28 @@ const CONFIG = {
   MAX_RANGE_EVENTS: 120,
   MAX_TASKS: 50,
   TASKLIST_IDS: [],    // empty = every task list
+
+  // Leave-by alerts: travel time from this address to each meeting's location.
+  // Empty = no travel times. Uses Apps Script's built-in Maps service (no key).
+  HOME_ADDRESS: '',
+  TRAVEL_MODE: 'driving',  // driving, walking, bicycling or transit
+  TRAVEL_HOURS_AHEAD: 12,  // only meetings starting within this many hours
+
+  // Birthdays and holidays on the display
+  HOLIDAYS_CALENDAR: 'en.romanian#holiday@group.v.calendar.google.com',  // '' = none
+  BIRTHDAYS: true,         // from your Google Contacts
+  DATES_DAYS_AHEAD: 60,
+
+  // Quick add: the display offers the tasks you complete most often.
+  FREQUENT_TASKS: 12,
+  FREQUENT_DAYS_BACK: 120,
 };
 
 const DISMISSED_KEY = 'dismissed';
 const HIDDEN_CALS_KEY = 'hiddenCalendars';
+const STARRED_KEY = 'starred';
+const CACHE_HOURS_DATES = 6;      // birthdays, holidays and frequent tasks change slowly
+const CACHE_MINUTES_TRAVEL = 30;
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
@@ -43,6 +65,9 @@ function doGet(e) {
       case 'uncomplete': return json_(setTaskStatus_(p.list, p.task, false));
       case 'dismiss': return json_(dismissEvent_(p.event, Number(p.until)));
       case 'showcal': return json_(showCalendar_(p.id, p.shown === '1'));
+      case 'add': return json_(addTask_(p.title, p.list, p.due));
+      case 'due': return json_(setTaskDue_(p.list, p.task, p.due));
+      case 'star': return json_(starEvent_(p.event, p.on === '1', p.title, Number(p.start), p.allDay === '1'));
       default: return json_({ error: 'unknown action' });
     }
   } catch (err) {
@@ -62,8 +87,11 @@ function feed_() {
     calendars: all.map(c => ({
       id: c.getId(), name: c.getName(), color: c.getColor(), shown: !hidden[c.getId()],
     })),
-    events: getEvents_(now, new Date(now.getTime() + CONFIG.DAYS_AHEAD * 86400000), CONFIG.MAX_EVENTS),
+    events: addTravel_(getEvents_(now, new Date(now.getTime() + CONFIG.DAYS_AHEAD * 86400000), CONFIG.MAX_EVENTS)),
     tasks: getTasks_(),
+    lists: taskLists_().map(l => ({ id: l.id, title: l.title })),
+    dates: getDates_(tz),
+    frequent: frequentTasks_(),
   };
 }
 
@@ -154,9 +182,13 @@ function loadHiddenCalendars_() {
 
 // ---- Tasks ----------------------------------------------------------------
 
-function getTasks_() {
-  const lists = (Tasks.Tasklists.list({ maxResults: 100 }).items || [])
+function taskLists_() {
+  return (Tasks.Tasklists.list({ maxResults: 100 }).items || [])
     .filter(l => !CONFIG.TASKLIST_IDS.length || CONFIG.TASKLIST_IDS.includes(l.id));
+}
+
+function getTasks_() {
+  const lists = taskLists_();
 
   const tasks = [];
   lists.forEach(list => {
@@ -191,7 +223,159 @@ function setTaskStatus_(listId, taskId, done) {
   return { ok: true };
 }
 
+// Google Tasks keeps only the date of "due", as midnight UTC.
+function dueValue_(day) {
+  if (!day) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('bad date');
+  return day + 'T00:00:00.000Z';
+}
+
+function addTask_(title, listId, due) {
+  title = String(title || '').trim();
+  if (!title) throw new Error('missing title');
+  const body = { title: title.substring(0, 200) };
+  const d = dueValue_(due);
+  if (d) body.due = d;
+  const list = listId || (taskLists_()[0] || {}).id || '@default';
+  const t = Tasks.Tasks.insert(body, list);
+  CacheService.getScriptCache().remove('frequent');
+  return { ok: true, id: t.id, listId: list };
+}
+
+function setTaskDue_(listId, taskId, due) {
+  if (!listId || !taskId) throw new Error('missing list or task');
+  Tasks.Tasks.patch({ due: dueValue_(due) }, listId, taskId);
+  return { ok: true };
+}
+
+// Titles you completed most often lately, for the quick add tiles.
+function frequentTasks_() {
+  if (!CONFIG.FREQUENT_TASKS) return [];
+  return cached_('frequent', CACHE_HOURS_DATES * 3600, () => {
+    const since = new Date(Date.now() - CONFIG.FREQUENT_DAYS_BACK * 86400000).toISOString();
+    const counts = {};
+    taskLists_().forEach(list => {
+      let pageToken, pages = 0;
+      do {
+        const res = Tasks.Tasks.list(list.id, {
+          showCompleted: true, showHidden: true, completedMin: since, maxResults: 100, pageToken: pageToken,
+        });
+        (res.items || []).forEach(t => {
+          if (t.status !== 'completed' || !t.title) return;
+          const title = t.title.trim();
+          const k = title.toLowerCase();
+          counts[k] = counts[k] || { title: title, n: 0 };
+          counts[k].n++;
+        });
+        pageToken = res.nextPageToken;
+      } while (pageToken && ++pages < 5);
+    });
+    return Object.keys(counts).map(k => counts[k])
+      .sort((a, b) => b.n - a.n || a.title.localeCompare(b.title))
+      .slice(0, CONFIG.FREQUENT_TASKS).map(x => x.title);
+  });
+}
+
+// ---- Travel times (leave-by alerts) ---------------------------------------
+
+function addTravel_(events) {
+  if (!CONFIG.HOME_ADDRESS) return events;
+  const limit = Date.now() + CONFIG.TRAVEL_HOURS_AHEAD * 3600000;
+  events.forEach(e => {
+    if (e.allDay || !e.loc || e.start > limit || e.start < Date.now()) return;
+    const min = travelMinutes_(e.loc, e.start);
+    if (min > 0) e.travelMin = min;
+  });
+  return events;
+}
+
+function travelMinutes_(destination, startMs) {
+  const hour = Math.floor(startMs / 3600000);  // traffic changes over the day
+  const key = 'tr:' + hour + ':' + Utilities.base64EncodeWebSafe(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, destination));
+  return cached_(key, CACHE_MINUTES_TRAVEL * 60, () => {
+    try {
+      const finder = Maps.newDirectionFinder()
+        .setOrigin(CONFIG.HOME_ADDRESS)
+        .setDestination(destination)
+        .setMode(CONFIG.TRAVEL_MODE);
+      // Ask for the departure that arrives in time, so traffic is counted.
+      const depart = new Date(Math.max(Date.now() + 60000, startMs - 3600000));
+      if (CONFIG.TRAVEL_MODE === 'driving' || CONFIG.TRAVEL_MODE === 'transit') finder.setDepart(depart);
+      const route = (finder.getDirections().routes || [])[0];
+      const leg = route && route.legs && route.legs[0];
+      if (!leg) return 0;
+      const secs = (leg.duration_in_traffic || leg.duration || {}).value || 0;
+      return Math.ceil(secs / 60);
+    } catch (err) {
+      return 0;  // not an address Maps understands, such as "Room 4B"
+    }
+  });
+}
+
+// ---- Birthdays, holidays and starred events --------------------------------
+
+function getDates_(tz) {
+  const dates = cached_('dates', CACHE_HOURS_DATES * 3600, () => {
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(from.getTime() + CONFIG.DATES_DAYS_AHEAD * 86400000);
+    const out = [];
+    const add = (kind, items) => (items || []).forEach(e => {
+      const day = e.start.date || (e.start.dateTime || '').substring(0, 10);
+      if (day && e.summary) out.push({ kind: kind, title: e.summary, day: day, key: kind + ':' + day + ':' + e.summary });
+    });
+    const query = { timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: true, orderBy: 'startTime', maxResults: 50 };
+    if (CONFIG.HOLIDAYS_CALENDAR) {
+      try { add('holiday', Calendar.Events.list(CONFIG.HOLIDAYS_CALENDAR, query).items); } catch (err) {}
+    }
+    if (CONFIG.BIRTHDAYS) {
+      try {
+        add('birthday', Calendar.Events.list('primary', Object.assign({ eventTypes: ['birthday'] }, query)).items);
+      } catch (err) {
+        try { add('birthday', Calendar.Events.list('addressbook#contacts@group.v.calendar.google.com', query).items); } catch (e2) {}
+      }
+    }
+    return out;
+  });
+  const starred = loadStarred_();
+  Object.keys(starred).forEach(k => {
+    const s = starred[k];
+    dates.push({ kind: 'star', title: s.title, day: Utilities.formatDate(new Date(s.start), tz, 'yyyy-MM-dd'), key: k });
+  });
+  return dates.sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+}
+
+function starEvent_(key, on, title, start, allDay) {
+  if (!key) throw new Error('missing event');
+  withLock_(() => {
+    const starred = loadStarred_();
+    if (on) starred[key] = { title: String(title || '').substring(0, 120), start: start, allDay: allDay };
+    else delete starred[key];
+    PropertiesService.getScriptProperties().setProperty(STARRED_KEY, JSON.stringify(starred));
+  });
+  return { ok: true };
+}
+
+function loadStarred_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(STARRED_KEY);
+  const all = raw ? JSON.parse(raw) : {};
+  const today = Date.now() - 86400000;
+  const live = {};
+  Object.keys(all).forEach(k => { if (all[k].start > today) live[k] = all[k]; });
+  return live;
+}
+
 // ---- Helpers --------------------------------------------------------------
+
+function cached_(key, seconds, fn) {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get(key);
+  if (hit) return JSON.parse(hit);
+  const value = fn();
+  cache.put(key, JSON.stringify(value), seconds);
+  return value;
+}
 
 function utcOffsetMinutes_(date, tz) {
   const z = Utilities.formatDate(date, tz, 'Z');  // e.g. "+0200"

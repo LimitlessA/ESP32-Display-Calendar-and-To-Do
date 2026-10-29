@@ -36,3 +36,15 @@
 #define ICON_PALETTE   "\xEF\x94\xBF"  // F53F
 #define ICON_CLOUD     "\xEF\x83\x82"  // F0C2
 #define ICON_WARNING   "\xEF\x81\xB1"  // F071
+#define ICON_STAR      "\xEF\x80\x85"  // F005
+#define ICON_CAR       "\xEF\x86\xB9"  // F1B9
+#define ICON_GIFT      "\xEF\x81\xAB"  // F06B
+#define ICON_KEYBOARD  "\xEF\x84\x9C"  // F11C
+#define ICON_TIMER     "\xEF\x8B\xB2"  // F2F2
+#define ICON_FLAG      "\xEF\x80\xA4"  // F024
+#define ICON_PAUSE     "\xEF\x81\x8C"  // F04C
+#define ICON_PLAY      "\xEF\x81\x8B"  // F04B
+#define ICON_STOP      "\xEF\x81\x8D"  // F04D
+#define ICON_BULB      "\xEF\x83\xAB"  // F0EB
+#define ICON_WALK      "\xEF\x95\x94"  // F554
+#define ICON_LAYERS    "\xEF\x97\xBD"  // F5FD

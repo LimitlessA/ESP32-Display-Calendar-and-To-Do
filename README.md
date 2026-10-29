@@ -2,8 +2,10 @@
 
 A touch display that shows your upcoming meetings from several Google accounts
 and your Google Tasks. From the screen you can dismiss a meeting, mark a task
-done (with Undo), browse the week, get a chime before meetings, and pick one of
-six themes. New firmware installs over Wi-Fi, so after the first flash you
+done (with Undo), add tasks, run a focus timer, browse the week, and get a
+chime before meetings, a "leave now" alert, a warning when meetings overlap, a
+morning summary and an evening review. Pick one of six themes, and for each
+feature one of three layouts. New firmware installs over Wi-Fi, so after the first flash you
 never need a cable again.
 
 | Home | Week | Tasks |
@@ -20,6 +22,13 @@ never need a cable again.
 - Optional: a LiPo on the battery connector. The board can't measure the
   battery itself; add a MAX17048 fuel gauge on the I2C header (address 0x36) if
   you want the level shown in Settings.
+- Optional: a **BH1750** light sensor (GY-302 board) on the I2C header (3V3,
+  GND, SDA, SCL; address 0x23). With *Ambient light* on, the screen dims in a
+  dark room.
+- Optional: a 3.3 V **PIR motion sensor** (for example AM312) with its output
+  on **IO44**, the RX pin of the UART header. With *Motion wake* on, the screen
+  wakes when someone walks up. IO44 is shared with the USB serial chip, so
+  unplug the sensor while flashing over USB.
 
 ## How it works
 
@@ -45,8 +54,12 @@ Do this once per account you want on the display.
 1. Sign in to the account and open <https://script.google.com/create>.
 2. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo.
 3. Open *Project Settings*, tick *Show "appsscript.json"*, and replace that file
-   with `apps-script/appsscript.json` (it turns on the Tasks service).
+   with `apps-script/appsscript.json` (it turns on the Tasks and Calendar
+   services).
 4. In `Code.gs`, change `TOKEN: 'change-me'` to a long random password.
+   For leave-by alerts, set `HOME_ADDRESS` to where you leave from (and
+   `TRAVEL_MODE` to `driving`, `walking`, `bicycling` or `transit`). For public
+   holidays of another country, change `HOLIDAYS_CALENDAR`.
 5. Pick `preview` in the function list and press *Run*. Allow access when
    Google asks. The log shows what the display will receive.
 6. *Deploy › New deployment › Web app*, with *Execute as: Me* and
@@ -107,6 +120,42 @@ Meetings and tasks appear within a few seconds.
   and wakes on touch.
 - **Settings**: brightness, chime volume, night mode, dim when idle, 12/24 h
   clock, theme, which calendars to show per account, and firmware updates.
+
+### Features (Settings › Features)
+
+Each one has its own switch; some have an option such as a time.
+
+| Feature | What it does |
+|---|---|
+| Quick add task | *+ Add a task* on Home and Tasks; suggests tasks you complete often |
+| Focus timer | Hold a task to start a timer (25 min by default); ends with *Mark task done* |
+| Daily summary | Your day at a glance every morning (07:00 by default) |
+| End-of-day review | Every evening, move or finish what is still open |
+| Conflict alerts | Highlights meetings that overlap, across all accounts |
+| Leave-by alerts | Warns before you must leave, using Google Maps travel time from `HOME_ADDRESS` |
+| Countdowns | Star a meeting in its details to count down to it |
+| Birthdays and holidays | From Google Contacts and the public holiday calendar |
+| Reminder sound | Chimes for reminders, leave-by alerts and the focus timer |
+| Ambient light | Follows the room light (needs the BH1750) |
+| Motion wake | Wakes the screen when someone walks up (needs the PIR) |
+| Offline copy | Keeps the last sync on the microSD card |
+
+### Layouts
+
+Settings › Features › *Layouts* works like the theme picker. Eight features
+come in three layouts each, and you can mix them; the presets are *Your picks*,
+*All A*, *All B* and *All C*.
+
+| Feature | A | B | C |
+|---|---|---|---|
+| Quick add task | Keyboard | Frequent tiles (pick) | Sheet over the list |
+| Focus timer | Big ring (pick) | Split screen | Header strip |
+| Daily summary | Stat tiles (pick) | Timeline | Briefing |
+| Conflict alerts | Banner on Home (pick) | Compare popup | Marked in Week |
+| Leave-by alert | Full screen | Card on Home (pick) | Header countdown |
+| Countdowns and dates | Home column | Ribbon (pick) | Dates tab |
+| End-of-day review | Checklist | One at a time | Plan by day (pick) |
+| Features screen | List | Tabs | Tiles (pick) |
 
 ### Themes
 
@@ -174,8 +223,9 @@ VS Code Draw.io extension. It has one page per level of the C4 model (system
 context, containers, firmware components, Apps Script components) and one
 swimlane flow per feature: start-up, Wi-Fi, adding an account, background
 sync, dismissing a meeting, completing a task, week view, reminders, night
-mode, themes, calendars, settings, removing an account, the three update paths
-and the first flash. The file is generated: edit `docs/diagrams/build_drawio.py`
+mode, themes, calendars, settings, removing an account, quick add, the focus
+timer, the daily summary and review, conflicts, leave-by alerts, countdowns,
+layouts, the room sensors, the three update paths and the first flash. The file is generated: edit `docs/diagrams/build_drawio.py`
 and run `python3 docs/diagrams/build_drawio.py`.
 
 To check UI changes without the board, run `firmware/sim/build.sh` (needs gcc,

@@ -38,6 +38,24 @@ String toJson(const Settings &s) {
   doc["theme"] = s.theme;
   doc["updateUrl"] = s.updateUrl;
   doc["autoUpdate"] = s.autoUpdate;
+  doc["sound"] = s.sound;
+  doc["summary"] = s.summary;
+  doc["summaryAt"] = s.summaryAt;
+  doc["review"] = s.review;
+  doc["reviewAt"] = s.reviewAt;
+  doc["conflicts"] = s.conflicts;
+  doc["leaveBy"] = s.leaveBy;
+  doc["leaveLead"] = s.leaveLead;
+  doc["focus"] = s.focus;
+  doc["focusMinutes"] = s.focusMinutes;
+  doc["quickAdd"] = s.quickAdd;
+  doc["countdowns"] = s.countdowns;
+  doc["dates"] = s.dates;
+  doc["ambient"] = s.ambient;
+  doc["motion"] = s.motion;
+  doc["offlineCopy"] = s.offlineCopy;
+  JsonArray layouts = doc["layouts"].to<JsonArray>();
+  for (uint8_t v : s.layouts) layouts.add(v);
   String out;
   serializeJson(doc, out);
   return out;
@@ -67,6 +85,27 @@ bool fromJson(const String &json, Settings &s) {
   s.theme = doc["theme"] | d.theme;
   s.updateUrl = doc["updateUrl"] | d.updateUrl;
   s.autoUpdate = doc["autoUpdate"] | d.autoUpdate;
+  s.sound = doc["sound"] | d.sound;
+  s.summary = doc["summary"] | d.summary;
+  s.summaryAt = doc["summaryAt"] | d.summaryAt;
+  s.review = doc["review"] | d.review;
+  s.reviewAt = doc["reviewAt"] | d.reviewAt;
+  s.conflicts = doc["conflicts"] | d.conflicts;
+  s.leaveBy = doc["leaveBy"] | d.leaveBy;
+  s.leaveLead = doc["leaveLead"] | d.leaveLead;
+  s.focus = doc["focus"] | d.focus;
+  s.focusMinutes = max<uint8_t>(1, doc["focusMinutes"] | d.focusMinutes);
+  s.quickAdd = doc["quickAdd"] | d.quickAdd;
+  s.countdowns = doc["countdowns"] | d.countdowns;
+  s.dates = doc["dates"] | d.dates;
+  s.ambient = doc["ambient"] | d.ambient;
+  s.motion = doc["motion"] | d.motion;
+  s.offlineCopy = doc["offlineCopy"] | d.offlineCopy;
+  JsonArray layouts = doc["layouts"].as<JsonArray>();
+  for (uint8_t i = 0; i < kLayoutCount; i++) {
+    const uint8_t v = i < layouts.size() ? layouts[i].as<uint8_t>() : kDefaultLayouts[i];
+    s.layouts[i] = v < 3 ? v : kDefaultLayouts[i];
+  }
   return true;
 }
 

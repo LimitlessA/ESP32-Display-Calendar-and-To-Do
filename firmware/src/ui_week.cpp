@@ -111,6 +111,10 @@ void week_refresh() {
   else lv_obj_clear_flag(loading, LV_OBJ_FLAG_HIDDEN);
 
   const long today = day_number(ui_now());
+  // Conflicts, layout C: overlapping meetings are outlined and their days marked.
+  const bool marks = g_settings.conflicts && g_settings.layout(Layout::Conflicts) == 2;
+  const std::vector<Conflict> conflicts =
+      marks && ready ? find_conflicts(g_snap.week, viewWeek, addDays(viewWeek, 7)) : std::vector<Conflict>();
   for (int d = 0; d < 7; d++) {
     const time_t day = addDays(viewWeek, d);
     const long dn = day_number(day);
@@ -127,7 +131,13 @@ void week_refresh() {
     lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
     lv_obj_set_width(head, lv_pct(100));
     set_flex(head, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    bool clashDay = false;
+    for (const Conflict &cf : conflicts) clashDay |= day_number(cf.from) == dn;
     lv_obj_t *name = mk_label(head, &font_12, isToday ? t.accent : t.muted, kDayNames[d]);
+    if (clashDay) {
+      lv_label_set_text_fmt(name, "%s  " ICON_WARNING, kDayNames[d]);
+      lv_obj_set_style_text_color(name, c(t.badFg), 0);
+    }
     lv_obj_set_style_text_letter_space(name, 1, 0);
     struct tm tm;
     localtime_r(&day, &tm);
@@ -151,7 +161,14 @@ void week_refresh() {
       lv_obj_set_style_bg_opa(top, LV_OPA_TRANSP, 0);
       set_flex(top, LV_FLEX_FLOW_ROW, 5);
       mk_dot(top, ev.color, 7);
-      mk_label(top, &font_12, t.muted, ev.allDay || s != dn ? kAllDay : fmt_time(ev.start / 1000).c_str());
+      const bool clash = has_conflict(ev, conflicts);
+      mk_label(top, &font_12, clash ? t.badFg : t.muted,
+               ev.allDay || s != dn ? kAllDay : fmt_time(ev.start / 1000).c_str());
+      if (clash) {
+        mk_label(top, &font_12, t.badFg, ICON_WARNING);
+        lv_obj_set_style_border_color(b, c(t.badFg), 0);
+        lv_obj_set_style_border_width(b, 2, 0);
+      }
       lv_obj_t *title = mk_label(b, &font_12, t.text, ev.title.c_str());
       lv_obj_set_width(title, DAY_W - 24);
       lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);

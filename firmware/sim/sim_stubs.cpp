@@ -1,10 +1,12 @@
 // Stand-ins for the device modules so the real UI code runs on a PC with
 // sample data. Touch actions update the sample data the same way sync does.
 #include <algorithm>
+#include <vector>
 
 #include "audio.h"
 #include "battery.h"
 #include "ota.h"
+#include "sensors.h"
 #include "settings.h"
 #include "storage.h"
 #include "sync.h"
@@ -17,10 +19,8 @@ extern time_t g_sim_now;
 static Settings simSettings;
 static uint32_t simSettingsVersion = 1;
 
-extern "C" uint32_t millis(void) {
-  static uint32_t t = 0;
-  return t += 5;
-}
+uint32_t g_sim_ms = 0;  // the simulator jumps it forward to run throttled ticks
+extern "C" uint32_t millis(void) { return g_sim_ms += 5; }
 
 void settings_begin() {}
 Settings settings_get() { return simSettings; }
@@ -57,6 +57,30 @@ void sync_uncomplete_task(const Task &task) {
   g_sim.version++;
 }
 void sync_show_calendar(uint8_t, const String &, bool) {}
+void sync_add_task(uint8_t account, const String &listId, const String &title, const String &dueKey) {
+  Task t;
+  t.account = account;
+  t.id = "new:" + title;
+  t.listId = listId;
+  t.title = title;
+  t.list = "My Tasks";
+  t.dueKey = dueKey;
+  g_sim.tasks.push_back(t);
+  g_sim.version++;
+}
+void sync_set_task_due(const Task &task, const String &dueKey) {
+  for (Task &t : g_sim.tasks) {
+    if (t.id == task.id) t.dueKey = dueKey;
+  }
+  g_sim.version++;
+}
+void sync_star_event(const Event &ev, bool on, const String &dayKey) {
+  auto &l = g_sim.dates;
+  l.erase(std::remove_if(l.begin(), l.end(), [&](const DateItem &d) { return d.key == ev.key; }), l.end());
+  if (on) l.push_back({DateKind::Star, ev.title, dayKey, ev.key, ev.account});
+  std::sort(l.begin(), l.end(), [](const DateItem &a, const DateItem &b) { return strcmp(a.day.c_str(), b.day.c_str()) < 0; });
+  g_sim.version++;
+}
 
 void wifi_begin() {}
 bool wifi_service() { return true; }
@@ -89,6 +113,14 @@ String web_url() { return "http://calendar.local"; }
 void audio_begin() {}
 void audio_chime(uint8_t) {}
 void audio_tick(uint8_t) {}
+void audio_alert(uint8_t) {}
+void audio_done(uint8_t) {}
+
+void sensors_begin() {}
+bool light_present() { return true; }
+int light_lux() { return 180; }
+bool motion_seen() { return false; }
+
 
 void battery_begin() {}
 bool battery_present() { return true; }

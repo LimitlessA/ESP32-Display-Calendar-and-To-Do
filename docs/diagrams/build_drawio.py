@@ -129,7 +129,8 @@ fw = p.add(c4label("Firmware", "C++, Arduino, FreeRTOS, LVGL 8, LovyanGFX on the
 nvs = p.add(c4label("Settings", "NVS flash (Preferences)", "Wi-Fi, accounts, display options as JSON."), STORE, 80, 800, 220, 130)
 sd = p.add(c4label("microSD card", "FAT, JSON files", "Offline copy of each account's feed, settings backup."), STORE, 340, 800, 220, 130)
 script = p.add(c4label("Apps Script web app", "Google Apps Script (one copy per Google account)",
-                       "Returns meetings, tasks and calendars as JSON; dismisses, completes, shows or hides calendars."),
+                       "Returns meetings, tasks, calendars, travel times, birthdays, holidays and frequent tasks as JSON; "
+                       "dismisses, completes, adds and moves tasks, stars meetings."),
                CONTAINER, 800, 540, 340, 160)
 ci = p.add(c4label("Build pipeline", "GitHub Actions, PlatformIO, esptool",
                    "Builds on every push; numbers the version; publishes a release from main."), CONTAINER, 880, 800, 260, 150)
@@ -138,6 +139,9 @@ rel_store = p.add(c4label("Firmware releases", "GitHub Releases", "firmware.bin,
 gcal = p.add(c4label("Google Calendar", "External system"), EXTERNAL, 1260, 480, 220, 90)
 gtasks = p.add(c4label("Google Tasks", "External system"), EXTERNAL, 1260, 640, 220, 90)
 ntp = p.add(c4label("Time servers", "External system"), EXTERNAL, 1260, 300, 220, 90)
+gmaps = p.add(c4label("Google Maps", "External system"), EXTERNAL, 1260, 800, 220, 90)
+sensors = p.add(c4label("Room sensors (optional)", "Hardware: BH1750 light sensor on I2C, PIR on IO44",
+                        "Room light for the backlight, motion to wake."), CONTAINER, 80, 560, 260, 120)
 p.link(andrei, screen, rel("Reads and taps"))
 p.link(andrei, setup, rel("Adds accounts, uploads firmware", "browser, HTTP"))
 p.link(andrei, ci, rel("Pushes code", "git"), points=[(1200, 135), (1200, 875)])
@@ -147,8 +151,10 @@ p.link(setup, fw, rel("Account and firmware requests", "HTTP form, PIN"))
 p.link(fw, nvs, rel("Reads and saves settings"))
 p.link(fw, sd, rel("Caches feeds, backs up settings", "SPI"))
 p.link(fw, script, rel("Fetches feed, sends actions", "HTTPS GET + token, JSON"))
-p.link(script, gcal, rel("Reads events", "CalendarApp"))
-p.link(script, gtasks, rel("Reads and updates tasks", "Tasks API"))
+p.link(script, gcal, rel("Reads events, birthdays, holidays", "CalendarApp, Calendar API"))
+p.link(script, gtasks, rel("Reads, adds and updates tasks", "Tasks API"))
+p.link(script, gmaps, rel("Travel time from home", "Maps DirectionFinder"))
+p.link(sensors, fw, rel("Light level, motion", "I2C, GPIO"))
 p.link(ci, rel_store, rel("Publishes on push to main"))
 p.link(fw, rel_store, rel("Checks manifest, downloads firmware", "HTTPS"))
 p.link(fw, ntp, rel("Sets the clock", "NTP"))
@@ -166,14 +172,19 @@ main = p.add(c4label("Main loop", "main.cpp", "Starts every module; every loop: 
              COMPONENT, 60, 130, 260, 110)
 uicore = p.add(c4label("UI core", "ui.cpp", "Navigation, reminders, night mode, dimming, auto-update timing, toasts."),
                COMPONENT, 370, 130, 270, 120)
-screens = p.add(c4label("Screens", "ui_home, ui_detail, ui_week, ui_tasks, ui_night, ui_wifi, ui_accounts, ui_settings",
-                        "Built once; data parts rebuilt only when changed."), COMPONENT, 370, 300, 270, 140)
-overlays = p.add(c4label("Overlays", "ui_overlays.cpp", "Meeting reminder, firmware update, theme picker, calendar chooser."),
-                 COMPONENT, 370, 490, 270, 120)
+screens = p.add(c4label("Screens", "ui_home, ui_detail, ui_week, ui_tasks, ui_night, ui_wifi, ui_accounts, "
+                        "ui_settings, ui_features, ui_dates",
+                        "Built once; data parts rebuilt only when changed. Layout A, B or C per feature."),
+                COMPONENT, 370, 300, 270, 150)
+overlays = p.add(c4label("Overlays", "ui_overlays, ui_quickadd, ui_focus, ui_daily, ui_alerts",
+                         "Reminder, update, theme and layout pickers, quick add, focus timer, daily summary, "
+                         "end-of-day review, conflicts, leave-by."),
+                 COMPONENT, 370, 490, 270, 150)
 theme = p.add(c4label("Themes", "theme.cpp", "Six colour sets."), COMPONENT, 60, 490, 240, 90)
 disp = p.add(c4label("Display driver", "display.cpp, LovyanGFX", "RGB panel, touch, backlight, LVGL flush with DMA."),
              COMPONENT, 60, 300, 260, 120)
 batt = p.add(c4label("Battery", "battery.cpp", "Optional MAX17048 fuel gauge."), COMPONENT, 60, 660, 240, 90)
+sens = p.add(c4label("Sensors", "sensors.cpp", "Optional BH1750 room light and PIR motion."), COMPONENT, 60, 780, 240, 90)
 sync = p.add(c4label("Sync worker", "sync.cpp", "Fetches every account, queues taps as actions, keeps the snapshot, offline cache."),
              COMPONENT, 760, 130, 270, 130)
 wifi = p.add(c4label("Wi-Fi manager", "wifi_mgr.cpp", "Connect, reconnect, scan."), COMPONENT, 1060, 130, 250, 100)
@@ -196,7 +207,7 @@ p.link(uicore, screens, rel("show, refresh"))
 p.link(uicore, overlays, rel("reminder, update dialog"), points=[(330, 560)])
 p.link(screens, theme, rel("colours"))
 p.link(disp, lcd, rel("pixels, touch"), points=[(45, 360), (45, 960)])
-p.link(screens, sync, rel("dismiss, complete, undo, week, calendars"))
+p.link(screens, sync, rel("dismiss, complete, undo, week, calendars, add, move, star"))
 p.link(sync, main, rel("snapshot (sync_get_if_newer)"), points=[(700, 110), (190, 110)])
 p.link(sync, wifi, rel("wifi_service"))
 p.link(sync, script, rel("HTTPS + token"))
@@ -206,7 +217,8 @@ p.link(web, ota, rel("upload chunks"))
 p.link(browser, web, rel("HTTP"))
 p.link(overlays, ota, rel("check, install"))
 p.link(ota, rels, rel("manifest, firmware.bin"))
-p.link(uicore, audio, rel("chime"), points=[(700, 545)])
+p.link(uicore, audio, rel("chime, alert, done"), points=[(700, 545)])
+p.link(uicore, sens, rel("lux, motion"), points=[(345, 270), (345, 825)])
 p.link(screens, batt, rel("level"), points=[(340, 700)])
 p.link(settings, nvs, rel("save"))
 p.link(settings, storage, rel("backup"))
@@ -230,6 +242,16 @@ dismiss = p.add(c4label("dismissEvent_", "Action: dismiss", "Remembers a dismiss
                 COMPONENT, 660, 500, 260, 100)
 showcal = p.add(c4label("showCalendar_", "Action: showcal", "Shows or hides one calendar on the display."),
                 COMPONENT, 660, 630, 260, 100)
+addt = p.add(c4label("addTask_", "Action: add", "Quick add: a new task in a list, with a due day."), COMPONENT, 660, 760, 260, 100)
+duet = p.add(c4label("setTaskDue_", "Action: due", "End-of-day review: moves a task to another day."),
+             COMPONENT, 660, 890, 260, 100)
+star = p.add(c4label("starEvent_", "Action: star", "Starts or stops a countdown to a meeting."), COMPONENT, 660, 1020, 260, 100)
+dates = p.add(c4label("getDates_", "Helper (cached 6 h)", "Starred meetings, birthdays (Contacts) and public holidays."),
+              COMPONENT, 1010, 720, 250, 110)
+travel = p.add(c4label("addTravel_", "Helper (cached 30 min)", "Travel minutes from CONFIG.HOME_ADDRESS to each location."),
+               COMPONENT, 1010, 870, 250, 110)
+freq = p.add(c4label("frequentTasks_", "Helper", "Titles you complete most often, for quick add."), COMPONENT, 1010, 1020, 250, 100)
+gmaps = p.add(c4label("Google Maps", "External system"), EXTERNAL, 1340, 880, 220, 90)
 events = p.add(c4label("getEvents_", "Helper", "Reads shown calendars, skips dismissed, trims text."),
                COMPONENT, 1010, 170, 250, 110)
 tasks = p.add(c4label("getTasks_", "Helper", "Reads task lists (CONFIG.TASKLIST_IDS or all)."), COMPONENT, 1010, 370, 250, 100)
@@ -237,10 +259,11 @@ props = p.add(c4label("Script properties", "Store", "dismissed, hiddenCalendars 
               STORE, 1010, 540, 250, 130)
 gcal = p.add(c4label("Google Calendar", "External system"), EXTERNAL, 1340, 170, 220, 90)
 gtasks = p.add(c4label("Google Tasks", "External system"), EXTERNAL, 1340, 370, 220, 90)
-p.add("<b>CONFIG</b> at the top of Code.gs: TOKEN, DAYS_AHEAD, MAX_EVENTS, MAX_RANGE_EVENTS, MAX_TASKS, TASKLIST_IDS",
-      NOTE, 40, 780, 900, 30)
+p.add("<b>CONFIG</b> at the top of Code.gs: TOKEN, DAYS_AHEAD, MAX_EVENTS, MAX_RANGE_EVENTS, MAX_TASKS, TASKLIST_IDS, "
+      "HOME_ADDRESS, TRAVEL_MODE, HOLIDAYS_CALENDAR, BIRTHDAYS, DATES_DAYS_AHEAD, FREQUENT_TASKS",
+      NOTE, 40, 1160, 1200, 30)
 p.link(fw, router, rel("GET ?token&action", "HTTPS"))
-for comp in (feed, rng, status, dismiss, showcal):
+for comp in (feed, rng, status, dismiss, showcal, addt, duet, star):
     p.link(router, comp)
 p.link(feed, events)
 p.link(rng, events)
@@ -251,6 +274,15 @@ p.link(tasks, gtasks, rel("Tasks.Tasks.list"))
 p.link(dismiss, props)
 p.link(showcal, props)
 p.link(events, props, rel("reads"))
+p.link(feed, dates)
+p.link(feed, travel)
+p.link(feed, freq)
+p.link(star, props, rel("starred"))
+p.link(dates, gcal, rel("Calendar API"), points=[(1300, 775)])
+p.link(travel, gmaps, rel("DirectionFinder"))
+p.link(addt, gtasks, rel("Tasks.Tasks.insert"), points=[(1300, 810)])
+p.link(duet, gtasks, rel("Tasks.Tasks.patch"), points=[(1290, 940)])
+p.link(freq, gtasks, rel("completed tasks"), points=[(1310, 1070)])
 pages.append(p)
 
 # ---- Flows --------------------------------------------------------------------
@@ -557,6 +589,114 @@ flow("Check for update by hand",
       ("err", SCREEN + "|R", 4, "Error + how to upload from the setup page", "end")],
      [("tap", "dlg", ""), ("dlg", "check", ""), ("check", "res", ""), ("res", "latest", "same"), ("res", "avail", "newer"),
       ("res", "err", "failed"), ("avail", "inst", ""), ("inst", "go", "")])
+
+flow("Quick add task",
+     "From the + button on Home or Tasks. Layout A: keyboard, B: tiles of your frequent tasks, C: sheet with suggestions.",
+     [UI, SCREEN, SYNC, SCRIPT, GOOGLE],
+     [("tap", UI, 0, "Taps + Add a task", "start"),
+      ("lay", SCREEN, 1, "Which layout?", "decide"),
+      ("kb", SCREEN, 2, "A: full keyboard, list and due chips", "step"),
+      ("tiles", SCREEN + "|R", 2, "B: tiles of frequent tasks, due chips", "step"),
+      ("pick", UI, 3, "Types or picks a title, picks a day", "step"),
+      ("opt", SCREEN, 4, "Add to the list at once (temporary id)", "step"),
+      ("send", SYNC, 5, "Queue action add", "step"),
+      ("ins", SCRIPT, 6, "addTask_: insert with due day", "step"),
+      ("g", GOOGLE, 7, "Task created in Google Tasks", "step"),
+      ("next", SYNC, 8, "Next sync replaces the temporary id", "end")],
+     [("tap", "lay", ""), ("lay", "kb", "A or C"), ("lay", "tiles", "B"), ("kb", "pick", ""), ("tiles", "pick", ""),
+      ("pick", "opt", "Add"), ("opt", "send", ""), ("send", "ins", "HTTPS"), ("ins", "g", ""), ("g", "next", "")])
+
+flow("Focus timer",
+     "Hold a task on Home or Tasks. Layout A: ring, B: split screen, C: only a pill in the header.",
+     [UI, SCREEN, SYNC],
+     [("hold", UI, 0, "Holds a task", "start"),
+      ("on", SCREEN, 1, "Focus timer on in Features?", "decide"),
+      ("start", SCREEN, 2, "Start: Settings focus minutes", "step"),
+      ("show", SCREEN, 3, "A/B: full-screen timer; C: header pill", "step"),
+      ("ctl", UI, 4, "Hide, Pause, +5 min, Done or Stop", "step"),
+      ("tick", SCREEN, 5, "Time is up?", "decide"),
+      ("ring", SCREEN, 6, "Done sound; ask: Mark task done?", "step"),
+      ("done", SYNC, 7, "Complete the task (see Complete a task)", "end"),
+      ("off", SCREEN + "|R", 2, "Nothing happens", "end")],
+     [("hold", "on", ""), ("on", "start", "yes"), ("on", "off", "no"), ("start", "show", ""), ("show", "ctl", ""),
+      ("ctl", "tick", ""), ("tick", "ring", "yes"), ("ring", "done", "Mark task done")])
+
+flow("Daily summary and end-of-day review",
+     "Each switched on in Features with its own time. Shown once a day, up to 2 hours late (for example after night mode).",
+     [SCREEN, UI, SYNC],
+     [("tick", SCREEN, 0, "daily_tick every 5 s", "start"),
+      ("sum", SCREEN, 1, "Summary time and not shown today?", "decide"),
+      ("show", SCREEN, 2, "Summary A tiles, B timeline or C briefing", "step"),
+      ("go", UI, 3, "Taps Start my day", "end"),
+      ("rev", SCREEN, 3, "Review time, open tasks left?", "decide"),
+      ("list", SCREEN, 4, "Review A checklist, B one at a time, C plan by day", "step"),
+      ("act", UI, 5, "Done, Tomorrow, Next week or a day", "step"),
+      ("move", SYNC, 6, "Complete, or action due (setTaskDue_)", "end")],
+     [("tick", "sum", ""), ("sum", "show", "yes"), ("show", "go", ""), ("sum", "rev", "no"), ("rev", "list", "yes"),
+      ("list", "act", ""), ("act", "move", "")])
+
+flow("Conflict alerts",
+     "Overlapping timed meetings across every account. Layout A: banner on Home, B: compare popup, C: marks in Week.",
+     [SYNC, SCREEN, UI],
+     [("snap", SYNC, 0, "New snapshot", "start"),
+      ("find", SCREEN, 1, "find_conflicts over the next 7 days", "step"),
+      ("lay", SCREEN, 2, "Which layout?", "decide"),
+      ("a", SCREEN, 3, "A: red banner and red outlines on Home", "step"),
+      ("b", SCREEN + "|R", 3, "B: compare popup once per overlap (next 24 h)", "step"),
+      ("c", SCREEN, 4, "C: red outline and warning on Week days", "step"),
+      ("cmp", UI, 5, "Compare: Hide one, or Keep both", "step"),
+      ("hide", SYNC, 6, "Hide = dismiss (see Dismiss a meeting)", "end")],
+     [("snap", "find", ""), ("find", "lay", ""), ("lay", "a", "A"), ("lay", "b", "B"), ("lay", "c", "C"),
+      ("a", "cmp", "tap Compare"), ("b", "cmp", ""), ("cmp", "hide", "Hide this one")])
+
+flow("Leave-by alert",
+     "Needs CONFIG.HOME_ADDRESS in the account's script. Travel time comes from Google Maps, cached 30 minutes.",
+     [SCRIPT, SYNC, SCREEN, UI],
+     [("feed", SCRIPT, 0, "Feed: travelMin for meetings with a location", "start"),
+      ("snap", SYNC, 1, "Snapshot with travel times", "step"),
+      ("tick", SCREEN, 2, "alerts_tick: within lead time of leave time?", "decide"),
+      ("once", SCREEN, 3, "Alert sound once per meeting", "step"),
+      ("lay", SCREEN, 4, "Which layout?", "decide"),
+      ("a", SCREEN, 5, "A: full-screen Leave in N min", "step"),
+      ("b", SCREEN + "|R", 5, "B: card at the top of Today", "step"),
+      ("c", SCREEN, 6, "C: countdown chip in the header", "step"),
+      ("ok", UI, 7, "Got it, or opens the details with travel info", "end")],
+     [("feed", "snap", ""), ("snap", "tick", ""), ("tick", "once", "yes"), ("once", "lay", ""), ("lay", "a", "A"),
+      ("lay", "b", "B"), ("lay", "c", "C"), ("a", "ok", ""), ("b", "ok", "tap"), ("c", "ok", "tap")])
+
+flow("Countdowns, birthdays and holidays",
+     "Star a meeting in its details to count down to it. Layout A: column on Home, B: ribbon, C: Dates tab.",
+     [UI, SCREEN, SYNC, SCRIPT],
+     [("star", UI, 0, "Taps Count down to this", "start"),
+      ("opt", SCREEN, 1, "Add to dates at once", "step"),
+      ("act", SYNC, 2, "Queue action star", "step"),
+      ("save", SCRIPT, 3, "starEvent_: save in properties", "step"),
+      ("dates", SCRIPT, 4, "getDates_: starred, birthdays, holidays (60 days)", "step"),
+      ("show", SCREEN, 5, "Shown per layout with days left", "end")],
+     [("star", "opt", ""), ("opt", "act", ""), ("act", "save", "HTTPS"), ("save", "dates", "next sync"),
+      ("dates", "show", "feed")])
+
+flow("Change layouts",
+     "Settings > Features > Layouts, or a feature's options. Works like the theme picker.",
+     [UI, SCREEN, "Settings store"],
+     [("open", UI, 0, "Opens Layouts", "start"),
+      ("pick", UI, 1, "Picks a preset or A, B or C for one screen", "step"),
+      ("save", "Settings store", 2, "Save layouts[] (NVS and SD backup)", "step"),
+      ("build", SCREEN, 3, "Rebuild every screen in the new layouts", "step"),
+      ("back", SCREEN, 4, "Back on the same screen", "end")],
+     [("open", "pick", ""), ("pick", "save", ""), ("save", "build", ""), ("build", "back", "")])
+
+flow("Ambient light and motion wake",
+     "Both optional sensors, each with a switch in Features.",
+     ["Sensors", SCREEN],
+     [("lux", "Sensors", 0, "BH1750 read once a second", "start"),
+      ("amb", SCREEN, 1, "Ambient light on?", "decide"),
+      ("lvl", SCREEN, 2, "Brightness setting scaled by room light (log curve)", "step"),
+      ("set", SCREEN, 3, "Change backlight in small steps", "end"),
+      ("pir", "Sensors", 4, "PIR on IO44: new movement", "start"),
+      ("mot", SCREEN, 5, "Motion wake on and not night?", "decide"),
+      ("wake", SCREEN, 6, "Count as a touch: undim", "end")],
+     [("lux", "amb", ""), ("amb", "lvl", "yes"), ("lvl", "set", ""), ("pir", "mot", ""), ("mot", "wake", "yes")])
 
 flow("First flash over USB",
      "Done once. After this every update arrives over Wi-Fi.",

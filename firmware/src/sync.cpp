@@ -31,6 +31,9 @@ constexpr const char *kActDismiss = "Dismiss";
 constexpr const char *kActComplete = "Complete";
 constexpr const char *kActUndo = "Undo";
 constexpr const char *kActCalendar = "Calendar change";
+constexpr const char *kActAdd = "Add task";
+constexpr const char *kActDue = "Move task";
+constexpr const char *kActStar = "Countdown";
 constexpr const char *kActOther = "Action";
 
 constexpr const char *kCachePath = "/calendar/cache_%08lx.json";  // offline copy on the SD card, per account list
@@ -44,7 +47,7 @@ constexpr uint32_t kTaskStack = 16384;
 
 // ---- State -------------------------------------------------------------------
 
-enum class ActionType { Dismiss, Complete, Uncomplete, ShowCalendar };
+enum class ActionType { Dismiss, Complete, Uncomplete, ShowCalendar, AddTask, SetDue, Star };
 
 struct Action {
   ActionType type;
@@ -171,6 +174,7 @@ void parseEvents(JsonArray arr, uint8_t account, std::vector<Event> &out) {
     ev.description = e["desc"].as<String>();
     ev.organizer = e["org"].as<String>();
     ev.guests = e["guests"].as<uint16_t>();
+    ev.travelMin = e["travelMin"] | 0;
     out.push_back(ev);
   }
 }
@@ -188,6 +192,41 @@ void parseTasks(JsonArray arr, uint8_t account, std::vector<Task> &out) {
     task.parent = t["parent"].as<String>();
     out.push_back(task);
   }
+}
+
+void parseLists(JsonArray arr, uint8_t account, std::vector<TaskList> &out) {
+  for (JsonObject l : arr) out.push_back({account, l["id"].as<String>(), l["title"].as<String>()});
+}
+
+void parseDates(JsonArray arr, uint8_t account, std::vector<DateItem> &out) {
+  for (JsonObject d : arr) {
+    const String kind = d["kind"].as<String>();
+    DateItem item{kind == "star" ? DateKind::Star : kind == "birthday" ? DateKind::Birthday : DateKind::Holiday,
+                  d["title"].as<String>(), d["day"].as<String>(), d["key"].as<String>(), account};
+    // Every account sees the same public holidays; keep one of each.
+    const bool dup = std::any_of(out.begin(), out.end(), [&](const DateItem &o) {
+      return o.kind == item.kind && o.day == item.day && o.title == item.title;
+    });
+    if (!dup && item.day.length() == 10) out.push_back(item);
+  }
+}
+
+void parseFrequent(JsonArray arr, std::vector<String> &out) {
+  for (JsonVariant v : arr) {
+    const String t = v.as<String>();
+    if (t.length() && std::find(out.begin(), out.end(), t) == out.end()) out.push_back(t);
+  }
+}
+
+// Everything in a feed besides events and tasks.
+struct Extras {
+  std::vector<TaskList> lists;
+  std::vector<DateItem> dates;
+  std::vector<String> frequent;
+};
+
+void sortDates(std::vector<DateItem> &dates) {
+  std::stable_sort(dates.begin(), dates.end(), [](const DateItem &a, const DateItem &b) { return a.day < b.day; });
 }
 
 void parseCalendars(JsonArray arr, std::vector<CalendarInfo> &out) {
@@ -231,11 +270,14 @@ void sortAndFilter(std::vector<Event> &events, std::vector<Task> &tasks) {
 
 // Applies one account's feed reply to the snapshot fields passed in.
 bool applyFeed(const String &body, uint8_t account, std::vector<Event> &events,
-               std::vector<Task> &tasks, AccountStatus &status, String &err) {
+               std::vector<Task> &tasks, Extras &extras, AccountStatus &status, String &err) {
   JsonDocument doc;
   if (!parseResponse(body, doc, err)) return false;
   parseEvents(doc["events"].as<JsonArray>(), account, events);
   parseTasks(doc["tasks"].as<JsonArray>(), account, tasks);
+  parseLists(doc["lists"].as<JsonArray>(), account, extras.lists);
+  parseDates(doc["dates"].as<JsonArray>(), account, extras.dates);
+  parseFrequent(doc["frequent"].as<JsonArray>(), extras.frequent);
   parseCalendars(doc["calendars"].as<JsonArray>(), status.calendars);
   status.email = doc["account"].as<String>();
   if (doc["utcOffsetMin"].is<int>()) applyUtcOffset(doc["utcOffsetMin"].as<int>());
@@ -244,22 +286,28 @@ bool applyFeed(const String &body, uint8_t account, std::vector<Event> &events,
 
 // Shows whatever the SD card has until the first sync is done.
 void loadCache(const Settings &s) {
+  if (!s.offlineCopy) return;
   std::vector<Event> events;
   std::vector<Task> tasks;
+  Extras extras;
   std::vector<AccountStatus> accounts(s.accounts.size());
   bool any = false;
   for (uint8_t i = 0; i < s.accounts.size(); i++) {
     String body, err;
     if (storage_read(cachePath(s.accounts[i]).c_str(), body) &&
-        applyFeed(body, i, events, tasks, accounts[i], err)) {
+        applyFeed(body, i, events, tasks, extras, accounts[i], err)) {
       any = true;
     }
   }
   if (!any) return;
   Guard g;
   sortAndFilter(events, tasks);
+  sortDates(extras.dates);
   snapshot.events = std::move(events);
   snapshot.tasks = std::move(tasks);
+  snapshot.lists = std::move(extras.lists);
+  snapshot.dates = std::move(extras.dates);
+  snapshot.frequent = std::move(extras.frequent);
   snapshot.accounts = std::move(accounts);
   snapshot.offline = true;
   snapshot.version++;
@@ -269,6 +317,7 @@ void fetchAll(const Settings &s) {
   const size_t n = s.accounts.size();
   std::vector<Event> events;
   std::vector<Task> tasks;
+  Extras extras;
   std::vector<AccountStatus> accounts;
   std::vector<bool> fetched(n, false);
   {
@@ -282,11 +331,11 @@ void fetchAll(const Settings &s) {
     String body, err;
     AccountStatus status = accounts[i];
     if (httpGet(accountUrl(s.accounts[i], ""), body, err) &&
-        applyFeed(body, i, events, tasks, status, err)) {
+        applyFeed(body, i, events, tasks, extras, status, err)) {
       fetched[i] = true;
       status.syncedAt = time(nullptr);
       status.error = "";
-      storage_write(cachePath(s.accounts[i]).c_str(), body);
+      if (s.offlineCopy) storage_write(cachePath(s.accounts[i]).c_str(), body);
     } else {
       status.error = err;
       if (errors.length()) errors += kErrJoin;
@@ -304,14 +353,25 @@ void fetchAll(const Settings &s) {
   for (const Task &t : snapshot.tasks) {
     if (t.account < n && !fetched[t.account]) tasks.push_back(t);
   }
+  for (const TaskList &l : snapshot.lists) {
+    if (l.account < n && !fetched[l.account]) extras.lists.push_back(l);
+  }
+  for (const DateItem &d : snapshot.dates) {
+    if (d.account < n && !fetched[d.account]) extras.dates.push_back(d);
+  }
+  if (extras.frequent.empty()) extras.frequent = snapshot.frequent;
   // Actions that have been sent are reflected in this fetch; forget them.
   for (auto it = hidden.begin(); it != hidden.end();) {
     it = it->second ? hidden.erase(it) : std::next(it);
   }
   sortAndFilter(events, tasks);
+  sortDates(extras.dates);
 
   snapshot.events = std::move(events);
   snapshot.tasks = std::move(tasks);
+  snapshot.lists = std::move(extras.lists);
+  snapshot.dates = std::move(extras.dates);
+  snapshot.frequent = std::move(extras.frequent);
   snapshot.accounts = std::move(accounts);
   snapshot.error = errors;
   if (!errors.length()) {
@@ -354,6 +414,9 @@ const char *actionName(ActionType t) {
     case ActionType::Complete: return kActComplete;
     case ActionType::Uncomplete: return kActUndo;
     case ActionType::ShowCalendar: return kActCalendar;
+    case ActionType::AddTask: return kActAdd;
+    case ActionType::SetDue: return kActDue;
+    case ActionType::Star: return kActStar;
   }
   return kActOther;
 }
@@ -567,6 +630,66 @@ void sync_show_calendar(uint8_t account, const String &calendarId, bool shown) {
     }
     pending.push_back({ActionType::ShowCalendar, account, "",
                        "action=showcal&id=" + urlEncode(calendarId) + "&shown=" + (shown ? "1" : "0")});
+    snapshot.version++;
+  }
+  wake();
+}
+
+void sync_add_task(uint8_t account, const String &listId, const String &title, const String &dueKey) {
+  {
+    Guard g;
+    // Shown straight away; the next sync replaces it with the real task.
+    Task t;
+    t.account = account;
+    t.id = "new:" + String(millis());
+    t.listId = listId;
+    t.title = title;
+    t.dueKey = dueKey;
+    for (const TaskList &l : snapshot.lists) {
+      if (l.account == account && l.id == listId) t.list = l.title;
+    }
+    snapshot.tasks.push_back(t);
+    std::vector<Event> none;
+    sortAndFilter(none, snapshot.tasks);
+    String q = "action=add&title=" + urlEncode(title);
+    if (listId.length()) q += "&list=" + urlEncode(listId);
+    if (dueKey.length()) q += "&due=" + dueKey;
+    pending.push_back({ActionType::AddTask, account, "", q});
+    snapshot.version++;
+  }
+  wake();
+}
+
+void sync_set_task_due(const Task &task, const String &dueKey) {
+  {
+    Guard g;
+    for (Task &t : snapshot.tasks) {
+      if (t.account == task.account && t.id == task.id) t.dueKey = dueKey;
+    }
+    std::vector<Event> none;
+    sortAndFilter(none, snapshot.tasks);
+    pending.push_back({ActionType::SetDue, task.account, "",
+                       "action=due&list=" + urlEncode(task.listId) + "&task=" + urlEncode(task.id) + "&due=" + dueKey});
+    snapshot.version++;
+  }
+  wake();
+}
+
+void sync_star_event(const Event &ev, bool on, const String &dayKey) {
+  {
+    Guard g;
+    auto &d = snapshot.dates;
+    d.erase(std::remove_if(d.begin(), d.end(), [&](const DateItem &x) {
+      return x.kind == DateKind::Star && x.key == ev.key;
+    }), d.end());
+    if (on) {
+      d.push_back({DateKind::Star, ev.title, dayKey, ev.key, ev.account});
+      sortDates(d);
+    }
+    pending.push_back({ActionType::Star, ev.account, "",
+                       "action=star&event=" + urlEncode(ev.key) + "&on=" + (on ? "1" : "0") + "&title=" +
+                           urlEncode(ev.title) + "&start=" + String((long long)ev.start) + "&allDay=" +
+                           (ev.allDay ? "1" : "0")});
     snapshot.version++;
   }
   wake();

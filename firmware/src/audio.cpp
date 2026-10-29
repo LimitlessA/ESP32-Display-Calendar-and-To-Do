@@ -16,6 +16,8 @@ struct Note {
 
 // Sounds: change the notes here
 const Note kChime[] = {{880.0f, 220}, {1318.5f, 420}};  // meeting reminder: A5 then E6
+const Note kAlert[] = {{987.8f, 160}, {987.8f, 160}, {1318.5f, 420}};  // leave-by: B5 B5 E6
+const Note kDone[] = {{1046.5f, 160}, {1318.5f, 160}, {1568.0f, 460}};  // focus timer over: C6 E6 G6
 const Note kTick[] = {{2000.0f, 18}};
 constexpr float kMaxGain = 0.6f;  // loudness at 100% volume
 
@@ -90,6 +92,18 @@ void audio_begin() {
 void audio_chime(uint8_t volume) {
   if (!queue || volume == 0) return;
   Sound s = {kChime, 2, volume};
+  xQueueSend(queue, &s, 0);
+}
+
+void audio_alert(uint8_t volume) {
+  if (!queue || volume == 0) return;
+  Sound s = {kAlert, 3, volume};
+  xQueueSend(queue, &s, 0);
+}
+
+void audio_done(uint8_t volume) {
+  if (!queue || volume == 0) return;
+  Sound s = {kDone, 3, volume};
   xQueueSend(queue, &s, 0);
 }
 

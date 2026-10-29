@@ -23,3 +23,10 @@ void sync_dismiss_event(const Event &ev);
 void sync_complete_task(const Task &task);
 void sync_uncomplete_task(const Task &task);
 void sync_show_calendar(uint8_t account, const String &calendarId, bool shown);
+
+// Quick add: a new task in that account's list (empty listId = its default list).
+void sync_add_task(uint8_t account, const String &listId, const String &title, const String &dueKey);
+// Moves a task to another day (yyyy-MM-dd, empty = no date).
+void sync_set_task_due(const Task &task, const String &dueKey);
+// Starred events show as countdowns. dayKey is the event's local day (yyyy-MM-dd).
+void sync_star_event(const Event &ev, bool on, const String &dayKey);

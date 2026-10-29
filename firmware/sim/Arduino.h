@@ -53,6 +53,9 @@ class String {
   bool endsWith(const String &p) const {
     return s_.size() >= p.s_.size() && s_.compare(s_.size() - p.s_.size(), p.s_.size(), p.s_) == 0;
   }
+  void toLowerCase() {
+    for (char &ch : s_) ch = (char)tolower((unsigned char)ch);
+  }
   void toUpperCase() {
     for (char &ch : s_) ch = toupper((unsigned char)ch);
   }

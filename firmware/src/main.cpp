@@ -9,6 +9,7 @@
 #include "battery.h"
 #include "display.h"
 #include "ota.h"
+#include "sensors.h"
 #include "settings.h"
 #include "storage.h"
 #include "sync.h"
@@ -31,6 +32,7 @@ void setup() {
   storage_begin();  // first, so settings can fall back to the SD backup
   settings_begin();
   display_init();
+  sensors_begin();  // after the display: the light sensor uses the touch I2C bus
   battery_begin();
   audio_begin();
   wifi_begin();
