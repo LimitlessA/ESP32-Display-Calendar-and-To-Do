@@ -160,7 +160,23 @@ firmware/         PlatformIO project for the display
   src/fonts/      Montserrat (English characters) and icons (tools/gen_fonts.sh)
   sim/            desktop build of the UI that renders screenshots (sim/build.sh)
 .github/workflows GitHub build: factory image, OTA image, releases
+docs/             C4 architecture and feature flows (architecture.drawio)
 ```
+
+Every source file starts with a "Texts and settings" block holding its
+on-screen texts and tunable numbers, so you can change wording or timings
+without reading the code.
+
+## Architecture diagrams
+
+`docs/architecture.drawio` opens in [draw.io](https://app.diagrams.net) or the
+VS Code Draw.io extension. It has one page per level of the C4 model (system
+context, containers, firmware components, Apps Script components) and one
+swimlane flow per feature: start-up, Wi-Fi, adding an account, background
+sync, dismissing a meeting, completing a task, week view, reminders, night
+mode, themes, calendars, settings, removing an account, the three update paths
+and the first flash. The file is generated: edit `docs/diagrams/build_drawio.py`
+and run `python3 docs/diagrams/build_drawio.py`.
 
 To check UI changes without the board, run `firmware/sim/build.sh` (needs gcc,
 git and Python with Pillow); screenshots of every screen and theme land in

@@ -201,7 +201,9 @@ void ui_init() {
   seenSettings = settings_version();
   g_settings = settings_get();
   ui_set_backlight(g_settings.brightness);
+  if (!g_settings.wifiSsid.length()) current = Screen::Wifi;  // first start: connect first
   buildAll();
+  if (current == Screen::Wifi) wifi_on_show();  // start the network scan
 }
 
 void ui_update(const Snapshot &snap) {
