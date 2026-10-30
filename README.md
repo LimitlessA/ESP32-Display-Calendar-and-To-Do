@@ -139,10 +139,16 @@ Each one has its own switch; some have an option such as a time.
 | Ambient light | Follows the room light (needs the BH1750) |
 | Motion wake | Wakes the screen when someone walks up (needs the PIR) |
 | Offline copy | Keeps the last sync on the microSD card |
+| Meeting timer | Time left in the meeting you are in, and a soft chime 5 minutes before the end |
+| Meeting cost | What a meeting costs: people × hourly rate (€45 by default) × time |
+| Phone presence | Notices your phone over Bluetooth; pair it once from the feature's options |
+| Procrastination radar | Counts how often each task is pushed back; "stuck" after 3 moves by default |
+| Task roulette | *Pick for me* on Tasks lets the display choose, favouring overdue tasks |
+| Smart desk | Controls a standing desk running [SmartStandingDeskDualCore](https://github.com/LimitlessA/SmartStandingDeskDualCore) |
 
 ### Layouts
 
-Settings › Features › *Layouts* works like the theme picker. Eight features
+Settings › Features › *Layouts* works like the theme picker. Fourteen features
 come in three layouts each, and you can mix them; the presets are *Your picks*,
 *All A*, *All B* and *All C*.
 
@@ -156,6 +162,38 @@ come in three layouts each, and you can mix them; the presets are *Your picks*,
 | Countdowns and dates | Home column | Ribbon (pick) | Dates tab |
 | End-of-day review | Checklist | One at a time | Plan by day (pick) |
 | Features screen | List | Tabs | Tiles (pick) |
+| Meeting timer | Progress on the meeting card (pick) | Full-screen countdown | Glowing top edge |
+| Phone presence | Welcome back summary (pick) | Privacy mode: titles read "Busy" | Away screen |
+| Meeting cost | On the meeting card (pick) | Big counter | Weekly receipt (Week screen) |
+| Procrastination radar | Glowing tasks (pick) | Daily nudge popup | Radar view (Tasks screen) |
+| Task roulette | Wheel (pick) | Card deck | Slot machine |
+| Smart desk | Dock on Home (pick) | Desk screen | Desk follows your calendar |
+
+### Phone presence
+
+Turn on Settings › Features › *Phone presence*, open it and tap *Pair a
+phone*. On the phone, open Bluetooth settings and pick **Calendar display**.
+It shows up as a media remote with no keys, so it never acts as a keyboard.
+From then on the phone reconnects by itself, and the display also recognises
+the phone's private Bluetooth address in passing. You count as away after 10
+minutes without your phone (an option). iPhones keep the link up reliably;
+some Android phones drop it to save battery, so allow a longer away time
+there. *Forget* removes the pairing on the display; also remove it on the
+phone.
+
+### Smart desk
+
+For a desk running
+[SmartStandingDeskDualCore](https://github.com/LimitlessA/SmartStandingDeskDualCore).
+On the setup page, under *Smart desk*, enter the desk's address (for example
+`smartdesk-a43c.local`) and, optionally, a desk account with the *user* role.
+Without an account the memory buttons and *Stop* work; with one you also get
+hold-to-raise/lower, the sit/stand timer and away mode. In the feature's
+options choose which memory buttons mean *sit* and *stand* (M1 and M2 by
+default). Layout C adds rules: stand for meetings of 15 minutes or more, stand
+while the focus timer runs, and away mode while your phone is away. A minute
+before a meeting it asks, with *Stay seated* to skip that one. The desk login
+is kept on the display like the Wi-Fi password.
 
 ### Themes
 
@@ -198,7 +236,9 @@ For a big change, raise the major or minor number of `FIRMWARE_VERSION` in
   the background, with an automatic roll-back if Google refuses.
 - Every screen is built once at start-up; switching pages only shows it and
   refreshes what changed.
-- Compiled with `-O2`.
+- LVGL and LovyanGFX are compiled with `-O2`; the rest with `-Os`, so the
+  firmware fits one 1.9 MB update slot (the build fails if it does not, and
+  prints how much room is left).
 
 ## Project layout
 
@@ -225,7 +265,8 @@ swimlane flow per feature: start-up, Wi-Fi, adding an account, background
 sync, dismissing a meeting, completing a task, week view, reminders, night
 mode, themes, calendars, settings, removing an account, quick add, the focus
 timer, the daily summary and review, conflicts, leave-by alerts, countdowns,
-layouts, the room sensors, the three update paths and the first flash. The file is generated: edit `docs/diagrams/build_drawio.py`
+layouts, the room sensors, the meeting timer and cost, phone presence, the
+procrastination radar, task roulette, the smart desk, the three update paths and the first flash. The file is generated: edit `docs/diagrams/build_drawio.py`
 and run `python3 docs/diagrams/build_drawio.py`.
 
 To check UI changes without the board, run `firmware/sim/build.sh` (needs gcc,

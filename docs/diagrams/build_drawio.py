@@ -110,7 +110,13 @@ p.link(display, gcal, rel("Reads meetings, hides dismissed ones", "HTTPS via App
 p.link(display, gtasks, rel("Reads tasks, marks them done", "HTTPS via Apps Script"))
 p.link(display, ntp, rel("Sets its clock", "NTP"))
 p.link(display, github, rel("Downloads new firmware", "HTTPS"))
+desk = p.add(c4label("Smart standing desk", "External system", "Andrei's own desk (SmartStandingDeskDualCore) with its web API."),
+             EXTERNAL, 1100, 620, 260, 120)
+phone = p.add(c4label("Andrei's phone", "External device", "Paired over Bluetooth LE to tell when Andrei is near."),
+              EXTERNAL, 1100, 820, 260, 120)
 p.link(other, gcal, rel("Shown as calendars", "ICS"))
+p.link(display, desk, rel("Reads height, recalls memories, stands up for meetings", "HTTP on Wi-Fi"))
+p.link(display, phone, rel("Sees it nearby", "Bluetooth LE"))
 pages.append(p)
 
 # ---- C4 level 2: containers ---------------------------------------------------
@@ -158,6 +164,11 @@ p.link(sensors, fw, rel("Light level, motion", "I2C, GPIO"))
 p.link(ci, rel_store, rel("Publishes on push to main"))
 p.link(fw, rel_store, rel("Checks manifest, downloads firmware", "HTTPS"))
 p.link(fw, ntp, rel("Sets the clock", "NTP"))
+desk = p.add(c4label("Smart standing desk", "External system: MicroPython web API at smartdesk-a43c.local"),
+             EXTERNAL, 1260, 960, 220, 100)
+phone = p.add(c4label("Phone", "External device, paired over BLE"), EXTERNAL, 80, 1040, 220, 80)
+p.link(fw, desk, rel("Status, memory recall, hold, timer, away mode", "HTTP + bearer login"), points=[(760, 1010)])
+p.link(phone, fw, rel("Advertises (resolvable private address)", "Bluetooth LE"), points=[(360, 1080), (360, 720)])
 pages.append(p)
 
 # ---- C4 level 3: firmware components ------------------------------------------
@@ -173,10 +184,11 @@ main = p.add(c4label("Main loop", "main.cpp", "Starts every module; every loop: 
 uicore = p.add(c4label("UI core", "ui.cpp", "Navigation, reminders, night mode, dimming, auto-update timing, toasts."),
                COMPONENT, 370, 130, 270, 120)
 screens = p.add(c4label("Screens", "ui_home, ui_detail, ui_week, ui_tasks, ui_night, ui_wifi, ui_accounts, "
-                        "ui_settings, ui_features, ui_dates",
+                        "ui_settings, ui_features, ui_dates, ui_desk",
                         "Built once; data parts rebuilt only when changed. Layout A, B or C per feature."),
                 COMPONENT, 370, 300, 270, 150)
-overlays = p.add(c4label("Overlays", "ui_overlays, ui_quickadd, ui_focus, ui_daily, ui_alerts",
+overlays = p.add(c4label("Overlays", "ui_overlays, ui_quickadd, ui_focus, ui_daily, ui_alerts, "
+                         "ui_meeting, ui_radar, ui_roulette, ui_presence",
                          "Reminder, update, theme and layout pickers, quick add, focus timer, daily summary, "
                          "end-of-day review, conflicts, leave-by."),
                  COMPONENT, 370, 490, 270, 150)
@@ -224,6 +236,16 @@ p.link(settings, nvs, rel("save"))
 p.link(settings, storage, rel("backup"))
 p.link(storage, sdc, rel("SPI"))
 p.link(uicore, settings, rel("read, save"), points=[(690, 230), (690, 715)])
+pres = p.add(c4label("Phone presence", "presence.cpp, NimBLE", "HID-looking BLE device, pairing window, RPA scan."),
+             COMPONENT, 1060, 455, 250, 90)
+deskc = p.add(c4label("Desk client", "desk.cpp", "Own task: polls the desk, queues commands, hold heartbeat."),
+              COMPONENT, 1060, 555, 250, 90)
+deskx = p.add(c4label("Smart desk", "External system"), EXTERNAL, 1420, 760, 200, 80)
+phonex = p.add(c4label("Phone", "BLE"), EXTERNAL, 1420, 460, 200, 80)
+p.link(uicore, pres, rel("near or away, pair, forget"), points=[(700, 480)])
+p.link(screens, deskc, rel("recall, hold, stop, timer, away"), points=[(700, 600)])
+p.link(phonex, pres, rel("adverts, bonded link"))
+p.link(deskc, deskx, rel("HTTP JSON"), points=[(1360, 600), (1360, 800)])
 pages.append(p)
 
 # ---- C4 level 3: Apps Script components ---------------------------------------
@@ -697,6 +719,79 @@ flow("Ambient light and motion wake",
       ("mot", SCREEN, 5, "Motion wake on and not night?", "decide"),
       ("wake", SCREEN, 6, "Count as a touch: undim", "end")],
      [("lux", "amb", ""), ("amb", "lvl", "yes"), ("lvl", "set", ""), ("pir", "mot", ""), ("mot", "wake", "yes")])
+
+PHONE = "Phone presence (BLE)"
+DESK = "Desk client (core 0)"
+
+flow("Meeting timer and cost",
+     "While a meeting runs. Timer A: bar on the card, B: full-screen countdown, C: glowing top edge. "
+     "Cost = people x hourly rate; A on the card, B big counter, C weekly receipt from Week.",
+     [SCREEN, UI],
+     [("tick", SCREEN, 0, "meeting_tick: a timed meeting is running?", "start"),
+      ("lay", SCREEN, 1, "Which timer layout?", "decide"),
+      ("a", SCREEN, 2, "A: progress bar, minutes left, cost on the card", "step"),
+      ("b", SCREEN + "|R", 2, "B: full-screen countdown and cost", "step"),
+      ("c", SCREEN, 3, "C: edge bar and pill above every screen", "step"),
+      ("chime", SCREEN, 4, "5 min before the end: soft chime once", "step"),
+      ("hide", UI, 5, "Hide, or opens Week > Meeting cost receipt", "end")],
+     [("tick", "lay", ""), ("lay", "a", "A"), ("lay", "b", "B"), ("lay", "c", "C"), ("a", "chime", ""),
+      ("b", "chime", ""), ("c", "chime", ""), ("chime", "hide", "")])
+
+flow("Phone presence",
+     "Pair once from Settings > Features > Phone presence. The phone counts as away after the Away minutes.",
+     [UI, PHONE, SCREEN],
+     [("pair", UI, 0, "Taps Pair a phone, picks Calendar display in Bluetooth", "start"),
+      ("bond", PHONE, 1, "Bonding open for 2 min; keeps the phone's IRK", "step"),
+      ("scan", PHONE, 2, "Scan: advert resolves with a stored IRK?", "decide"),
+      ("seen", PHONE, 3, "Mark seen now", "step"),
+      ("st", SCREEN, 4, "presence_tick: near or away?", "decide"),
+      ("a", SCREEN, 5, "A: back after 15+ min: welcome back summary", "step"),
+      ("b", SCREEN + "|R", 5, "B: away: titles shown as Busy", "step"),
+      ("c", SCREEN, 6, "C: away: away screen with the clock", "end")],
+     [("pair", "bond", ""), ("bond", "scan", ""), ("scan", "seen", "yes"), ("seen", "st", ""), ("st", "a", "A"),
+      ("st", "b", "B"), ("st", "c", "C")])
+
+flow("Procrastination radar",
+     "Counts how often each task's due date moved or passed, saved in /radar.txt on the TF card.",
+     [SYNC, SCREEN, UI],
+     [("snap", SYNC, 0, "New snapshot", "start"),
+      ("upd", SCREEN, 1, "radar_update: due date changed or missed? count a move", "step"),
+      ("stuck", SCREEN, 2, "Moves at least the Stuck setting?", "decide"),
+      ("a", SCREEN, 3, "A: glow and N x badge on the task", "step"),
+      ("b", SCREEN + "|R", 3, "B: one nudge popup a day", "step"),
+      ("c", SCREEN, 4, "C: Radar view from Tasks", "step"),
+      ("act", UI, 5, "Do it now (focus), pick a day, or Done", "end")],
+     [("snap", "upd", ""), ("upd", "stuck", ""), ("stuck", "a", "A"), ("stuck", "b", "B"), ("stuck", "c", "C"),
+      ("a", "act", "tap"), ("b", "act", ""), ("c", "act", "")])
+
+flow("Task roulette",
+     "Pick for me on Tasks. Overdue tasks weigh 3, due today 2, others 1, plus radar moves.",
+     [UI, SCREEN, SYNC],
+     [("tap", UI, 0, "Taps Pick for me", "start"),
+      ("w", SCREEN, 1, "Weight open tasks", "step"),
+      ("lay", SCREEN, 2, "Which layout?", "decide"),
+      ("a", SCREEN, 3, "A: wheel spins", "step"),
+      ("b", SCREEN + "|R", 3, "B: card deck shuffles", "step"),
+      ("c", SCREEN, 4, "C: slot machine: task, time, reward", "step"),
+      ("go", UI, 5, "Start now, or spin again", "step"),
+      ("focus", SCREEN, 6, "Focus timer on that task", "end")],
+     [("tap", "w", ""), ("w", "lay", ""), ("lay", "a", "A"), ("lay", "b", "B"), ("lay", "c", "C"), ("a", "go", ""),
+      ("b", "go", ""), ("c", "go", ""), ("go", "focus", "Start")])
+
+flow("Smart desk",
+     "Settings > Features > Smart desk, host and login on the setup page. Memories and Stop work without a login.",
+     [UI, SCREEN, DESK, "Smart desk"],
+     [("tap", UI, 0, "Taps a memory, holds raise or lower, or Stop", "start"),
+      ("q", SCREEN, 1, "Queue the command (screen never waits)", "step"),
+      ("login", DESK, 2, "Needs a login and no token?", "decide"),
+      ("auth", DESK + "|R", 2, "POST /api/auth/login", "step"),
+      ("send", DESK, 3, "POST /position, /api/desk/hold (every 350 ms), /interval/start...", "step"),
+      ("move", "Smart desk", 4, "Desk moves", "step"),
+      ("poll", DESK, 5, "Poll /api/desk/status every 0.5-2 s", "step"),
+      ("show", SCREEN, 6, "A: dock on Home, B: desk drawing, C: day timeline", "end"),
+      ("auto", SCREEN + "|R", 0, "C: meeting of 15+ min starts, focus starts or phone leaves", "start")],
+     [("tap", "q", ""), ("auto", "q", "rule on"), ("q", "login", ""), ("login", "auth", "yes"), ("auth", "send", "token"),
+      ("login", "send", "no"), ("send", "move", "HTTP"), ("move", "poll", ""), ("poll", "show", "")])
 
 flow("First flash over USB",
      "Done once. After this every update arrives over Wi-Fi.",
