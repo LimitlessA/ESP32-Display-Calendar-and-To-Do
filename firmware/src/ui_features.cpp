@@ -21,6 +21,11 @@ constexpr const char *kOff = "OFF";
 constexpr const char *kLayoutRow = "Layout";
 constexpr const char *kOptionRow = "When";
 constexpr const char *kPhoneRow = "Phone";
+constexpr const char *kDeskRow = "Desk";
+constexpr const char *kSitRow = "Sit";
+constexpr const char *kStandRow = "Stand";
+constexpr const char *kSlotChip = "M%d";
+constexpr const char *kDeskSetup = "Set the desk address and login on the setup page (Settings > Accounts).";
 constexpr const char *kPair = "Pair a phone";
 constexpr const char *kForget = "Forget";
 constexpr const char *kForgotten = "Paired phones removed. Also remove \"Calendar display\" in your phone's Bluetooth settings.";
@@ -49,11 +54,12 @@ const LayoutInfo kLayoutInfo[kLayoutCount] = {
     {"Meeting cost", {"On the card", "Big counter", "Weekly receipt"}},
     {"Procrastination radar", {"Glowing tasks", "Nudge popup", "Radar view"}},
     {"Task roulette", {"Wheel", "Card deck", "Slot machine"}},
+    {"Smart desk", {"Dock on Home", "Desk screen", "Follows calendar"}},
 };
 
 enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves };
 enum class Tab { Alerts, Meetings, Home, Tasks, Sensors, Device, Count };
-const char *kTabNames[] = {"Alerts", "Meetings", "Home screen", "Tasks", "Sensors and phone", "Device"};
+const char *kTabNames[] = {"Alerts", "Meetings", "Home screen", "Tasks", "Sensors and devices", "Device"};
 
 struct Feature {
   const char *name;
@@ -80,6 +86,7 @@ const Feature kFeatures[] = {
     {"Ambient light", "Dims in a dark room", &Settings::ambient, Opt::None, -1, Tab::Sensors},
     {"Motion wake", "PIR sensor on the UART header RX pin", &Settings::motion, Opt::None, -1, Tab::Sensors},
     {"Phone presence", "Away after %s without your phone", &Settings::presence, Opt::AwayMinutes, (int8_t)Layout::Presence, Tab::Sensors},
+    {"Smart desk", "Standing desk on Wi-Fi", &Settings::desk, Opt::None, (int8_t)Layout::Desk, Tab::Sensors},
     {"Offline copy", "Keep the last sync on the TF card", &Settings::offlineCopy, Opt::None, -1, Tab::Device},
 };
 constexpr int kFeatureCount = sizeof(kFeatures) / sizeof(kFeatures[0]);
@@ -369,6 +376,40 @@ void showDialog(int i) {
     lv_obj_t *l = mk_label(row, &font_14b, t.muted, optionLabel(f.opt));
     lv_obj_set_width(l, 70);
     on_click(mk_chip(row, optionValue(f.opt).c_str(), true), [](lv_event_t *) { stepOptionLater(dialogFeature); });
+  }
+  if (f.on == &Settings::desk) {
+    lv_obj_t *row = mk_box(card, 0, 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_width(row, 504);
+    set_flex(row, LV_FLEX_FLOW_ROW, 8);
+    lv_obj_t *l = mk_label(row, &font_14b, t.muted, kDeskRow);
+    lv_obj_set_width(l, 70);
+    const String st = g_settings.desk ? desk_status_text() : String(g_settings.deskHost);
+    lv_obj_t *status = mk_label(row, &font_14, t.text, st.c_str());
+    lv_obj_set_width(status, 420);
+    lv_label_set_long_mode(status, LV_LABEL_LONG_DOT);
+    // Which memory buttons mean sitting and standing.
+    lv_obj_t *slots = mk_box(card, 0, 0);
+    lv_obj_set_style_bg_opa(slots, LV_OPA_TRANSP, 0);
+    lv_obj_set_width(slots, 504);
+    set_flex(slots, LV_FLEX_FLOW_ROW, 10);
+    for (int stand = 0; stand < 2; stand++) {
+      lv_obj_t *sl = mk_label(slots, &font_14b, t.muted, stand ? kStandRow : kSitRow);
+      lv_obj_set_width(sl, stand ? 60 : 70);
+      const uint8_t v = stand ? g_settings.deskStandSlot : g_settings.deskSitSlot;
+      on_click(mk_chip(slots, strf(kSlotChip, v).c_str(), true), [](lv_event_t *e) {
+        lv_async_call([](void *p) {
+          Settings s = g_settings;
+          uint8_t &slot = p ? s.deskStandSlot : s.deskSitSlot;
+          slot = slot % 4 + 1;
+          ui_save_settings(s);
+          showDialog(dialogFeature);
+        }, lv_event_get_user_data(e));
+      }, (void *)(intptr_t)stand);
+    }
+    lv_obj_t *hint = mk_label(card, &font_12, t.muted, kDeskSetup);
+    lv_obj_set_width(hint, 504);
+    lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
   }
   if (f.on == &Settings::presence) {
     lv_obj_t *row = mk_box(card, 0, 0);

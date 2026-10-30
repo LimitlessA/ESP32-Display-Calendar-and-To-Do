@@ -62,6 +62,15 @@ String toJson(const Settings &s) {
   doc["radar"] = s.radar;
   doc["radarMoves"] = s.radarMoves;
   doc["roulette"] = s.roulette;
+  doc["desk"] = s.desk;
+  doc["deskHost"] = s.deskHost;
+  doc["deskUser"] = s.deskUser;
+  doc["deskPassword"] = s.deskPassword;
+  doc["deskSitSlot"] = s.deskSitSlot;
+  doc["deskStandSlot"] = s.deskStandSlot;
+  doc["deskMeetings"] = s.deskMeetings;
+  doc["deskFocus"] = s.deskFocus;
+  doc["deskAway"] = s.deskAway;
   JsonArray layouts = doc["layouts"].to<JsonArray>();
   for (uint8_t v : s.layouts) layouts.add(v);
   String out;
@@ -117,6 +126,15 @@ bool fromJson(const String &json, Settings &s) {
   s.radar = doc["radar"] | d.radar;
   s.radarMoves = max<uint8_t>(1, doc["radarMoves"] | d.radarMoves);
   s.roulette = doc["roulette"] | d.roulette;
+  s.desk = doc["desk"] | d.desk;
+  s.deskHost = doc["deskHost"] | d.deskHost;
+  s.deskUser = doc["deskUser"] | d.deskUser;
+  s.deskPassword = doc["deskPassword"] | d.deskPassword;
+  s.deskSitSlot = constrain(doc["deskSitSlot"] | d.deskSitSlot, 1, 4);
+  s.deskStandSlot = constrain(doc["deskStandSlot"] | d.deskStandSlot, 1, 4);
+  s.deskMeetings = doc["deskMeetings"] | d.deskMeetings;
+  s.deskFocus = doc["deskFocus"] | d.deskFocus;
+  s.deskAway = doc["deskAway"] | d.deskAway;
   JsonArray layouts = doc["layouts"].as<JsonArray>();
   for (uint8_t i = 0; i < kLayoutCount; i++) {
     const uint8_t v = i < layouts.size() ? layouts[i].as<uint8_t>() : kDefaultLayouts[i];

@@ -6,6 +6,7 @@
 #include "audio.h"
 #include "battery.h"
 #include "ota.h"
+#include "desk.h"
 #include "presence.h"
 #include "sensors.h"
 #include "settings.h"
@@ -132,6 +133,30 @@ void presence_pair(bool) {}
 bool presence_pairing() { return true; }
 int presence_paired_count() { return 1; }
 void presence_forget() {}
+
+// Smart desk: sitting at M1 with the timer running; sim_main can change it.
+DeskStatus g_sim_desk = [] {
+  DeskStatus d;
+  d.online = d.loggedIn = d.hasLogin = true;
+  d.heightMm = 802;
+  d.state = "SITTING";
+  d.memoryMm[0] = 720;
+  d.memoryMm[1] = 1120;
+  d.memoryMm[2] = 950;
+  d.memoryMm[3] = 1180;
+  d.timerRunning = true;
+  d.timerPhase = "SIT";
+  d.timerLeft = 12 * 60 + 20;
+  d.sitMinutes = d.standMinutes = 30;
+  return d;
+}();
+void desk_begin() {}
+DeskStatus desk_status() { return g_sim_desk; }
+void desk_recall(uint8_t slot) { g_sim_desk.heightMm = g_sim_desk.memoryMm[slot - 1]; }
+void desk_hold(int) {}
+void desk_stop() {}
+void desk_timer(bool on) { g_sim_desk.timerRunning = on; }
+void desk_away(bool) {}
 
 
 void battery_begin() {}

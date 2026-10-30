@@ -7,6 +7,7 @@
 
 #include "audio.h"
 #include "battery.h"
+#include "desk.h"
 #include "display.h"
 #include "ota.h"
 #include "sensors.h"
@@ -40,6 +41,7 @@ void setup() {
   sync_start();
   web_begin();
   ota_begin();
+  desk_begin();
 }
 
 void loop() {

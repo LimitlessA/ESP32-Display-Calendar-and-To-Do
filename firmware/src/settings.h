@@ -15,12 +15,12 @@ struct Account {
 // Screens that come in three layouts (A, B, C), chosen like a theme.
 enum class Layout : uint8_t {
   QuickAdd, Focus, Summary, Conflicts, LeaveBy, Dates, Review, Features,
-  MeetTimer, Presence, Cost, Radar, Roulette, Count
+  MeetTimer, Presence, Cost, Radar, Roulette, Desk, Count
 };
 constexpr uint8_t kLayoutCount = (uint8_t)Layout::Count;
 // The ones picked from the mockups: 1B 2A 3A 4A 5B 7B 8C 9C (the photo frame, row 6, was dropped),
-// then A for the meeting timer, phone presence, cost meter, radar and roulette.
-constexpr uint8_t kDefaultLayouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0};
+// then A for the meeting timer, phone presence, cost meter, radar, roulette and desk.
+constexpr uint8_t kDefaultLayouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0, 0};
 
 struct Settings {
   String wifiSsid;
@@ -67,7 +67,16 @@ struct Settings {
   bool radar = true;            // highlight tasks you keep postponing
   uint8_t radarMoves = 3;       // moves before a task counts as stuck
   bool roulette = true;         // let the display pick a task for you
-  uint8_t layouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0};  // see kDefaultLayouts
+  bool desk = false;            // control a smart standing desk over Wi-Fi
+  String deskHost = "smartdesk-a43c.local";
+  String deskUser;              // desk web UI account; empty = guest (memory buttons only)
+  String deskPassword;
+  uint8_t deskSitSlot = 1;      // memory button for sitting (M1-M4)
+  uint8_t deskStandSlot = 2;    // ...and for standing
+  bool deskMeetings = true;     // layout C: stand for meetings of 15 min or more
+  bool deskFocus = false;       // layout C: stand while the focus timer runs
+  bool deskAway = true;         // layout C: desk away mode while your phone is away
+  uint8_t layouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0, 0};  // see kDefaultLayouts
 
   uint8_t layout(Layout l) const { return layouts[(int)l]; }
 };

@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "ota.h"
+#include "desk.h"
 #include "presence.h"
 #include "settings.h"
 #include "sync.h"
@@ -17,6 +18,7 @@ extern OtaStatus g_sim_ota;
 extern uint32_t g_sim_ms;
 extern PhoneState g_sim_phone;
 extern long g_sim_seen_ago;
+extern DeskStatus g_sim_desk;
 void sim_set_settings(const Settings &s);
 
 static lv_color_t fb[SCREEN_W * SCREEN_H];
@@ -366,6 +368,34 @@ static void renderVariants(const char *dir) {
   ui_show(Screen::Tasks);
   setLayout(Layout::Radar, 0);
   render(dir, "r13-radar-tasks");
+
+  // Smart desk: a morning of sitting and standing, so the timeline has history.
+  Settings desk = g_settings;
+  desk.desk = true;
+  ui_save_settings(desk);
+  const time_t morning = g_sim_now;
+  ui_show(Screen::Settings);  // fewer screens to redraw while time runs
+  for (time_t t = at(2026, 10, 29, 8, 30); t < morning; t += 60) {
+    g_sim_now = t;
+    const int m = (int)((t - at(2026, 10, 29, 8, 30)) / 60);
+    g_sim_desk.heightMm = (m % 70) >= 45 ? 1120 : 720;
+    g_sim_ms += 600;
+    desk_tick();
+  }
+  g_sim_now = morning;
+  g_sim_desk.heightMm = 802;
+  for (uint8_t v = 0; v < 3; v++) {
+    snprintf(name, sizeof(name), "r15-desk-%c", abc[v]);
+    setLayout(Layout::Desk, v);
+    ui_show(v == 0 ? Screen::Home : Screen::Desk);
+    tick();
+    render(dir, name);
+    clearTop();
+  }
+  ui_show(Screen::Features);
+  render(dir, "r15-desk-features");
+  desk.desk = false;
+  ui_save_settings(desk);
 
   for (uint8_t v = 0; v < 3; v++) {
     snprintf(name, sizeof(name), "r14-roulette-%c", abc[v]);

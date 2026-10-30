@@ -78,6 +78,7 @@ void refresh(Screen s) {
     case Screen::Settings: settings_refresh(); break;
     case Screen::Features: features_refresh(); break;
     case Screen::Dates: dates_refresh(); break;
+    case Screen::Desk: desk_refresh(); break;
     default: break;
   }
 }
@@ -116,6 +117,7 @@ void buildAll() {
   screens[(int)Screen::Settings] = settings_create();
   screens[(int)Screen::Features] = features_create();
   screens[(int)Screen::Dates] = dates_create();
+  screens[(int)Screen::Desk] = desk_create();
   for (bool &d : dirty) d = true;
 
   if (current == Screen::Detail) current = Screen::Home;  // its event is gone
@@ -258,7 +260,8 @@ bool needsRebuild(const Settings &a, const Settings &b) {
          a.conflicts != b.conflicts || a.leaveBy != b.leaveBy || a.focus != b.focus ||
          a.meetTimer != b.meetTimer || a.costMeter != b.costMeter || a.costRate != b.costRate ||
          a.radar != b.radar || a.radarMoves != b.radarMoves || a.roulette != b.roulette ||
-         a.presence != b.presence;
+         a.presence != b.presence || a.desk != b.desk || a.deskSitSlot != b.deskSitSlot ||
+         a.deskStandSlot != b.deskStandSlot;
 }
 
 void hideToast(lv_timer_t *) {
@@ -317,6 +320,7 @@ void ui_tick() {
   focus_tick();
   meeting_tick();
   presence_tick();
+  desk_tick();
   checkReminders();
   alerts_tick();
   daily_tick();

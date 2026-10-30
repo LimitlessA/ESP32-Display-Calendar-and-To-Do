@@ -19,6 +19,7 @@ constexpr const char *kTabHome = "Home";
 constexpr const char *kTabWeek = "Week";
 constexpr const char *kTabTasks = "Tasks";
 constexpr const char *kTabDates = "Dates";  // only with the "Dates tab" layout
+constexpr const char *kTabDesk = "Desk";    // only with the desk screen layouts
 constexpr const char *kAm = " AM";
 constexpr const char *kPm = " PM";
 constexpr const char *kNoClock = "--:--";  // before the clock is set
@@ -300,6 +301,7 @@ const Tab kTabs[] = {
     {Screen::Week, ICON_CALENDAR, kTabWeek},
     {Screen::Tasks, ICON_TASKS, kTabTasks},
     {Screen::Dates, ICON_STAR, kTabDates},
+    {Screen::Desk, ICON_UPDOWN, kTabDesk},
     {Screen::Settings, ICON_SLIDERS, nullptr},
 };
 
@@ -371,6 +373,7 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   set_flex(nav, LV_FLEX_FLOW_ROW, 4);
   for (const Tab &tab : kTabs) {
     if (tab.screen == Screen::Dates && !datesTab()) continue;
+    if (tab.screen == Screen::Desk && !desk_tab()) continue;
     const bool on = tab.screen == active;
     lv_obj_t *b = mk_button(nav, on ? t.raised : t.header);
     lv_obj_set_height(b, TOUCH);

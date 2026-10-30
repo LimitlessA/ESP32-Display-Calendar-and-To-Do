@@ -30,7 +30,7 @@ constexpr int PAD = 14;
 constexpr int GAP = 12;
 constexpr int TOUCH = 44;  // smallest touch target
 
-enum class Screen { Home, Detail, Week, Tasks, Night, Wifi, Accounts, Settings, Features, Dates, Count };
+enum class Screen { Home, Detail, Week, Tasks, Night, Wifi, Accounts, Settings, Features, Dates, Desk, Count };
 
 // Latest data and settings, owned by ui.cpp.
 extern Snapshot g_snap;
@@ -178,6 +178,16 @@ String event_title(const Event &ev);  // "Busy" in privacy mode
 String presence_status();       // "1 paired · here now"
 void presence_pair_show();
 void presence_tick();
+
+bool presence_away();           // feature on and the phone is away
+
+// Smart desk (ui_desk.cpp, network in desk.cpp)
+bool desk_tab();                // layouts B and C: a Desk tab in the header
+lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w);  // layout A, Home; nullptr if off
+lv_obj_t *desk_create();
+void desk_refresh();
+void desk_tick();
+String desk_status_text();      // "80.2 cm · Sitting", or what is wrong
 
 // Marks every screen out of date and rebuilds the visible one.
 void ui_refresh_all();

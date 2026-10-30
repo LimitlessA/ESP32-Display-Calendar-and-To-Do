@@ -182,6 +182,8 @@ bool presence_private() {
   return g_settings.presence && g_settings.layout(Layout::Presence) == 1 && state == PhoneState::Away;
 }
 
+bool presence_away() { return g_settings.presence && state == PhoneState::Away; }
+
 bool presence_away_screen() {
   return g_settings.presence && g_settings.layout(Layout::Presence) == 2 && state == PhoneState::Away;
 }

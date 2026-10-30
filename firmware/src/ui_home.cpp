@@ -145,6 +145,9 @@ void layoutBody() {
   colH = BODY_H;
   if (lv_obj_t *r = mk_dates_ribbon(body, BODY_W)) colH -= lv_obj_get_style_height(r, 0) + 8;
   if (lv_obj_t *b = mk_conflict_banner(body, BODY_W)) colH -= lv_obj_get_style_height(b, 0) + 8;
+  // The desk dock goes last, under the columns.
+  lv_obj_t *dock = mk_desk_dock(body, BODY_W);
+  if (dock) colH -= lv_obj_get_style_height(dock, 0) + 8;
   const bool datesCol = g_settings.layout(Layout::Dates) == 0 && (g_settings.countdowns || g_settings.dates);
   colW = (BODY_W - 2 * GAP - (datesCol ? DATES_W + GAP : 0)) / 3;
 
@@ -152,6 +155,7 @@ void layoutBody() {
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_size(row, BODY_W, colH);
   set_flex(row, LV_FLEX_FLOW_ROW, GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  if (dock) lv_obj_move_to_index(dock, -1);
 
   todayList = list(column(row, kColToday, &todayCount), 8);
   lv_obj_t *mid = column(row, kColComingUp, nullptr);

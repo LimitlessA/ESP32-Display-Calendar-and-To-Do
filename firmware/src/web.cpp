@@ -24,6 +24,7 @@ constexpr const char *kTooMany = "Too many accounts";
 constexpr const char *kAdded = "Account added. It syncs within a few seconds.";
 constexpr const char *kRemoved = "Account removed.";
 constexpr const char *kLinkSaved = "Update link saved.";
+constexpr const char *kDeskSaved = "Desk settings saved. Turn the desk on in Settings > Features > Smart desk.";
 constexpr const char *kInstalled = "Installed. The display is restarting.";
 constexpr const char *kUpdateFailed = "Update failed: ";
 constexpr const char *kInterrupted = "upload interrupted";
@@ -68,6 +69,19 @@ const char kAddSection[] PROGMEM =
     "<label for=token>Token</label><input id=token name=token required>"
     "<label for=pin1>PIN from the display</label><input id=pin1 name=pin inputmode=numeric required>"
     "<button>Add account</button></form></div>";
+// Smart desk: address and the desk web UI login. Values go between the parts.
+const char kDeskStart[] PROGMEM =
+    "<h2>Smart desk</h2><div class=card><p>The display talks to the desk's own web UI. "
+    "Without a login only the memory buttons and Stop work; raise, lower, the sit/stand timer and "
+    "away mode need a desk account with the <b>user</b> role.</p>"
+    "<form method=post action=/settings/desk>"
+    "<label for=dhost>Desk address</label><input id=dhost name=host placeholder='smartdesk-a43c.local' value='";
+const char kDeskUser[] PROGMEM = "'><label for=duser>Desk username (optional)</label><input id=duser name=user autocomplete=off value='";
+const char kDeskEnd[] PROGMEM =
+    "'><label for=dpass>Desk password</label><input id=dpass name=pass type=password autocomplete=new-password "
+    "placeholder='unchanged if empty'>"
+    "<label for=pin4>PIN from the display</label><input id=pin4 name=pin inputmode=numeric required>"
+    "<button>Save desk</button></form></div>";
 const char kFirmwareSection[] PROGMEM =
     "<h2>Firmware update</h2><div class=card><p>New versions install by themselves (Settings &rsaquo; Auto-update). "
     "To install one by hand, upload a <b>firmware.bin</b> from a GitHub release or build. "
@@ -171,6 +185,11 @@ void handleRoot() {
   }
 
   h += FPSTR(kAddSection);
+  h += FPSTR(kDeskStart);
+  h += esc(s.deskHost);
+  h += FPSTR(kDeskUser);
+  h += esc(s.deskUser);
+  h += FPSTR(kDeskEnd);
   h += FPSTR(kFirmwareSection);
   h += esc(s.updateUrl);
   h += FPSTR(kPageEnd);
@@ -216,6 +235,19 @@ void handleUpdateUrl() {
   s.updateUrl.trim();
   settings_save(s);
   redirectHome(kLinkSaved);
+}
+
+void handleDesk() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  s.deskHost = server.arg("host");
+  s.deskHost.trim();
+  s.deskUser = server.arg("user");
+  s.deskUser.trim();
+  if (!s.deskUser.length()) s.deskPassword = "";
+  else if (server.arg("pass").length()) s.deskPassword = server.arg("pass");
+  settings_save(s);
+  redirectHome(kDeskSaved);
 }
 
 void handleUploadDone() {
@@ -270,6 +302,7 @@ void web_begin() {
   server.on("/account/add", HTTP_POST, handleAddAccount);
   server.on("/account/remove", HTTP_POST, handleRemoveAccount);
   server.on("/settings/update-url", HTTP_POST, handleUpdateUrl);
+  server.on("/settings/desk", HTTP_POST, handleDesk);
   server.on("/update", HTTP_POST, handleUploadDone, handleUpload);
   server.onNotFound([] { server.send(404, "text/plain", kNotFound); });
   server.begin();

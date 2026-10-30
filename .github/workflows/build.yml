@@ -41,6 +41,8 @@ jobs:
           export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION=\\\"$VERSION\\\""
           pio run -d firmware
           grep -q "$VERSION" firmware/.pio/build/crowpanel_5inch/firmware.bin || { echo "version $VERSION not in firmware"; exit 1; }
+          SIZE=$(stat -c%s firmware/.pio/build/crowpanel_5inch/firmware.bin)
+          echo "::notice::Firmware $SIZE of 1966080 bytes ($((SIZE * 100 / 1966080))% of an update slot, $(((1966080 - SIZE) / 1024)) KB free)"
       - name: Make the factory image and manifest
         run: |
           B=firmware/.pio/build/crowpanel_5inch
