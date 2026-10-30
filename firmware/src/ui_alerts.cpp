@@ -78,7 +78,7 @@ void eventColumn(lv_obj_t *parent, const Event &ev, int w) {
   lv_obj_set_style_border_color(col, c(ev.color), 0);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   mk_label(col, &font_20b, t.text, (fmt_time(ev.start / 1000) + " - " + fmt_time(ev.end / 1000)).c_str());
-  lv_obj_t *title = mk_label(col, &font_16s, t.text, ev.title.c_str());
+  lv_obj_t *title = mk_label(col, &font_16s, t.text, event_title(ev).c_str());
   lv_obj_set_width(title, w - 32);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
   lv_obj_t *cal = mk_label(col, &font_12, t.muted, ev.calendar.c_str());
@@ -114,7 +114,7 @@ void leaveAlertShow(const Event &ev, time_t leaveAt) {
   lv_obj_t *head = mk_label(leaveLayer, &font_34b, t.accent, mins > 0 ? strf(kLeaveIn, mins).c_str() : kLeaveNow);
   lv_obj_set_style_text_letter_space(head, 1, 0);
   lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 140);
-  lv_obj_t *title = mk_label(leaveLayer, &font_26b, t.text, ev.title.c_str());
+  lv_obj_t *title = mk_label(leaveLayer, &font_26b, t.text, event_title(ev).c_str());
   lv_obj_set_width(title, SCREEN_W - 120);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
@@ -276,7 +276,7 @@ lv_obj_t *mk_leave_card(lv_obj_t *parent, int w) {
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   leaveCardLabel = mk_label(col, w < 240 ? &font_16s : &font_20b, t.accent, leaveCardText(leaveAt).c_str());
   lv_obj_add_event_cb(card, [](lv_event_t *) { leaveCardLabel = nullptr; }, LV_EVENT_DELETE, nullptr);
-  lv_obj_t *title = mk_label(col, &font_14b, t.text, (ev->title + " \xC2\xB7 " + fmt_time(ev->start / 1000)).c_str());
+  lv_obj_t *title = mk_label(col, &font_14b, t.text, (event_title(*ev) + " \xC2\xB7 " + fmt_time(ev->start / 1000)).c_str());
   lv_obj_set_width(title, w - 24 - 42);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   mk_label(col, &font_12, t.muted, strf(kTravel, (int)ev->travelMin).c_str());

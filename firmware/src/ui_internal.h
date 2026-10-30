@@ -114,7 +114,7 @@ void review_show();
 
 // Focus timer (ui_focus.cpp)
 bool focus_enabled_for(const Task &task);
-void focus_start(const Task &task);
+void focus_start(const Task &task, int minutes = 0);  // 0 = the Focus timer setting
 void focus_hold(lv_obj_t *row, const Task &task);  // holding the row starts the timer
 bool focus_running();
 void focus_stop();
@@ -147,6 +147,40 @@ String day_key(time_t t);  // local yyyy-MM-dd
 
 // Daily summary and end-of-day review (ui_daily.cpp)
 void daily_tick();
+
+// Meeting timer and meeting cost (ui_meeting.cpp)
+const Event *meeting_now();                    // the timed meeting under way, if any
+long meeting_cost(const Event &ev, time_t upTo);  // people x rate x hours, whole currency units
+void mk_meeting_extras(lv_obj_t *card, const Event &ev, int w);  // Home card, layouts A
+bool meeting_receipt_on();                     // cost layout C: Week screen button
+void meeting_receipt_show();
+void meeting_tick();
+void meeting_reset();                          // before the screens are rebuilt
+
+// Procrastination radar (ui_radar.cpp)
+void radar_update();                 // after new data: counts moved and missed due dates
+int radar_moves(const Task &t);
+bool radar_stuck(const Task &t);     // moved at least the "stuck after" setting
+// Layout A: glow and a count on a task card; returns the "Moved 6 times since..." line or "".
+String radar_mark(lv_obj_t *card, const Task &t);
+void radar_nudge_show(const Task &t);  // layout B popup, also a tap in C
+bool radar_view_on();                // layout C: Tasks screen button
+void radar_view_show();
+void radar_tick();
+
+// Task roulette (ui_roulette.cpp)
+void roulette_show();
+
+// Phone presence (ui_presence.cpp, Bluetooth in presence.cpp)
+bool presence_private();        // layout B, phone away: meeting titles hidden
+bool presence_away_screen();    // layout C, phone away: show the night clock
+String event_title(const Event &ev);  // "Busy" in privacy mode
+String presence_status();       // "1 paired · here now"
+void presence_pair_show();
+void presence_tick();
+
+// Marks every screen out of date and rebuilds the visible one.
+void ui_refresh_all();
 
 // On-screen keyboard shared by Wi-Fi and quick add.
 lv_obj_t *mk_keyboard(lv_obj_t *parent, lv_obj_t *textarea);

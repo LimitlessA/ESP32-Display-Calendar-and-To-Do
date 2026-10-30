@@ -54,6 +54,14 @@ String toJson(const Settings &s) {
   doc["ambient"] = s.ambient;
   doc["motion"] = s.motion;
   doc["offlineCopy"] = s.offlineCopy;
+  doc["meetTimer"] = s.meetTimer;
+  doc["presence"] = s.presence;
+  doc["awayMinutes"] = s.awayMinutes;
+  doc["costMeter"] = s.costMeter;
+  doc["costRate"] = s.costRate;
+  doc["radar"] = s.radar;
+  doc["radarMoves"] = s.radarMoves;
+  doc["roulette"] = s.roulette;
   JsonArray layouts = doc["layouts"].to<JsonArray>();
   for (uint8_t v : s.layouts) layouts.add(v);
   String out;
@@ -101,6 +109,14 @@ bool fromJson(const String &json, Settings &s) {
   s.ambient = doc["ambient"] | d.ambient;
   s.motion = doc["motion"] | d.motion;
   s.offlineCopy = doc["offlineCopy"] | d.offlineCopy;
+  s.meetTimer = doc["meetTimer"] | d.meetTimer;
+  s.presence = doc["presence"] | d.presence;
+  s.awayMinutes = max<uint8_t>(1, doc["awayMinutes"] | d.awayMinutes);
+  s.costMeter = doc["costMeter"] | d.costMeter;
+  s.costRate = doc["costRate"] | d.costRate;
+  s.radar = doc["radar"] | d.radar;
+  s.radarMoves = max<uint8_t>(1, doc["radarMoves"] | d.radarMoves);
+  s.roulette = doc["roulette"] | d.roulette;
   JsonArray layouts = doc["layouts"].as<JsonArray>();
   for (uint8_t i = 0; i < kLayoutCount; i++) {
     const uint8_t v = i < layouts.size() ? layouts[i].as<uint8_t>() : kDefaultLayouts[i];

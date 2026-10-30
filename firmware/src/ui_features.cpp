@@ -1,6 +1,7 @@
 // Settings > Features: a switch for every feature, in three layouts (mockup
 // row 9: A list, B tabs, C tiles), plus the layout picker, which works like
 // the theme picker: every screen that comes in A, B and C can be switched.
+#include "presence.h"
 #include "sensors.h"
 #include "ui_internal.h"
 
@@ -19,6 +20,10 @@ constexpr const char *kOn = "ON";
 constexpr const char *kOff = "OFF";
 constexpr const char *kLayoutRow = "Layout";
 constexpr const char *kOptionRow = "When";
+constexpr const char *kPhoneRow = "Phone";
+constexpr const char *kPair = "Pair a phone";
+constexpr const char *kForget = "Forget";
+constexpr const char *kForgotten = "Paired phones removed. Also remove \"Calendar display\" in your phone's Bluetooth settings.";
 constexpr const char *kPresetPicks = "Your picks";
 constexpr const char *kPresetA = "All A";
 constexpr const char *kPresetB = "All B";
@@ -39,11 +44,16 @@ const LayoutInfo kLayoutInfo[kLayoutCount] = {
     {"Countdowns and dates", {"Home column", "Ribbon", "Dates tab"}},
     {"End-of-day review", {"Checklist", "One at a time", "Plan by day"}},
     {"Features screen", {"List", "Tabs", "Tiles"}},
+    {"Meeting timer", {"Card progress", "Full screen", "Glowing edge"}},
+    {"Phone presence", {"Welcome back", "Privacy mode", "Away screen"}},
+    {"Meeting cost", {"On the card", "Big counter", "Weekly receipt"}},
+    {"Procrastination radar", {"Glowing tasks", "Nudge popup", "Radar view"}},
+    {"Task roulette", {"Wheel", "Card deck", "Slot machine"}},
 };
 
-enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes };
-enum class Tab { Alerts, Home, Tasks, Sensors, Device, Count };
-const char *kTabNames[] = {"Alerts", "Home screen", "Tasks", "Sensors", "Device"};
+enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves };
+enum class Tab { Alerts, Meetings, Home, Tasks, Sensors, Device, Count };
+const char *kTabNames[] = {"Alerts", "Meetings", "Home screen", "Tasks", "Sensors and phone", "Device"};
 
 struct Feature {
   const char *name;
@@ -56,15 +66,20 @@ struct Feature {
 const Feature kFeatures[] = {
     {"Daily summary", "Every morning at %s", &Settings::summary, Opt::SummaryAt, (int8_t)Layout::Summary, Tab::Alerts},
     {"End-of-day review", "Every evening at %s", &Settings::review, Opt::ReviewAt, (int8_t)Layout::Review, Tab::Alerts},
-    {"Conflict alerts", "Overlapping meetings, all accounts", &Settings::conflicts, Opt::None, (int8_t)Layout::Conflicts, Tab::Alerts},
-    {"Leave-by alerts", "%s before you must leave", &Settings::leaveBy, Opt::LeaveLead, (int8_t)Layout::LeaveBy, Tab::Alerts},
+    {"Conflict alerts", "Overlapping meetings, all accounts", &Settings::conflicts, Opt::None, (int8_t)Layout::Conflicts, Tab::Meetings},
+    {"Leave-by alerts", "%s before you must leave", &Settings::leaveBy, Opt::LeaveLead, (int8_t)Layout::LeaveBy, Tab::Meetings},
+    {"Meeting timer", "Time left, chime 5 min before the end", &Settings::meetTimer, Opt::None, (int8_t)Layout::MeetTimer, Tab::Meetings},
+    {"Meeting cost", "People x %s per hour", &Settings::costMeter, Opt::CostRate, (int8_t)Layout::Cost, Tab::Meetings},
     {"Reminder sound", "Chime on the speaker", &Settings::sound, Opt::None, -1, Tab::Alerts},
     {"Focus timer", "%s, hold a task to start", &Settings::focus, Opt::FocusMinutes, (int8_t)Layout::Focus, Tab::Tasks},
     {"Quick add task", "Add tasks from the display", &Settings::quickAdd, Opt::None, (int8_t)Layout::QuickAdd, Tab::Tasks},
+    {"Procrastination radar", "Stuck after %s moves", &Settings::radar, Opt::RadarMoves, (int8_t)Layout::Radar, Tab::Tasks},
+    {"Task roulette", "Let the display pick a task", &Settings::roulette, Opt::None, (int8_t)Layout::Roulette, Tab::Tasks},
     {"Countdowns", "Starred events on Home", &Settings::countdowns, Opt::None, (int8_t)Layout::Dates, Tab::Home},
     {"Birthdays and holidays", "From Contacts and Google", &Settings::dates, Opt::None, (int8_t)Layout::Dates, Tab::Home},
     {"Ambient light", "Dims in a dark room", &Settings::ambient, Opt::None, -1, Tab::Sensors},
     {"Motion wake", "PIR sensor on the UART header RX pin", &Settings::motion, Opt::None, -1, Tab::Sensors},
+    {"Phone presence", "Away after %s without your phone", &Settings::presence, Opt::AwayMinutes, (int8_t)Layout::Presence, Tab::Sensors},
     {"Offline copy", "Keep the last sync on the TF card", &Settings::offlineCopy, Opt::None, -1, Tab::Device},
 };
 constexpr int kFeatureCount = sizeof(kFeatures) / sizeof(kFeatures[0]);
@@ -75,7 +90,11 @@ const uint16_t kSummaryTimes[] = {6 * 60, 6 * 60 + 30, 7 * 60, 7 * 60 + 30, 8 * 
 const uint16_t kReviewTimes[] = {17 * 60, 18 * 60, 19 * 60, 20 * 60, 20 * 60 + 30, 21 * 60, 22 * 60};
 const uint8_t kLeadMinutes[] = {5, 10, 15, 20, 30};
 const uint8_t kFocusMinutes[] = {15, 20, 25, 30, 45, 50, 60};
+const uint16_t kCostRates[] = {20, 30, 45, 60, 80, 100, 150};
+const uint8_t kAwayMinutes[] = {5, 10, 15, 30};
+const uint8_t kRadarMoves[] = {2, 3, 4, 5};
 constexpr const char *kMinutes = "%d min";
+constexpr const char *kMoney = "\u20AC%d";
 
 constexpr int BODY_Y = HEADER_H + GAP;
 constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
@@ -95,12 +114,26 @@ String fmtMinutes(uint16_t m) {
   return strf("%02d:%02d", m / 60, m % 60);
 }
 
+const char *optionLabel(Opt o) {
+  switch (o) {
+    case Opt::LeaveLead: return "Warn";
+    case Opt::FocusMinutes: return "Length";
+    case Opt::CostRate: return "Rate";
+    case Opt::AwayMinutes: return "Away";
+    case Opt::RadarMoves: return "Stuck";
+    default: return kOptionRow;
+  }
+}
+
 String optionValue(Opt o) {
   switch (o) {
     case Opt::SummaryAt: return fmtMinutes(g_settings.summaryAt);
     case Opt::ReviewAt: return fmtMinutes(g_settings.reviewAt);
     case Opt::LeaveLead: return strf(kMinutes, g_settings.leaveLead);
     case Opt::FocusMinutes: return strf(kMinutes, g_settings.focusMinutes);
+    case Opt::CostRate: return strf(kMoney, (int)g_settings.costRate);
+    case Opt::AwayMinutes: return strf(kMinutes, g_settings.awayMinutes);
+    case Opt::RadarMoves: return String((int)g_settings.radarMoves);
     default: return "";
   }
 }
@@ -120,6 +153,9 @@ void stepOption(Opt o) {
     case Opt::ReviewAt: s.reviewAt = nextOf(kReviewTimes, s.reviewAt); break;
     case Opt::LeaveLead: s.leaveLead = nextOf(kLeadMinutes, s.leaveLead); break;
     case Opt::FocusMinutes: s.focusMinutes = nextOf(kFocusMinutes, s.focusMinutes); break;
+    case Opt::CostRate: s.costRate = nextOf(kCostRates, s.costRate); break;
+    case Opt::AwayMinutes: s.awayMinutes = nextOf(kAwayMinutes, s.awayMinutes); break;
+    case Opt::RadarMoves: s.radarMoves = nextOf(kRadarMoves, s.radarMoves); break;
     default: return;
   }
   ui_save_settings(s);
@@ -251,8 +287,7 @@ void buildTabs() {
 // C: tiles; tap toggles, hold opens the options.
 void buildTiles() {
   const Theme &t = theme();
-  lv_obj_t *grid = mk_box(body, 0, 0);
-  lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
+  lv_obj_t *grid = mk_scroll_column(body, 0);  // scrolls once there are more than three rows
   lv_obj_set_size(grid, SCREEN_W - 2 * PAD, BODY_H);
   lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_style_pad_row(grid, 8, 0);
@@ -331,9 +366,34 @@ void showDialog(int i) {
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
     lv_obj_set_width(row, 504);
     set_flex(row, LV_FLEX_FLOW_ROW, 10);
-    lv_obj_t *l = mk_label(row, &font_14b, t.muted, kOptionRow);
+    lv_obj_t *l = mk_label(row, &font_14b, t.muted, optionLabel(f.opt));
     lv_obj_set_width(l, 70);
     on_click(mk_chip(row, optionValue(f.opt).c_str(), true), [](lv_event_t *) { stepOptionLater(dialogFeature); });
+  }
+  if (f.on == &Settings::presence) {
+    lv_obj_t *row = mk_box(card, 0, 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_width(row, 504);
+    set_flex(row, LV_FLEX_FLOW_ROW, 8);
+    lv_obj_t *l = mk_label(row, &font_14b, t.muted, kPhoneRow);
+    lv_obj_set_width(l, 70);
+    lv_obj_t *status = mk_label(row, &font_14, t.text, presence_status().c_str());
+    lv_obj_set_flex_grow(status, 1);
+    on_click(mk_chip(row, kPair, false), [](lv_event_t *) {
+      lv_async_call([](void *) {
+        close_overlay(&dialog);
+        presence_pair_show();
+      }, nullptr);
+    });
+    if (presence_paired_count() > 0) {
+      on_click(mk_chip(row, kForget, false), [](lv_event_t *) {
+        lv_async_call([](void *) {
+          presence_forget();
+          toast(kForgotten);
+          showDialog(dialogFeature);
+        }, nullptr);
+      });
+    }
   }
   if (f.layout >= 0) {
     lv_obj_t *row = mk_box(card, 0, 0);
@@ -385,9 +445,10 @@ void showPicker() {
   lv_obj_t *title = mk_label(head, &font_20b, t.text, kLayoutsTitle);
   lv_obj_set_flex_grow(title, 1);
   // Presets, like a set of themes for the layouts.
-  static const uint8_t kAllA[kLayoutCount] = {0, 0, 0, 0, 0, 0, 0, 0};
-  static const uint8_t kAllB[kLayoutCount] = {1, 1, 1, 1, 1, 1, 1, 1};
-  static const uint8_t kAllC[kLayoutCount] = {2, 2, 2, 2, 2, 2, 2, 2};
+  static uint8_t kAllA[kLayoutCount], kAllB[kLayoutCount], kAllC[kLayoutCount];
+  memset(kAllA, 0, kLayoutCount);
+  memset(kAllB, 1, kLayoutCount);
+  memset(kAllC, 2, kLayoutCount);
   struct Preset {
     const char *name;
     const uint8_t *values;

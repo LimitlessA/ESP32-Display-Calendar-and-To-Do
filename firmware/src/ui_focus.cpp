@@ -273,14 +273,15 @@ void build() {
 
 bool focus_enabled_for(const Task &) { return g_settings.focus; }
 
-void focus_start(const Task &t) {
+void focus_start(const Task &t, int minutes) {
   if (!g_settings.focus) return;
+  if (minutes <= 0) minutes = g_settings.focusMinutes;
   task = t;
   running = true;
   paused = over = false;
-  total = g_settings.focusMinutes * 60L;
+  total = minutes * 60L;
   endAt = ui_now() + total;
-  if (g_settings.layout(Layout::Focus) == 2) toast(strf(kStarted, (int)g_settings.focusMinutes));
+  if (g_settings.layout(Layout::Focus) == 2) toast(strf(kStarted, minutes));
   else build();
 }
 

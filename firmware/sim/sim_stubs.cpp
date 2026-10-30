@@ -6,6 +6,7 @@
 #include "audio.h"
 #include "battery.h"
 #include "ota.h"
+#include "presence.h"
 #include "sensors.h"
 #include "settings.h"
 #include "storage.h"
@@ -120,6 +121,17 @@ void sensors_begin() {}
 bool light_present() { return true; }
 int light_lux() { return 180; }
 bool motion_seen() { return false; }
+
+// Phone presence: sim_main sets g_sim_phone and g_sim_seen_ago to try the layouts.
+PhoneState g_sim_phone = PhoneState::Near;
+long g_sim_seen_ago = 20;
+void presence_apply(bool) {}
+PhoneState presence_state(uint8_t) { return g_sim_phone; }
+long presence_seen_ago() { return g_sim_seen_ago; }
+void presence_pair(bool) {}
+bool presence_pairing() { return true; }
+int presence_paired_count() { return 1; }
+void presence_forget() {}
 
 
 void battery_begin() {}

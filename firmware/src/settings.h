@@ -13,10 +13,14 @@ struct Account {
 };
 
 // Screens that come in three layouts (A, B, C), chosen like a theme.
-enum class Layout : uint8_t { QuickAdd, Focus, Summary, Conflicts, LeaveBy, Dates, Review, Features, Count };
+enum class Layout : uint8_t {
+  QuickAdd, Focus, Summary, Conflicts, LeaveBy, Dates, Review, Features,
+  MeetTimer, Presence, Cost, Radar, Roulette, Count
+};
 constexpr uint8_t kLayoutCount = (uint8_t)Layout::Count;
-// The ones picked from the mockups: 1B 2A 3A 4A 5B 7B 8C 9C (the photo frame, row 6, was dropped).
-constexpr uint8_t kDefaultLayouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2};
+// The ones picked from the mockups: 1B 2A 3A 4A 5B 7B 8C 9C (the photo frame, row 6, was dropped),
+// then A for the meeting timer, phone presence, cost meter, radar and roulette.
+constexpr uint8_t kDefaultLayouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0};
 
 struct Settings {
   String wifiSsid;
@@ -55,7 +59,15 @@ struct Settings {
   bool ambient = false;         // follow the room light (needs a BH1750 sensor)
   bool motion = false;          // wake when someone walks up (needs a PIR sensor)
   bool offlineCopy = true;      // keep the last sync on the TF card
-  uint8_t layouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2};  // see kDefaultLayouts
+  bool meetTimer = true;        // time left in the meeting you are in
+  bool presence = false;        // notice your phone over Bluetooth (pair it first)
+  uint8_t awayMinutes = 10;     // phone not seen this long = away
+  bool costMeter = false;       // what a meeting costs, people x hourly rate
+  uint16_t costRate = 45;       // per person per hour
+  bool radar = true;            // highlight tasks you keep postponing
+  uint8_t radarMoves = 3;       // moves before a task counts as stuck
+  bool roulette = true;         // let the display pick a task for you
+  uint8_t layouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0};  // see kDefaultLayouts
 
   uint8_t layout(Layout l) const { return layouts[(int)l]; }
 };

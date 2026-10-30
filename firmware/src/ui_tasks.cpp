@@ -16,6 +16,8 @@ constexpr const char *kNothingHere = "Nothing here";
 constexpr const char *kSeparator = " \xC2\xB7 ";  // between list, account and notes
 constexpr const char *kAddTask = "Add task";
 constexpr const char *kHoldHint = "Hold a task to start the focus timer";
+constexpr const char *kPickForMe = "Pick for me";
+constexpr const char *kRadar = "Radar";
 
 constexpr int NAV_W = 200;
 constexpr int BODY_Y = HEADER_H + GAP;
@@ -100,7 +102,8 @@ void taskRow(const Task &task, bool sub) {
   lv_obj_t *title = mk_label(text, &font_16, t.text, task.title.c_str());
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   lv_obj_set_width(title, PANEL_W - 24 - 56 - 110 - (sub ? 28 : 0));
-  String meta = task.list;
+  const String moved = radar_mark(row, task);
+  String meta = moved.length() ? moved + kSeparator + task.list : task.list;
   if (task.account < g_settings.accounts.size()) meta += kSeparator + g_settings.accounts[task.account].label;
   if (task.notes.length()) meta += kSeparator + task.notes;
   lv_obj_t *m = mk_label(text, &font_12, t.muted, meta.c_str());
@@ -157,6 +160,26 @@ void tasks_refresh() {
     mk_label(add, &font_14b, t.onAccent, ICON_PLUS);
     mk_label(add, &font_14b, t.onAccent, kAddTask);
     on_click(add, [](lv_event_t *) { quick_add_show(); });
+  }
+  if (g_settings.roulette || radar_view_on()) {
+    lv_obj_t *row = mk_box(nav, 0, 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_size(row, NAV_W, TOUCH);
+    set_flex(row, LV_FLEX_FLOW_ROW, 6);
+    if (g_settings.roulette) {
+      lv_obj_t *b = mk_button(row, t.raised, 12);
+      lv_obj_set_height(b, TOUCH);
+      lv_obj_set_flex_grow(b, 1);
+      lv_obj_center(mk_label(b, &font_14b, t.text, kPickForMe));
+      on_click(b, [](lv_event_t *) { roulette_show(); });
+    }
+    if (radar_view_on()) {
+      lv_obj_t *b = mk_button(row, t.raised, 12);
+      lv_obj_set_height(b, TOUCH);
+      lv_obj_set_flex_grow(b, 1);
+      lv_obj_center(mk_label(b, &font_14b, t.accent, kRadar));
+      on_click(b, [](lv_event_t *) { radar_view_show(); });
+    }
   }
   navButton(kAll, g_snap.tasks.size(), t.text, Selection{Filter::All, 0, ""});
   navButton(kOverdue, overdue, t.badFg, Selection{Filter::Overdue, 0, ""});

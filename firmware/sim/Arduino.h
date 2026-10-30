@@ -19,6 +19,8 @@ uint32_t millis(void);
 #include <string>
 
 inline void delay(uint32_t) {}
+inline long random(long howbig) { return howbig > 0 ? rand() % howbig : 0; }
+inline long random(long howsmall, long howbig) { return howbig > howsmall ? howsmall + rand() % (howbig - howsmall) : howsmall; }
 
 class String {
  public:

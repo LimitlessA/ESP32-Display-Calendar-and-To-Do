@@ -104,6 +104,7 @@ void buildAll() {
   clocks.clear();
   statusSlots.clear();
   reminder_hide();
+  meeting_reset();
 
   screens[(int)Screen::Home] = home_create();
   screens[(int)Screen::Detail] = detail_create();
@@ -167,7 +168,7 @@ void checkNightAndDim() {
   if (g_settings.motion && motion_seen() && current != Screen::Night) lv_disp_trig_activity(nullptr);
 
   const uint32_t idle = lv_disp_get_inactive_time(nullptr);
-  const bool night = inNightWindow();
+  const bool night = inNightWindow() || presence_away_screen();
 
   if (night && current != Screen::Night && idle > kNightIdleMs && !overlay_visible()) {
     beforeNight = Screen::Home;
@@ -254,7 +255,10 @@ void autoUpdate() {
 bool needsRebuild(const Settings &a, const Settings &b) {
   return a.theme != b.theme || memcmp(a.layouts, b.layouts, sizeof(a.layouts)) != 0 ||
          a.quickAdd != b.quickAdd || a.countdowns != b.countdowns || a.dates != b.dates ||
-         a.conflicts != b.conflicts || a.leaveBy != b.leaveBy || a.focus != b.focus;
+         a.conflicts != b.conflicts || a.leaveBy != b.leaveBy || a.focus != b.focus ||
+         a.meetTimer != b.meetTimer || a.costMeter != b.costMeter || a.costRate != b.costRate ||
+         a.radar != b.radar || a.radarMoves != b.radarMoves || a.roulette != b.roulette ||
+         a.presence != b.presence;
 }
 
 void hideToast(lv_timer_t *) {
@@ -281,6 +285,7 @@ void ui_init() {
 void ui_update(const Snapshot &snap) {
   const bool hadError = g_snap.error.length() > 0;
   g_snap = snap;
+  radar_update();
   for (bool &d : dirty) d = true;
   refresh(current);
   // Surface new problems once; the Settings screen keeps showing them.
@@ -310,9 +315,12 @@ void ui_tick() {
   if (current == Screen::Wifi) wifi_tick();
   ota_dialog_tick();
   focus_tick();
+  meeting_tick();
+  presence_tick();
   checkReminders();
   alerts_tick();
   daily_tick();
+  radar_tick();
   checkNightAndDim();
   refreshStatus();
   autoUpdate();
@@ -336,11 +344,17 @@ void ui_show(Screen s) {
   lv_scr_load(screens[(int)s]);
 }
 
+void ui_refresh_all() {
+  for (bool &d : dirty) d = true;
+  refresh(current);
+}
+
 Screen ui_current() {
   return current;
 }
 
 void ui_open_event(const Event &ev) {
+  if (presence_private()) return;
   detail_show(ev);
   ui_show(Screen::Detail);
 }

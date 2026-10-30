@@ -214,7 +214,7 @@ void home_refresh() {
       }
       set_flex(card, LV_FLEX_FLOW_COLUMN, 3, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
       mk_label(card, &font_20b, live ? t.accent : t.text, ev.allDay ? kAllDay : fmt_time(start).c_str());
-      lv_obj_t *title = mk_label(card, &font_16s, t.text, ev.title.c_str());
+      lv_obj_t *title = mk_label(card, &font_16s, t.text, event_title(ev).c_str());
       lv_obj_set_width(title, colW - 12 - TOUCH - 4);
       lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
       lv_obj_t *meta = mk_box(card, 0, 0);
@@ -225,6 +225,7 @@ void home_refresh() {
       lv_obj_t *ml = mk_label(meta, &font_12, t.muted, (m + " · " + ev.calendar).c_str());
       lv_label_set_long_mode(ml, LV_LABEL_LONG_DOT);
       lv_obj_set_width(ml, colW - 12 - TOUCH - 4 - 14);
+      if (live) mk_meeting_extras(card, ev, colW - 12 - TOUCH - 4);
       Event *copy = attach(card, ev);
       on_click(card, openEvent, copy);
 
@@ -255,7 +256,7 @@ void home_refresh() {
     lv_obj_t *tl = mk_label(open, &font_14b, clash ? t.badFg : t.muted, ev.allDay ? kAllDay : fmt_time(start).c_str());
     lv_obj_set_width(tl, g_settings.use24h ? 44 : 64);
     if (clash) mk_label(open, &font_12, t.badFg, ICON_WARNING);
-    lv_obj_t *title = mk_label(open, &font_14, t.text, ev.title.c_str());
+    lv_obj_t *title = mk_label(open, &font_14, t.text, event_title(ev).c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(title, 1);
     Event *copy = attach(row, ev);
@@ -292,9 +293,15 @@ void home_refresh() {
     lv_obj_t *title = mk_label(text, &font_14b, t.text, task.title.c_str());
     lv_obj_set_width(title, colW - 48 - 14);
     lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
+    const String moved = radar_mark(card, task);
+    if (moved.length()) lv_obj_set_width(title, colW - 48 - 14 - 40);  // room for the badge
     Tone tone;
     const String due = due_text(task.dueKey, tone);
-    if (due.length()) {
+    if (moved.length()) {
+      lv_obj_t *l = mk_label(text, &font_12, t.accent, moved.c_str());
+      lv_obj_set_width(l, colW - 48 - 14 - 40);
+      lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+    } else if (due.length()) {
       mk_label(text, &font_12, tone == Tone::Bad ? t.badFg : tone == Tone::Warn ? t.warnFg : t.muted, due.c_str());
     }
   }

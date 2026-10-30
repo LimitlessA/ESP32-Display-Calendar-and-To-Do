@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "ota.h"
+#include "presence.h"
 #include "settings.h"
 #include "sync.h"
 #include "ui.h"
@@ -14,6 +15,8 @@ Snapshot g_sim;
 time_t g_sim_now;
 extern OtaStatus g_sim_ota;
 extern uint32_t g_sim_ms;
+extern PhoneState g_sim_phone;
+extern long g_sim_seen_ago;
 void sim_set_settings(const Settings &s);
 
 static lv_color_t fb[SCREEN_W * SCREEN_H];
@@ -138,6 +141,7 @@ static void render(const char *dir, const char *name) {
   for (int i = 0; i < 5; i++) lv_timer_handler();
   lv_obj_invalidate(lv_scr_act());
   lv_obj_invalidate(lv_layer_top());
+  lv_obj_invalidate(lv_layer_sys());
   lv_refr_now(nullptr);
   char path[512];
   snprintf(path, sizeof(path), "%s/%s.ppm", dir, name);
@@ -268,6 +272,120 @@ static void renderVariants(const char *dir) {
   layout_picker_show();
   render(dir, "r9-layouts");
   clearTop();
+
+  // Round 4. During the design review (14:00-15:00, 6 people).
+  const time_t before = g_sim_now;
+  g_sim_now = at(2026, 10, 29, 14, 38);
+  Settings cost = g_settings;
+  cost.costMeter = true;
+  ui_save_settings(cost);
+  for (uint8_t v = 0; v < 3; v++) {
+    snprintf(name, sizeof(name), "r10-meeting-%c", abc[v]);
+    setLayout(Layout::MeetTimer, v);
+    Settings s = g_settings;
+    s.layouts[(int)Layout::Cost] = 2;  // no cost on the card or the full screen
+    ui_save_settings(s);
+    ui_show(Screen::Home);
+    tick();
+    render(dir, name);
+    clearTop();
+  }
+  for (uint8_t v = 0; v < 3; v++) {
+    snprintf(name, sizeof(name), "r11-cost-%c", abc[v]);
+    setLayout(Layout::Cost, v);
+    Settings s = g_settings;
+    s.layouts[(int)Layout::MeetTimer] = 2;
+    ui_save_settings(s);
+    ui_show(v == 2 ? Screen::Week : Screen::Home);
+    tick();
+    tick();  // the glowing edge of the timer stays on the system layer
+    if (v == 2) meeting_receipt_show();
+    render(dir, name);
+    clearTop();
+  }
+  Settings noCost = g_settings;
+  noCost.costMeter = false;
+  noCost.meetTimer = false;
+  ui_save_settings(noCost);
+  tick();
+  noCost.meetTimer = true;
+  ui_save_settings(noCost);
+  g_sim_now = before;
+
+  // Phone presence: away for 40 minutes, a meeting was added meanwhile.
+  for (uint8_t v = 0; v < 3; v++) {
+    snprintf(name, sizeof(name), "r12-presence-%c", abc[v]);
+    setLayout(Layout::Presence, v);
+    Settings s = g_settings;
+    s.presence = true;
+    ui_save_settings(s);
+    ui_show(Screen::Home);
+    g_sim_phone = PhoneState::Near;
+    tick();
+    g_sim_phone = PhoneState::Away;
+    g_sim_seen_ago = 600;
+    tick();
+    if (v == 0) {
+      g_sim.events.push_back(ev(1, "new1", at(2026, 10, 30, 16, 0), at(2026, 10, 30, 16, 30), "Budget sync", "Work",
+                                0x6C8CFF));
+      g_sim.version++;
+      tick();
+      g_sim_now += 8 * 60;  // away 18 min in all, before the next reminder
+      g_sim_phone = PhoneState::Near;
+      tick();
+      g_sim_now -= 8 * 60;
+    }
+    if (v == 2) ui_show(Screen::Night);
+    render(dir, name);
+    clearTop();
+    g_sim_phone = PhoneState::Near;
+    tick();
+  }
+  Settings noPresence = g_settings;
+  noPresence.presence = false;
+  ui_save_settings(noPresence);
+
+  // Procrastination radar: "Book flights" pushed back five times, slides three.
+  for (int i = 1; i <= 5; i++) {
+    for (Task &t : g_sim.tasks) {
+      if (t.id == "t3") t.dueKey = strf("2026-11-%02d", i);
+      if (t.id == "t6" && i <= 4) t.dueKey = strf("2026-11-%02d", i);
+    }
+    g_sim.version++;
+    tick();
+  }
+  for (uint8_t v = 0; v < 3; v++) {
+    snprintf(name, sizeof(name), "r13-radar-%c", abc[v]);
+    setLayout(Layout::Radar, v);
+    ui_show(v == 0 ? Screen::Home : Screen::Tasks);
+    if (v == 1) radar_nudge_show(taskById("t3"));
+    if (v == 2) radar_view_show();
+    render(dir, name);
+    clearTop();
+  }
+  ui_show(Screen::Tasks);
+  setLayout(Layout::Radar, 0);
+  render(dir, "r13-radar-tasks");
+
+  for (uint8_t v = 0; v < 3; v++) {
+    snprintf(name, sizeof(name), "r14-roulette-%c", abc[v]);
+    setLayout(Layout::Roulette, v);
+    roulette_show();
+    if (v == 0) {
+      for (int i = 0; i < 5; i++) lv_timer_handler();
+      render(dir, "r14-roulette-a-start");
+      // Press Spin: the last row of the box on the right.
+      lv_obj_t *box = lv_obj_get_child(lv_obj_get_child(lv_layer_top(), 0), 3);
+      lv_obj_t *row = lv_obj_get_child(box, lv_obj_get_child_cnt(box) - 1);
+      lv_event_send(lv_obj_get_child(row, 0), LV_EVENT_CLICKED, nullptr);
+    }
+    for (int i = 0; i < 40; i++) {
+      g_sim_ms += 100;
+      lv_timer_handler();
+    }
+    render(dir, name);
+    clearTop();
+  }
 }
 
 int main(int argc, char **argv) {

@@ -48,3 +48,9 @@
 #define ICON_BULB      "\xEF\x83\xAB"  // F0EB
 #define ICON_WALK      "\xEF\x95\x94"  // F554
 #define ICON_LAYERS    "\xEF\x97\xBD"  // F5FD
+#define ICON_PHONE     "\xEF\x8F\x8D"  // F3CD
+#define ICON_DICE      "\xEF\x94\xA2"  // F522
+#define ICON_UPDOWN    "\xEF\x8C\xB8"  // F338
+#define ICON_CARET_DN  "\xEF\x83\x97"  // F0D7
+#define ICON_CARET_UP  "\xEF\x83\x98"  // F0D8
+#define ICON_RADAR     "\xEF\x81\x9B"  // F05B
