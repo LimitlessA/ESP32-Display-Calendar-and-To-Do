@@ -17,6 +17,7 @@ struct Event {
   String description;
   String organizer;
   uint16_t guests;
+  uint16_t travelMin = 0;  // travel time from home for leave-by alerts, 0 = unknown
 };
 
 struct Task {
@@ -28,6 +29,23 @@ struct Task {
   String dueKey;     // yyyy-MM-dd, empty if no due date
   String notes;
   String parent;     // parent task id for subtasks
+};
+
+// A Google Tasks list, for picking where quick add puts a task.
+struct TaskList {
+  uint8_t account;
+  String id;
+  String title;
+};
+
+// Birthday, public holiday or starred event, for countdowns.
+enum class DateKind : uint8_t { Star, Birthday, Holiday };
+struct DateItem {
+  DateKind kind;
+  String title;
+  String day;        // yyyy-MM-dd
+  String key;        // starred: the event key
+  uint8_t account;
 };
 
 struct CalendarInfo {
@@ -48,6 +66,9 @@ struct Snapshot {
   std::vector<Event> events;          // next 7 days, all accounts merged, by start
   std::vector<Task> tasks;            // all accounts, dated first then undated
   std::vector<AccountStatus> accounts;  // same order as Settings::accounts
+  std::vector<TaskList> lists;        // every account's task lists
+  std::vector<DateItem> dates;        // next 60 days, by day, duplicates across accounts removed
+  std::vector<String> frequent;       // most often completed task titles, for quick add
 
   time_t weekStart = 0;               // local midnight of the week view's Monday
   std::vector<Event> week;            // events for that week

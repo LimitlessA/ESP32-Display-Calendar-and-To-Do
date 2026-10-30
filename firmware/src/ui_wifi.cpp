@@ -22,30 +22,6 @@ constexpr const char *kConnecting = "Connecting...";
 constexpr const char *kConnectedTo = ICON_CHECK "  Connected to %s  %s";  // network, IP address
 constexpr const char *kFailed = "Could not connect. Check the password and try again.";
 
-// On-screen keyboard layouts
-#define BKSP LV_SYMBOL_BACKSPACE
-#define OK LV_SYMBOL_OK
-const char *kLower[] = {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p", BKSP, "\n",
-                        "a", "s", "d", "f", "g", "h", "j", "k", "l", "\n",
-                        "ABC", "z", "x", "c", "v", "b", "n", "m", ".", "-", "\n",
-                        "1#", " ", OK, ""};
-const char *kUpper[] = {"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", BKSP, "\n",
-                        "A", "S", "D", "F", "G", "H", "J", "K", "L", "\n",
-                        "abc", "Z", "X", "C", "V", "B", "N", "M", ".", "-", "\n",
-                        "1#", " ", OK, ""};
-const char *kSpecial[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", BKSP, "\n",
-                          "!", "@", "#", "$", "%", "&", "*", "(", ")", "\n",
-                          "abc", "_", "+", "=", "?", "/", ":", ";", ",", "\"", "\n",
-                          "ABC", " ", OK, ""};
-#undef BKSP
-#undef OK
-
-constexpr lv_btnmatrix_ctrl_t F = LV_KEYBOARD_CTRL_BTN_FLAGS;
-const lv_btnmatrix_ctrl_t kCtrl[] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6 | F,
-                                     4, 4, 4, 4, 4, 4, 4, 4, 4,
-                                     6 | F, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-                                     3 | F, 10, 4 | F};
-
 constexpr int LIST_W = 290;
 constexpr int BODY_Y = HEADER_H + GAP;
 constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
@@ -170,20 +146,9 @@ lv_obj_t *wifi_create() {
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_width(row, RIGHT_W - 32);
   set_flex(row, LV_FLEX_FLOW_ROW, 8);
-  password = lv_textarea_create(row);
-  lv_textarea_set_one_line(password, true);
+  password = mk_textarea(row, kPassword);
   lv_textarea_set_password_mode(password, true);
-  lv_textarea_set_placeholder_text(password, kPassword);
-  lv_obj_set_height(password, 48);
   lv_obj_set_flex_grow(password, 1);
-  lv_obj_set_style_text_font(password, &font_16, 0);
-  lv_obj_set_style_bg_color(password, c(t.bg), 0);
-  lv_obj_set_style_text_color(password, c(t.text), 0);
-  lv_obj_set_style_border_color(password, c(t.accent), 0);
-  lv_obj_set_style_border_width(password, 2, 0);
-  lv_obj_set_style_radius(password, 12, 0);
-  lv_obj_set_scrollbar_mode(password, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_set_style_pad_ver(password, 12, 0);
   eye = mk_button(row, t.raised, 12);
   lv_obj_set_size(eye, 48, 48);
   lv_obj_center(mk_label(eye, &font_16, t.text, ICON_EYE));
@@ -195,27 +160,9 @@ lv_obj_t *wifi_create() {
   on_click(connectOpen, [](lv_event_t *) { connect(); });
   status = mk_label(form, &font_14, t.muted, "");
 
-  keyboard = lv_keyboard_create(scr);
-  lv_keyboard_set_map(keyboard, LV_KEYBOARD_MODE_TEXT_LOWER, kLower, kCtrl);
-  lv_keyboard_set_map(keyboard, LV_KEYBOARD_MODE_TEXT_UPPER, kUpper, kCtrl);
-  lv_keyboard_set_map(keyboard, LV_KEYBOARD_MODE_SPECIAL, kSpecial, kCtrl);
-  lv_keyboard_set_textarea(keyboard, password);
-  lv_obj_set_align(keyboard, LV_ALIGN_TOP_LEFT);  // the keyboard defaults to bottom-centre
+  keyboard = mk_keyboard(scr, password);
   lv_obj_set_pos(keyboard, RIGHT_X, BODY_Y + 148);
   lv_obj_set_size(keyboard, RIGHT_W, BODY_H - 148);
-  lv_obj_set_style_bg_color(keyboard, c(t.panel), 0);
-  lv_obj_set_style_radius(keyboard, 16, 0);
-  lv_obj_set_style_pad_all(keyboard, 8, 0);
-  lv_obj_set_style_pad_gap(keyboard, 5, 0);
-  lv_obj_set_style_border_width(keyboard, 0, 0);
-  lv_obj_set_style_bg_color(keyboard, c(t.raised), LV_PART_ITEMS);
-  lv_obj_set_style_bg_color(keyboard, c(t.line), LV_PART_ITEMS | LV_STATE_PRESSED);
-  lv_obj_set_style_bg_color(keyboard, c(t.raised), LV_PART_ITEMS | LV_STATE_CHECKED);
-  lv_obj_set_style_text_color(keyboard, c(t.text), LV_PART_ITEMS);
-  lv_obj_set_style_text_font(keyboard, &font_16, LV_PART_ITEMS);
-  lv_obj_set_style_radius(keyboard, 8, LV_PART_ITEMS);
-  lv_obj_set_style_border_width(keyboard, 0, LV_PART_ITEMS);
-  lv_obj_set_style_shadow_width(keyboard, 0, LV_PART_ITEMS);
   lv_obj_add_event_cb(keyboard, [](lv_event_t *) { connect(); }, LV_EVENT_READY, nullptr);
   return scr;
 }

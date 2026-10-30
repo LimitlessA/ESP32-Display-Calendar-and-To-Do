@@ -16,12 +16,15 @@ constexpr const char *kSeparator = " \xC2\xB7 ";  // " · " between calendar and
 constexpr const char *kOrganizer = "%s (organizer)";
 constexpr const char *kAndOthers = " and %d others";
 constexpr const char *kOthers = "%d others";
+constexpr const char *kStar = "Count down to this";
+constexpr const char *kStarred = "Counting down";
 
 // ---- State -------------------------------------------------------------------
 
 Event shown;
 lv_obj_t *dot, *calLabel, *untilLabel, *title, *whenLabel, *locRow, *locLabel;
 lv_obj_t *peopleRow, *peopleLabel, *descLabel, *remindBtn, *remindLabel;
+lv_obj_t *travelRow, *travelLabel, *starBtn, *starLabel;
 
 // ---- Code --------------------------------------------------------------------
 
@@ -46,6 +49,26 @@ void updateRemind() {
   lv_label_set_text(remindLabel, text.c_str());
   lv_obj_set_style_text_color(remindLabel, c(on ? theme().onAccent : theme().text), 0);
   lv_obj_set_style_bg_color(remindBtn, c(on ? theme().accent : theme().raised), 0);
+}
+
+bool starred() {
+  for (const DateItem &d : g_snap.dates) {
+    if (d.kind == DateKind::Star && d.key == shown.key) return true;
+  }
+  return false;
+}
+
+void updateStar() {
+  const Theme &t = theme();
+  if (!g_settings.countdowns) {
+    lv_obj_add_flag(starBtn, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  lv_obj_clear_flag(starBtn, LV_OBJ_FLAG_HIDDEN);
+  const bool on = starred();
+  lv_label_set_text(starLabel, on ? kStarred : kStar);
+  lv_obj_set_style_bg_color(starBtn, c(on ? t.warnBg : t.raised), 0);
+  lv_obj_set_style_text_color(lv_obj_get_child(starBtn, 0), c(on ? t.accent : t.text), 0);
 }
 
 }  // namespace
@@ -77,6 +100,7 @@ lv_obj_t *detail_create() {
 
   infoRow(card, ICON_CLOCK, &whenLabel);
   locRow = infoRow(card, ICON_PIN, &locLabel);
+  travelRow = infoRow(card, ICON_CAR, &travelLabel);
   peopleRow = infoRow(card, ICON_USERS, &peopleLabel);
 
   descLabel = mk_label(card, &font_14, t.muted, "");
@@ -104,6 +128,17 @@ lv_obj_t *detail_create() {
     const bool on = o == 1 || (o < 0 && g_settings.chime);
     ui_set_reminder_override(shown.key, on ? 0 : 1);
     updateRemind();
+  });
+
+  starBtn = mk_button(side, t.raised, 14);
+  lv_obj_set_size(starBtn, 220, 56);
+  lv_obj_set_style_pad_hor(starBtn, 14, 0);
+  set_flex(starBtn, LV_FLEX_FLOW_ROW, 10);
+  mk_label(starBtn, &font_16, t.text, ICON_STAR);
+  starLabel = mk_label(starBtn, &font_14b, t.text, "");
+  on_click(starBtn, [](lv_event_t *) {
+    sync_star_event(shown, !starred(), day_key(shown.start / 1000));
+    updateStar();
   });
 
   lv_obj_t *dismiss = mk_button(side, t.bg, 14);
@@ -142,6 +177,12 @@ void detail_show(const Event &ev) {
   } else {
     lv_obj_add_flag(locRow, LV_OBJ_FLAG_HIDDEN);
   }
+  if (ev.travelMin && g_settings.leaveBy) {
+    lv_obj_clear_flag(travelRow, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(travelLabel, travel_text(ev).c_str());
+  } else {
+    lv_obj_add_flag(travelRow, LV_OBJ_FLAG_HIDDEN);
+  }
   if (ev.guests || ev.organizer.length()) {
     lv_obj_clear_flag(peopleRow, LV_OBJ_FLAG_HIDDEN);
     String people = ev.organizer.length() ? strf(kOrganizer, ev.organizer.c_str()) : String("");
@@ -152,6 +193,7 @@ void detail_show(const Event &ev) {
   }
   lv_label_set_text(descLabel, ev.description.c_str());
   updateRemind();
+  updateStar();
   detail_tick();
 }
 

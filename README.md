@@ -2,8 +2,10 @@
 
 A touch display that shows your upcoming meetings from several Google accounts
 and your Google Tasks. From the screen you can dismiss a meeting, mark a task
-done (with Undo), browse the week, get a chime before meetings, and pick one of
-six themes. New firmware installs over Wi-Fi, so after the first flash you
+done (with Undo), add tasks, run a focus timer, browse the week, and get a
+chime before meetings, a "leave now" alert, a warning when meetings overlap, a
+morning summary and an evening review. Pick one of six themes, and for each
+feature one of three layouts. New firmware installs over Wi-Fi, so after the first flash you
 never need a cable again.
 
 | Home | Week | Tasks |
@@ -20,6 +22,13 @@ never need a cable again.
 - Optional: a LiPo on the battery connector. The board can't measure the
   battery itself; add a MAX17048 fuel gauge on the I2C header (address 0x36) if
   you want the level shown in Settings.
+- Optional: a **BH1750** light sensor (GY-302 board) on the I2C header (3V3,
+  GND, SDA, SCL; address 0x23). With *Ambient light* on, the screen dims in a
+  dark room.
+- Optional: a 3.3 V **PIR motion sensor** (for example AM312) with its output
+  on **IO44**, the RX pin of the UART header. With *Motion wake* on, the screen
+  wakes when someone walks up. IO44 is shared with the USB serial chip, so
+  unplug the sensor while flashing over USB.
 
 ## How it works
 
@@ -45,8 +54,12 @@ Do this once per account you want on the display.
 1. Sign in to the account and open <https://script.google.com/create>.
 2. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo.
 3. Open *Project Settings*, tick *Show "appsscript.json"*, and replace that file
-   with `apps-script/appsscript.json` (it turns on the Tasks service).
+   with `apps-script/appsscript.json` (it turns on the Tasks and Calendar
+   services).
 4. In `Code.gs`, change `TOKEN: 'change-me'` to a long random password.
+   For leave-by alerts, set `HOME_ADDRESS` to where you leave from (and
+   `TRAVEL_MODE` to `driving`, `walking`, `bicycling` or `transit`). For public
+   holidays of another country, change `HOLIDAYS_CALENDAR`.
 5. Pick `preview` in the function list and press *Run*. Allow access when
    Google asks. The log shows what the display will receive.
 6. *Deploy › New deployment › Web app*, with *Execute as: Me* and
@@ -108,6 +121,80 @@ Meetings and tasks appear within a few seconds.
 - **Settings**: brightness, chime volume, night mode, dim when idle, 12/24 h
   clock, theme, which calendars to show per account, and firmware updates.
 
+### Features (Settings › Features)
+
+Each one has its own switch; some have an option such as a time.
+
+| Feature | What it does |
+|---|---|
+| Quick add task | *+ Add a task* on Home and Tasks; suggests tasks you complete often |
+| Focus timer | Hold a task to start a timer (25 min by default); ends with *Mark task done* |
+| Daily summary | Your day at a glance every morning (07:00 by default) |
+| End-of-day review | Every evening, move or finish what is still open |
+| Conflict alerts | Highlights meetings that overlap, across all accounts |
+| Leave-by alerts | Warns before you must leave, using Google Maps travel time from `HOME_ADDRESS` |
+| Countdowns | Star a meeting in its details to count down to it |
+| Birthdays and holidays | From Google Contacts and the public holiday calendar |
+| Reminder sound | Chimes for reminders, leave-by alerts and the focus timer |
+| Ambient light | Follows the room light (needs the BH1750) |
+| Motion wake | Wakes the screen when someone walks up (needs the PIR) |
+| Offline copy | Keeps the last sync on the microSD card |
+| Meeting timer | Time left in the meeting you are in, and a soft chime 5 minutes before the end |
+| Meeting cost | What a meeting costs: people × hourly rate (€45 by default) × time |
+| Phone presence | Notices your phone over Bluetooth; pair it once from the feature's options |
+| Procrastination radar | Counts how often each task is pushed back; "stuck" after 3 moves by default |
+| Task roulette | *Pick for me* on Tasks lets the display choose, favouring overdue tasks |
+| Smart desk | Controls a standing desk running [SmartStandingDeskDualCore](https://github.com/LimitlessA/SmartStandingDeskDualCore) |
+
+### Layouts
+
+Settings › Features › *Layouts* works like the theme picker. Fourteen features
+come in three layouts each, and you can mix them; the presets are *Your picks*,
+*All A*, *All B* and *All C*.
+
+| Feature | A | B | C |
+|---|---|---|---|
+| Quick add task | Keyboard | Frequent tiles (pick) | Sheet over the list |
+| Focus timer | Big ring (pick) | Split screen | Header strip |
+| Daily summary | Stat tiles (pick) | Timeline | Briefing |
+| Conflict alerts | Banner on Home (pick) | Compare popup | Marked in Week |
+| Leave-by alert | Full screen | Card on Home (pick) | Header countdown |
+| Countdowns and dates | Home column | Ribbon (pick) | Dates tab |
+| End-of-day review | Checklist | One at a time | Plan by day (pick) |
+| Features screen | List | Tabs | Tiles (pick) |
+| Meeting timer | Progress on the meeting card (pick) | Full-screen countdown | Glowing top edge |
+| Phone presence | Welcome back summary (pick) | Privacy mode: titles read "Busy" | Away screen |
+| Meeting cost | On the meeting card (pick) | Big counter | Weekly receipt (Week screen) |
+| Procrastination radar | Glowing tasks (pick) | Daily nudge popup | Radar view (Tasks screen) |
+| Task roulette | Wheel (pick) | Card deck | Slot machine |
+| Smart desk | Dock on Home (pick) | Desk screen | Desk follows your calendar |
+
+### Phone presence
+
+Turn on Settings › Features › *Phone presence*, open it and tap *Pair a
+phone*. On the phone, open Bluetooth settings and pick **Calendar display**.
+It shows up as a media remote with no keys, so it never acts as a keyboard.
+From then on the phone reconnects by itself, and the display also recognises
+the phone's private Bluetooth address in passing. You count as away after 10
+minutes without your phone (an option). iPhones keep the link up reliably;
+some Android phones drop it to save battery, so allow a longer away time
+there. *Forget* removes the pairing on the display; also remove it on the
+phone.
+
+### Smart desk
+
+For a desk running
+[SmartStandingDeskDualCore](https://github.com/LimitlessA/SmartStandingDeskDualCore).
+On the setup page, under *Smart desk*, enter the desk's address (for example
+`smartdesk-a43c.local`) and, optionally, a desk account with the *user* role.
+Without an account the memory buttons and *Stop* work; with one you also get
+hold-to-raise/lower, the sit/stand timer and away mode. In the feature's
+options choose which memory buttons mean *sit* and *stand* (M1 and M2 by
+default). Layout C adds rules: stand for meetings of 15 minutes or more, stand
+while the focus timer runs, and away mode while your phone is away. A minute
+before a meeting it asks, with *Stay seated* to skip that one. The desk login
+is kept on the display like the Wi-Fi password.
+
 ### Themes
 
 Settings › Display and sound › Theme: **Midnight**, **Ocean**, **Forest**,
@@ -117,7 +204,7 @@ contrast in every theme.
 ## Firmware updates over Wi-Fi (no PC)
 
 **Automatic, on every push to main.** Each push to `main` builds the firmware
-with a new version number (`1.0.<build number>`) and publishes it as the
+with a new version number (`0.1.<build number>`) and publishes it as the
 latest GitHub release. The display looks for a new release every 3 hours and
 installs it by itself when nobody is using it: during night mode, or after 15
 minutes without a touch, and never in the 15 minutes before a meeting. The
@@ -129,7 +216,7 @@ still install by hand with Settings › *Check for update*.
 > be **public** (it contains no passwords: tokens live only on the display).
 > To change the update source, set another `manifest.json` address under
 > *Update link* on the setup page; the format is
-> `{"version":"1.1.0","url":"https://…/firmware.bin"}`.
+> `{"version":"0.2.0","url":"https://…/firmware.bin"}`.
 
 **From the setup page.** Download the **firmware** artifact from the Actions
 tab, open the display's setup page, choose `firmware.bin` (not `factory.bin`)
@@ -149,7 +236,9 @@ For a big change, raise the major or minor number of `FIRMWARE_VERSION` in
   the background, with an automatic roll-back if Google refuses.
 - Every screen is built once at start-up; switching pages only shows it and
   refreshes what changed.
-- Compiled with `-O2`.
+- LVGL and LovyanGFX are compiled with `-O2`; the rest with `-Os`, so the
+  firmware fits one 1.9 MB update slot (the build fails if it does not, and
+  prints how much room is left).
 
 ## Project layout
 
@@ -174,8 +263,10 @@ VS Code Draw.io extension. It has one page per level of the C4 model (system
 context, containers, firmware components, Apps Script components) and one
 swimlane flow per feature: start-up, Wi-Fi, adding an account, background
 sync, dismissing a meeting, completing a task, week view, reminders, night
-mode, themes, calendars, settings, removing an account, the three update paths
-and the first flash. The file is generated: edit `docs/diagrams/build_drawio.py`
+mode, themes, calendars, settings, removing an account, quick add, the focus
+timer, the daily summary and review, conflicts, leave-by alerts, countdowns,
+layouts, the room sensors, the meeting timer and cost, phone presence, the
+procrastination radar, task roulette, the smart desk, the three update paths and the first flash. The file is generated: edit `docs/diagrams/build_drawio.py`
 and run `python3 docs/diagrams/build_drawio.py`.
 
 To check UI changes without the board, run `firmware/sim/build.sh` (needs gcc,

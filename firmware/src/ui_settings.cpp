@@ -51,6 +51,9 @@ constexpr const char *kChimeSub = "%d min before each meeting";
 constexpr const char *kDim = "Dim when idle";
 constexpr const char *kDimSub = "after %d minutes";
 constexpr const char *kTimeFormat = "Time format";
+constexpr const char *kFeatures = "Features";
+constexpr const char *kFeaturesOn = "%d on";
+constexpr const char *kLayouts = "Layouts";
 constexpr const char *k24h = "24 h";
 constexpr const char *k12h = "12 h";
 
@@ -78,7 +81,7 @@ lv_obj_t *wifiName, *wifiInfo;
 lv_obj_t *accCount, *accProblem, *accEvery;
 lv_obj_t *sdInfo, *batInfo;
 lv_obj_t *syncLast, *syncNext;
-lv_obj_t *swNight, *swChime, *swDim, *swAuto, *fmt24, *fmt12, *themeName;
+lv_obj_t *swNight, *swChime, *swDim, *swAuto, *fmt24, *fmt12, *themeName, *featuresOn;
 
 // ---- Code --------------------------------------------------------------------
 
@@ -240,6 +243,23 @@ lv_obj_t *settings_create() {
   themeName = mk_label(themeBtn, &font_14b, t.text, theme().name);
   on_click(themeBtn, [](lv_event_t *) { theme_picker_show(); });
 
+  lv_obj_t *featRow = controlRow(left, kFeatures, "");
+  featuresOn = lv_obj_get_child(lv_obj_get_child(featRow, 0), 1);
+  lv_obj_t *buttons = mk_box(featRow, 0, 0);
+  lv_obj_set_style_bg_opa(buttons, LV_OPA_TRANSP, 0);
+  set_flex(buttons, LV_FLEX_FLOW_ROW, 6);
+  lv_obj_t *layoutsBtn = mk_button(buttons, t.raised, 20);
+  lv_obj_set_size(layoutsBtn, LV_SIZE_CONTENT, 40);
+  lv_obj_set_style_pad_hor(layoutsBtn, 12, 0);
+  set_flex(layoutsBtn, LV_FLEX_FLOW_ROW, 6);
+  mk_label(layoutsBtn, &font_14, t.accent, ICON_LAYERS);
+  mk_label(layoutsBtn, &font_14b, t.text, kLayouts);
+  on_click(layoutsBtn, [](lv_event_t *) { layout_picker_show(); });
+  lv_obj_t *featBtn = mk_button(buttons, t.raised, 20);
+  lv_obj_set_size(featBtn, 44, 40);
+  lv_obj_center(mk_label(featBtn, &font_14, t.text, ICON_RIGHT));
+  on_click(featBtn, [](lv_event_t *) { ui_show(Screen::Features); });
+
   const String night = strf(kNightModeSub, g_settings.nightStart / 60, g_settings.nightStart % 60,
                             g_settings.nightEnd / 60, g_settings.nightEnd % 60);
   swNight = mk_switch(controlRow(right, kNightMode, night.c_str()), g_settings.nightMode, toggled);
@@ -349,4 +369,5 @@ void settings_refresh() {
   lv_obj_set_style_bg_opa(fmt24, g_settings.use24h ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
   lv_obj_set_style_bg_opa(fmt12, g_settings.use24h ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
   lv_label_set_text(themeName, theme().name);
+  lv_label_set_text(featuresOn, strf(kFeaturesOn, features_on_count()).c_str());
 }

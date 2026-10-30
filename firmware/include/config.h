@@ -5,7 +5,7 @@
 // The GitHub build sets this to "<major>.<minor>.<build number>"; raise the
 // major.minor here by hand for big changes.
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "0.1.0"
 #endif
 // Every push to main publishes a GitHub release; this always points at the newest one.
 #define DEFAULT_UPDATE_URL \
@@ -29,5 +29,12 @@
 // The board has a battery charger but no way to measure the battery. A
 // MAX17048 fuel gauge on the I2C header is detected automatically.
 #define FUEL_GAUGE_ADDR 0x36
+
+// Optional BH1750 light sensor on the I2C header (Settings > Features > Ambient light).
+#define LIGHT_SENSOR_ADDR 0x23
+
+// Optional PIR motion sensor: its output on the RX pin of the UART header.
+// (GPIO38 on the GPIO_D header is not free: the touch controller needs it.)
+#define MOTION_PIN 44
 
 #define MAX_ACCOUNTS 6

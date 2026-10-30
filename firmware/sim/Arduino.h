@@ -19,6 +19,8 @@ uint32_t millis(void);
 #include <string>
 
 inline void delay(uint32_t) {}
+inline long random(long howbig) { return howbig > 0 ? rand() % howbig : 0; }
+inline long random(long howsmall, long howbig) { return howbig > howsmall ? howsmall + rand() % (howbig - howsmall) : howsmall; }
 
 class String {
  public:
@@ -52,6 +54,9 @@ class String {
   bool startsWith(const String &p) const { return s_.compare(0, p.s_.size(), p.s_) == 0; }
   bool endsWith(const String &p) const {
     return s_.size() >= p.s_.size() && s_.compare(s_.size() - p.s_.size(), p.s_.size(), p.s_) == 0;
+  }
+  void toLowerCase() {
+    for (char &ch : s_) ch = (char)tolower((unsigned char)ch);
   }
   void toUpperCase() {
     for (char &ch : s_) ch = toupper((unsigned char)ch);
