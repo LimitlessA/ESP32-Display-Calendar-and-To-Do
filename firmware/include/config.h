@@ -5,7 +5,7 @@
 // The GitHub build sets this to "<major>.<minor>.<build number>"; raise the
 // major.minor here by hand for big changes.
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "0.1.0"
 #endif
 // Every push to main publishes a GitHub release; this always points at the newest one.
 #define DEFAULT_UPDATE_URL \

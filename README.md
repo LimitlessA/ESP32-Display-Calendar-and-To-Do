@@ -204,7 +204,7 @@ contrast in every theme.
 ## Firmware updates over Wi-Fi (no PC)
 
 **Automatic, on every push to main.** Each push to `main` builds the firmware
-with a new version number (`1.0.<build number>`) and publishes it as the
+with a new version number (`0.1.<build number>`) and publishes it as the
 latest GitHub release. The display looks for a new release every 3 hours and
 installs it by itself when nobody is using it: during night mode, or after 15
 minutes without a touch, and never in the 15 minutes before a meeting. The
@@ -216,7 +216,7 @@ still install by hand with Settings › *Check for update*.
 > be **public** (it contains no passwords: tokens live only on the display).
 > To change the update source, set another `manifest.json` address under
 > *Update link* on the setup page; the format is
-> `{"version":"1.1.0","url":"https://…/firmware.bin"}`.
+> `{"version":"0.2.0","url":"https://…/firmware.bin"}`.
 
 **From the setup page.** Download the **firmware** artifact from the Actions
 tab, open the display's setup page, choose `firmware.bin` (not `factory.bin`)

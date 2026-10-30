@@ -68,6 +68,6 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
-          name: Firmware ${{ env.VERSION }}
+          name: Firmware ${{ env.VERSION }} (not yet tested on a real board)
           make_latest: true
           files: dist/*
