@@ -1,0 +1,56 @@
+// Font Awesome glyphs compiled into font_14, font_16 and font_20b.
+// Keep in sync with ICONS in tools/gen_fonts.sh.
+#pragma once
+
+#define ICON_HOME      "\xEF\x80\x95"  // F015
+#define ICON_CALENDAR  "\xEF\x84\xB3"  // F133
+#define ICON_TASKS     "\xEF\x85\x8A"  // F14A
+#define ICON_SLIDERS   "\xEF\x87\x9E"  // F1DE
+#define ICON_WIFI      "\xEF\x87\xAB"  // F1EB
+#define ICON_CLOSE     "\xEF\x80\x8D"  // F00D
+#define ICON_CHECK     "\xEF\x80\x8C"  // F00C
+#define ICON_BELL      "\xEF\x83\xB3"  // F0F3
+#define ICON_LEFT      "\xEF\x81\x93"  // F053
+#define ICON_RIGHT     "\xEF\x81\x94"  // F054
+#define ICON_REFRESH   "\xEF\x80\xA1"  // F021
+#define ICON_TRASH     "\xEF\x87\xB8"  // F1F8
+#define ICON_EYE       "\xEF\x81\xAE"  // F06E
+#define ICON_USERS     "\xEF\x83\x80"  // F0C0
+#define ICON_PIN       "\xEF\x8F\x85"  // F3C5
+#define ICON_CLOCK     "\xEF\x80\x97"  // F017
+#define ICON_LOCK      "\xEF\x80\xA3"  // F023
+#define ICON_BAT_FULL  "\xEF\x89\x80"  // F240
+#define ICON_BAT_3     "\xEF\x89\x81"  // F241
+#define ICON_BAT_2     "\xEF\x89\x82"  // F242
+#define ICON_BAT_1     "\xEF\x89\x83"  // F243
+#define ICON_BAT_EMPTY "\xEF\x89\x84"  // F244
+#define ICON_BOLT      "\xEF\x83\xA7"  // F0E7
+#define ICON_SD        "\xEF\x9F\x82"  // F7C2
+#define ICON_UPLOAD    "\xEF\x82\x93"  // F093
+#define ICON_BACKSPACE "\xEF\x95\x9A"  // F55A
+#define ICON_SHIFT     "\xEF\x81\xA2"  // F062
+#define ICON_QR        "\xEF\x80\xA9"  // F029
+#define ICON_PLUS      "\xEF\x81\xA7"  // F067
+#define ICON_MOON      "\xEF\x86\x86"  // F186
+#define ICON_VOLUME    "\xEF\x80\xA8"  // F028
+#define ICON_PALETTE   "\xEF\x94\xBF"  // F53F
+#define ICON_CLOUD     "\xEF\x83\x82"  // F0C2
+#define ICON_WARNING   "\xEF\x81\xB1"  // F071
+#define ICON_STAR      "\xEF\x80\x85"  // F005
+#define ICON_CAR       "\xEF\x86\xB9"  // F1B9
+#define ICON_GIFT      "\xEF\x81\xAB"  // F06B
+#define ICON_KEYBOARD  "\xEF\x84\x9C"  // F11C
+#define ICON_TIMER     "\xEF\x8B\xB2"  // F2F2
+#define ICON_FLAG      "\xEF\x80\xA4"  // F024
+#define ICON_PAUSE     "\xEF\x81\x8C"  // F04C
+#define ICON_PLAY      "\xEF\x81\x8B"  // F04B
+#define ICON_STOP      "\xEF\x81\x8D"  // F04D
+#define ICON_BULB      "\xEF\x83\xAB"  // F0EB
+#define ICON_WALK      "\xEF\x95\x94"  // F554
+#define ICON_LAYERS    "\xEF\x97\xBD"  // F5FD
+#define ICON_PHONE     "\xEF\x8F\x8D"  // F3CD
+#define ICON_DICE      "\xEF\x94\xA2"  // F522
+#define ICON_UPDOWN    "\xEF\x8C\xB8"  // F338
+#define ICON_CARET_DN  "\xEF\x83\x97"  // F0D7
+#define ICON_CARET_UP  "\xEF\x83\x98"  // F0D8
+#define ICON_RADAR     "\xEF\x81\x9B"  // F05B

@@ -1,0 +1,73 @@
+name: Build firmware
+
+# Every push builds the firmware. The "firmware" artifact holds:
+#   factory.bin   - full image for the first flash over USB, written at 0x0
+#   firmware.bin  - app only, for updates over Wi-Fi (setup page upload)
+#   manifest.json - {version, url} the display reads to find updates
+# The version is <major.minor from config.h>.<build number>. Every push to main
+# publishes these files as the latest GitHub release, and displays with
+# auto-update on install it the next time nobody is using them.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
+      - run: pip install platformio esptool==4.8.1
+      - name: Pick the version
+        run: |
+          BASE=$(sed -n 's/#define FIRMWARE_VERSION "\([0-9]*\.[0-9]*\).*"/\1/p' firmware/include/config.h)
+          echo "VERSION=$BASE.${{ github.run_number }}" >> "$GITHUB_ENV"
+      - name: Build
+        env:
+          SCONSFLAGS: -k  # report every compile error in one run, not just the first
+        run: |
+          export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION=\\\"$VERSION\\\""
+          pio run -d firmware
+          grep -q "$VERSION" firmware/.pio/build/crowpanel_5inch/firmware.bin || { echo "version $VERSION not in firmware"; exit 1; }
+          SIZE=$(stat -c%s firmware/.pio/build/crowpanel_5inch/firmware.bin)
+          echo "::notice::Firmware $SIZE of 1966080 bytes ($((SIZE * 100 / 1966080))% of an update slot, $(((1966080 - SIZE) / 1024)) KB free)"
+      - name: Make the factory image and manifest
+        run: |
+          B=firmware/.pio/build/crowpanel_5inch
+          mkdir -p dist
+          esptool.py --chip esp32s3 merge_bin -o dist/factory.bin \
+            --flash_mode keep --flash_freq keep --flash_size 4MB \
+            0x0 $B/bootloader.bin \
+            0x8000 $B/partitions.bin \
+            0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+            0x10000 $B/firmware.bin
+          cp $B/firmware.bin dist/firmware.bin
+          URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/firmware.bin"
+          printf '{"version":"%s","url":"%s"}\n' "$VERSION" "$URL" > dist/manifest.json
+          cat dist/manifest.json
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: dist/
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Firmware ${{ env.VERSION }} (not yet tested on a real board)
+          make_latest: true
+          files: dist/*
