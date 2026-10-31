@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 #include "display.h"
+#include "rgb_bounce.h"
 
 #include "config.h"
 
@@ -26,15 +27,19 @@ struct RgbTiming {
 // 7.0" (EK9716BD3 + EK73002ACGB, TN): B3..B7, G2..G7, R3..R7 of the panel.
 static constexpr RgbPins kPins = {
     {15, 7, 6, 5, 4}, {9, 46, 3, 8, 16, 1}, {14, 21, 47, 48, 45}, 41, 40, 39, 0};
-static constexpr RgbTiming kTiming = {15000000, 40, 48, 40, 1, 31, 13};
+// 24 MHz: about 49 frames per second, like Elecrow's V3.0 example. At 15 MHz
+// (31 fps) the TN panel visibly flickers; the bounce buffers in
+// rgb_bounce.cpp make the faster clock possible.
+static constexpr RgbTiming kTiming = {24000000, 40, 48, 40, 1, 31, 13};
 // V3.0 boards reset the touch controller through a PCA9557 I/O expander.
 static constexpr uint8_t kExpanderAddr = 0x18;
 #else
 // 5.0"
 static constexpr RgbPins kPins = {
     {8, 3, 46, 9, 1}, {5, 6, 7, 15, 16, 4}, {45, 48, 47, 21, 14}, 40, 41, 39, 0};
-// 12 MHz leaves PSRAM bandwidth for Wi-Fi without flicker
-static constexpr RgbTiming kTiming = {12000000, 8, 4, 43, 8, 4, 12};
+// 15 MHz: about 35 frames per second (12 MHz gave 28 and flickered). The
+// bounce buffers keep PSRAM traffic from disturbing the picture.
+static constexpr RgbTiming kTiming = {15000000, 8, 4, 43, 8, 4, 12};
 #endif
 
 // Set to true if taps land mirrored (top/bottom and left/right swapped):
@@ -44,7 +49,7 @@ static constexpr bool kTouchRotated180 = false;
 // ---- Code ----
 class LGFX : public lgfx::LGFX_Device {
 public:
-  lgfx::Bus_RGB bus;
+  BusRgbBounce bus;
   lgfx::Panel_RGB panel;
   lgfx::Light_PWM light;
   lgfx::Touch_GT911 touch;
@@ -150,6 +155,7 @@ static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *px) 
   const uint32_t w = area->x2 - area->x1 + 1;
   const uint32_t h = area->y2 - area->y1 + 1;
   lcd.pushImageDMA(area->x1, area->y1, w, h, (lgfx::rgb565_t *)&px->full);
+  lcd.bus.writeBack(area->y1, h);
   lv_disp_flush_ready(drv);
 }
 
@@ -206,6 +212,7 @@ void display_init() {
 
   lcd.begin();
   lcd.fillScreen(TFT_BLACK);
+  lcd.bus.writeBack(0, SCREEN_H);
   lcd.setBrightness(200);
 
   lv_init();
