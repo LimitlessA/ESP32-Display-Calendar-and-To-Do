@@ -170,22 +170,25 @@ static lv_color_t *alloc_buf(size_t px) {
 }
 
 #ifdef BOARD_CROWPANEL_7
-// Elecrow's V3.0 start-up: hold the touch controller in reset with its INT
-// line low (expander IO0 = reset, IO1 = INT), release reset, then let INT go.
+// Elecrow's V3.0 start-up (PCA9557 library: reset(), setMode(IO_OUTPUT), ...):
+// hold the touch controller in reset with its INT line low (expander IO0 =
+// reset, IO1 = INT), release reset, then let INT go.
 // Without it the GT911 may not answer. Older boards have no expander and
 // simply ignore these writes.
 static void reset_touch_via_expander() {
-  enum : uint8_t { REG_OUT = 1, REG_POL = 2, REG_CFG = 3 };
+  enum : uint8_t { REG_OUT = 1, REG_CFG = 3 };
   constexpr uint32_t kFreq = 400000;
   lgfx::i2c::init(I2C_PORT, I2C_SDA, I2C_SCL);
   auto w = [&](uint8_t reg, uint8_t v) {
     return lgfx::i2c::writeRegister8(I2C_PORT, kExpanderAddr, reg, v, 0, kFreq).has_value();
   };
-  if (!w(REG_POL, 0x00)) return;  // no expander on this board
-  w(REG_OUT, 0x00);
-  w(REG_CFG, 0x00);  // all outputs, IO0 and IO1 low
+  // IO2..IO7 must stay HIGH: the expander also drives the LCD's power and
+  // reset lines, and holding them low leaves the panel showing only lines.
+  if (!w(REG_OUT, 0xFF)) return;  // no expander on this board
+  w(REG_CFG, 0x00);  // all outputs, all high
+  w(REG_OUT, 0xFC);  // IO0 (touch reset) and IO1 (touch INT) low
   delay(20);
-  w(REG_OUT, 0x01);  // release touch reset
+  w(REG_OUT, 0xFD);  // release touch reset
   delay(100);
   w(REG_CFG, 0x02);  // IO1 (touch INT) back to input
 }
