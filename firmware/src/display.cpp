@@ -1,11 +1,10 @@
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
-#include <lgfx/v1/platforms/esp32s3/Bus_RGB.hpp>
-#include <lgfx/v1/platforms/esp32s3/Panel_RGB.hpp>
+#include <esp_lcd_panel_ops.h>
+#include <esp_lcd_panel_rgb.h>
 #include <lvgl.h>
 
 #include "display.h"
-#include "rgb_bounce.h"
 
 #include "config.h"
 
@@ -28,8 +27,7 @@ struct RgbTiming {
 static constexpr RgbPins kPins = {
     {15, 7, 6, 5, 4}, {9, 46, 3, 8, 16, 1}, {14, 21, 47, 48, 45}, 41, 40, 39, 0};
 // 24 MHz: about 49 frames per second, like Elecrow's V3.0 example. At 15 MHz
-// (31 fps) the TN panel visibly flickers; the bounce buffers in
-// rgb_bounce.cpp make the faster clock possible.
+// (31 fps) the TN panel visibly flickers.
 static constexpr RgbTiming kTiming = {24000000, 40, 48, 40, 1, 31, 13};
 // V3.0 boards reset the touch controller through a PCA9557 I/O expander.
 static constexpr uint8_t kExpanderAddr = 0x18;
@@ -37,8 +35,7 @@ static constexpr uint8_t kExpanderAddr = 0x18;
 // 5.0"
 static constexpr RgbPins kPins = {
     {8, 3, 46, 9, 1}, {5, 6, 7, 15, 16, 4}, {45, 48, 47, 21, 14}, 40, 41, 39, 0};
-// 15 MHz: about 35 frames per second (12 MHz gave 28 and flickered). The
-// bounce buffers keep PSRAM traffic from disturbing the picture.
+// 15 MHz: about 35 frames per second (12 MHz gave 28 and flickered).
 static constexpr RgbTiming kTiming = {15000000, 8, 4, 43, 8, 4, 12};
 #endif
 
@@ -46,124 +43,43 @@ static constexpr RgbTiming kTiming = {15000000, 8, 4, 43, 8, 4, 12};
 // Elecrow says some 7.0" touch panels are mounted turned 180 degrees.
 static constexpr bool kTouchRotated180 = false;
 
-// ---- Code ----
-class LGFX : public lgfx::LGFX_Device {
-public:
-  BusRgbBounce bus;
-  lgfx::Panel_RGB panel;
-  lgfx::Light_PWM light;
-  lgfx::Touch_GT911 touch;
-
-  LGFX() {
-    {
-      auto cfg = panel.config();
-      cfg.memory_width = 800;
-      cfg.memory_height = 480;
-      cfg.panel_width = 800;
-      cfg.panel_height = 480;
-      cfg.offset_x = 0;
-      cfg.offset_y = 0;
-      panel.config(cfg);
-    }
-    {
-      auto cfg = panel.config_detail();
-      cfg.use_psram = 1;
-      panel.config_detail(cfg);
-    }
-    {
-      auto cfg = bus.config();
-      cfg.panel = &panel;
-      cfg.pin_d0 = kPins.b[0];
-      cfg.pin_d1 = kPins.b[1];
-      cfg.pin_d2 = kPins.b[2];
-      cfg.pin_d3 = kPins.b[3];
-      cfg.pin_d4 = kPins.b[4];
-      cfg.pin_d5 = kPins.g[0];
-      cfg.pin_d6 = kPins.g[1];
-      cfg.pin_d7 = kPins.g[2];
-      cfg.pin_d8 = kPins.g[3];
-      cfg.pin_d9 = kPins.g[4];
-      cfg.pin_d10 = kPins.g[5];
-      cfg.pin_d11 = kPins.r[0];
-      cfg.pin_d12 = kPins.r[1];
-      cfg.pin_d13 = kPins.r[2];
-      cfg.pin_d14 = kPins.r[3];
-      cfg.pin_d15 = kPins.r[4];
-      cfg.pin_henable = kPins.de;
-      cfg.pin_vsync = kPins.vsync;
-      cfg.pin_hsync = kPins.hsync;
-      cfg.pin_pclk = kPins.pclk;
-      cfg.freq_write = kTiming.pclk_hz;
-      cfg.hsync_polarity = 0;
-      cfg.hsync_front_porch = kTiming.h_front;
-      cfg.hsync_pulse_width = kTiming.h_pulse;
-      cfg.hsync_back_porch = kTiming.h_back;
-      cfg.vsync_polarity = 0;
-      cfg.vsync_front_porch = kTiming.v_front;
-      cfg.vsync_pulse_width = kTiming.v_pulse;
-      cfg.vsync_back_porch = kTiming.v_back;
-      cfg.pclk_active_neg = 1;
-      cfg.de_idle_high = 0;
-      cfg.pclk_idle_high = 0;
-      bus.config(cfg);
-    }
-    panel.setBus(&bus);
-    {
-      auto cfg = light.config();
-      cfg.pin_bl = GPIO_NUM_2;
-      cfg.invert = false;
-      cfg.freq = 44100;
-      cfg.pwm_channel = 7;
-      light.config(cfg);
-    }
-    panel.light(&light);
-    {
-      auto cfg = touch.config();
-      cfg.x_min = 0;
-      cfg.x_max = 799;
-      cfg.y_min = 0;
-      cfg.y_max = 479;
-      cfg.pin_int = -1;
-      cfg.pin_rst = -1;
-      cfg.bus_shared = false;
-      cfg.offset_rotation = kTouchRotated180 ? 2 : 0;
-      cfg.i2c_port = I2C_PORT;
-      cfg.pin_sda = I2C_SDA;
-      cfg.pin_scl = I2C_SCL;
-      cfg.freq = 400000;
-      cfg.i2c_addr = 0x14;  // the driver retries 0x5D if this one does not answer
-      touch.config(cfg);
-    }
-    panel.setTouch(&touch);
-    setPanel(&panel);
-  }
-};
-
-static LGFX lcd;
-
 static constexpr int SCREEN_W = 800;
 static constexpr int SCREEN_H = 480;
 // One draw buffer of 24 lines (38 KB) in internal RAM. flush_cb copies it
 // into the frame before returning, so a second buffer would never be drawn
-// into while the first is flushed; it only took the internal RAM that HTTPS
-// needs for its handshake.
+// into while the first is flushed.
 static constexpr int BUF_LINES = 24;
+// The LCD reads two bounce buffers of 10 lines in internal RAM (2 x 16 KB),
+// refilled from the frame in PSRAM, as Espressif recommends against drift.
+static constexpr int BOUNCE_LINES = 10;
+
+// ---- Code ----
+// The picture: ESP-IDF's RGB panel driver (frame in PSRAM, bounce buffers).
+// The program runs from PSRAM (CONFIG_SPIRAM_XIP_FROM_PSRAM), so writing to
+// flash no longer pauses the picture. Touch and backlight via LovyanGFX.
+static esp_lcd_panel_handle_t panel = nullptr;
+static lgfx::Light_PWM light;
+static lgfx::Touch_GT911 touch;
 
 static lv_disp_draw_buf_t draw_buf;
 static lv_disp_drv_t disp_drv;
 static lv_indev_drv_t indev_drv;
 
 static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *px) {
-  const uint32_t w = area->x2 - area->x1 + 1;
-  const uint32_t h = area->y2 - area->y1 + 1;
-  lcd.pushImageDMA(area->x1, area->y1, w, h, (lgfx::rgb565_t *)&px->full);
-  lcd.bus.writeBack(area->y1, h);
+  // Copies into the frame (and writes the cache back) before it returns.
+  esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px);
   lv_disp_flush_ready(drv);
 }
 
 static void touch_cb(lv_indev_drv_t *, lv_indev_data_t *data) {
-  uint16_t x, y;
-  if (lcd.getTouch(&x, &y)) {
+  lgfx::touch_point_t tp;
+  if (touch.getTouchRaw(&tp, 1)) {
+    int x = std::min<int>(std::max<int>(tp.x, 0), SCREEN_W - 1);
+    int y = std::min<int>(std::max<int>(tp.y, 0), SCREEN_H - 1);
+    if (kTouchRotated180) {
+      x = SCREEN_W - 1 - x;
+      y = SCREEN_H - 1 - y;
+    }
     data->state = LV_INDEV_STATE_PR;
     data->point.x = x;
     data->point.y = y;
@@ -204,6 +120,68 @@ static void reset_touch_via_expander() {
 }
 #endif
 
+static void start_panel() {
+  esp_lcd_rgb_panel_config_t cfg = {};
+  cfg.clk_src = LCD_CLK_SRC_DEFAULT;
+  cfg.timings.pclk_hz = kTiming.pclk_hz;
+  cfg.timings.h_res = SCREEN_W;
+  cfg.timings.v_res = SCREEN_H;
+  cfg.timings.hsync_pulse_width = kTiming.h_pulse;
+  cfg.timings.hsync_back_porch = kTiming.h_back;
+  cfg.timings.hsync_front_porch = kTiming.h_front;
+  cfg.timings.vsync_pulse_width = kTiming.v_pulse;
+  cfg.timings.vsync_back_porch = kTiming.v_back;
+  cfg.timings.vsync_front_porch = kTiming.v_front;
+  cfg.timings.flags.pclk_active_neg = 1;
+  cfg.data_width = 16;
+  cfg.bits_per_pixel = 16;
+  cfg.num_fbs = 1;
+  cfg.bounce_buffer_size_px = SCREEN_W * BOUNCE_LINES;
+  cfg.hsync_gpio_num = kPins.hsync;
+  cfg.vsync_gpio_num = kPins.vsync;
+  cfg.de_gpio_num = kPins.de;
+  cfg.pclk_gpio_num = kPins.pclk;
+  cfg.disp_gpio_num = -1;
+  // RGB565, lowest bit first: B, then G, then R.
+  int i = 0;
+  for (int8_t p : kPins.b) cfg.data_gpio_nums[i++] = p;
+  for (int8_t p : kPins.g) cfg.data_gpio_nums[i++] = p;
+  for (int8_t p : kPins.r) cfg.data_gpio_nums[i++] = p;
+  cfg.flags.fb_in_psram = 1;
+  ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&cfg, &panel));
+  ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
+  ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+}
+
+static void start_touch_and_light() {
+  {
+    auto cfg = light.config();
+    cfg.pin_bl = GPIO_NUM_2;
+    cfg.invert = false;
+    cfg.freq = 44100;
+    cfg.pwm_channel = 7;
+    light.config(cfg);
+    light.init(0);
+  }
+  {
+    auto cfg = touch.config();
+    cfg.x_min = 0;
+    cfg.x_max = SCREEN_W - 1;
+    cfg.y_min = 0;
+    cfg.y_max = SCREEN_H - 1;
+    cfg.pin_int = -1;
+    cfg.pin_rst = -1;
+    cfg.bus_shared = false;
+    cfg.i2c_port = I2C_PORT;
+    cfg.pin_sda = I2C_SDA;
+    cfg.pin_scl = I2C_SCL;
+    cfg.freq = 400000;
+    cfg.i2c_addr = 0x14;  // the driver retries 0x5D if this one does not answer
+    touch.config(cfg);
+    touch.init();
+  }
+}
+
 void display_init() {
   // Elecrow's examples hold GPIO38 low on the 5" and 7" boards before starting touch.
   pinMode(38, OUTPUT);
@@ -212,10 +190,9 @@ void display_init() {
   reset_touch_via_expander();
 #endif
 
-  lcd.begin();
-  lcd.fillScreen(TFT_BLACK);
-  lcd.bus.writeBack(0, SCREEN_H);
-  lcd.setBrightness(200);
+  // Set up on this core (the one running LVGL), as Espressif recommends.
+  start_panel();
+  start_touch_and_light();
 
   lv_init();
   const size_t px = SCREEN_W * BUF_LINES;
@@ -232,6 +209,8 @@ void display_init() {
   indev_drv.type = LV_INDEV_TYPE_POINTER;
   indev_drv.read_cb = touch_cb;
   lv_indev_drv_register(&indev_drv);
+
+  light.setBrightness(200);
 }
 
 static uint8_t brightness = 200;
@@ -239,10 +218,10 @@ static bool blanked = false;
 
 void display_set_brightness(uint8_t level) {
   brightness = level;
-  if (!blanked) lcd.setBrightness(level);
+  if (!blanked) light.setBrightness(level);
 }
 
 void display_blank(bool blank) {
   blanked = blank;
-  lcd.setBrightness(blank ? 0 : brightness);
+  light.setBrightness(blank ? 0 : brightness);
 }
