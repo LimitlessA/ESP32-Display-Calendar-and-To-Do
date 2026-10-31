@@ -1,4 +1,4 @@
-// Calendar and to-do display for the Elecrow CrowPanel 5.0" (ESP32-S3).
+// Calendar and to-do display for the Elecrow CrowPanel 7.0" or 5.0" (ESP32-S3).
 // Core 1 runs only the UI (this loop), so touch and page changes never wait on
 // the network. Wi-Fi, sync, the setup page and OTA run in their own tasks on
 // core 0 and hand data over through sync_get_if_newer().
