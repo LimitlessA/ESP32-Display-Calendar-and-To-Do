@@ -69,6 +69,18 @@ jobs:
         with:
           name: firmware
           path: dist/
+      - name: Keep test builds of other branches on a builds/ branch
+        # Lets a branch's firmware be fetched with plain git (no Actions login)
+        # before it is merged; overwritten by every push to that branch.
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        run: |
+          cd dist
+          git init -q -b build
+          git add -A
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+            commit -q -m "Firmware $VERSION from ${{ github.ref_name }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" \
+            "build:refs/heads/builds/${{ github.ref_name }}"
       - name: Publish release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
