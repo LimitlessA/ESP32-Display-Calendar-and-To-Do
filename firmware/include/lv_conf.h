@@ -8,12 +8,12 @@
 #define LV_COLOR_DEPTH 16
 #define LV_COLOR_16_SWAP 0
 
-// System heap: small allocations stay in internal RAM, big ones go to PSRAM.
+// System heap, but in PSRAM: internal RAM is kept for Wi-Fi, TLS and DMA.
 #define LV_MEM_CUSTOM 1
-#define LV_MEM_CUSTOM_INCLUDE <stdlib.h>
-#define LV_MEM_CUSTOM_ALLOC malloc
+#define LV_MEM_CUSTOM_INCLUDE "lv_mem_psram.h"
+#define LV_MEM_CUSTOM_ALLOC lv_psram_alloc
 #define LV_MEM_CUSTOM_FREE free
-#define LV_MEM_CUSTOM_REALLOC realloc
+#define LV_MEM_CUSTOM_REALLOC lv_psram_realloc
 #define LV_MEMCPY_MEMSET_STD 1
 
 #define LV_TICK_CUSTOM 1

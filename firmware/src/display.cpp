@@ -138,7 +138,9 @@ static LGFX lcd;
 
 static constexpr int SCREEN_W = 800;
 static constexpr int SCREEN_H = 480;
-static constexpr int BUF_LINES = 48;
+// Two draw buffers of 24 lines (2 x 38 KB) in internal RAM. 48 lines took
+// 154 KB and, with Wi-Fi, left too little for a scan to start.
+static constexpr int BUF_LINES = 24;
 
 static lv_disp_draw_buf_t draw_buf;
 static lv_disp_drv_t disp_drv;
