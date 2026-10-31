@@ -133,6 +133,10 @@ bool httpGet(const String &url, String &body, String &err) {
   const int code = http.GET();
   if (code != HTTP_CODE_OK) {
     err = code < 0 ? HTTPClient::errorToString(code) : strf(kErrHttp, code);
+    // HTTPClient says "connection refused" for any failed connect, a failed
+    // secure handshake (e.g. short on memory) included: add the TLS reason.
+    char tls[96];
+    if (code < 0 && client.lastError(tls, sizeof(tls))) err += String(" (") + tls + ")";
     http.end();
     return false;
   }
