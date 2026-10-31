@@ -12,6 +12,13 @@ SemaphoreHandle_t lock;
 Settings current;
 uint32_t version = 1;
 
+// Writing to flash pauses the PSRAM cache, and with it the screen's video
+// feed, so the picture jumps. Saves wait until the settings have been left
+// alone for a few seconds: flipping several toggles costs one write.
+constexpr uint32_t kSaveDelayMs = 5000;
+bool dirty = false;
+uint32_t changedAt = 0;
+
 String toJson(const Settings &s) {
   JsonDocument doc;
   doc["wifiSsid"] = s.wifiSsid;
@@ -168,10 +175,22 @@ Settings settings_get() {
 }
 
 void settings_save(const Settings &s) {
-  const String json = toJson(s);
   xSemaphoreTake(lock, portMAX_DELAY);
   current = s;
   version++;
+  dirty = true;
+  changedAt = millis();
+  xSemaphoreGive(lock);
+}
+
+void settings_flush(bool now) {
+  xSemaphoreTake(lock, portMAX_DELAY);
+  if (!dirty || (!now && millis() - changedAt < kSaveDelayMs)) {
+    xSemaphoreGive(lock);
+    return;
+  }
+  dirty = false;
+  const String json = toJson(current);
   xSemaphoreGive(lock);
 
   Preferences prefs;

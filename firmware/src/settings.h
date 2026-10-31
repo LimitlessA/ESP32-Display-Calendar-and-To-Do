@@ -87,8 +87,13 @@ void settings_begin();
 // Thread-safe copy of the current settings.
 Settings settings_get();
 
-// Replaces the settings, saves them to flash and backs them up to SD.
+// Replaces the settings. They are saved to flash and backed up to SD by
+// settings_flush() a few seconds later.
 void settings_save(const Settings &s);
+
+// Writes changed settings once they have been unchanged for a few seconds,
+// or at once with now = true (before a restart). Call often, e.g. from loop().
+void settings_flush(bool now = false);
 
 // Bumps whenever settings change, so other modules can notice.
 uint32_t settings_version();

@@ -1,9 +1,11 @@
 name: Build firmware
 
-# Every push builds the firmware. The "firmware" artifact holds:
+# Every push builds the firmware for both CrowPanel sizes. The "firmware"
+# artifact holds, for the 7.0" board:
 #   factory.bin   - full image for the first flash over USB, written at 0x0
 #   firmware.bin  - app only, for updates over Wi-Fi (setup page upload)
 #   manifest.json - {version, url} the display reads to find updates
+# and the same three files with a "-5inch" suffix for the 5.0" board.
 # The version is <major.minor from config.h>.<build number>. Every push to main
 # publishes these files as the latest GitHub release, and displays with
 # auto-update on install it the next time nobody is using them.
@@ -39,29 +41,46 @@ jobs:
           SCONSFLAGS: -k  # report every compile error in one run, not just the first
         run: |
           export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION=\\\"$VERSION\\\""
-          pio run -d firmware
-          grep -q "$VERSION" firmware/.pio/build/crowpanel_5inch/firmware.bin || { echo "version $VERSION not in firmware"; exit 1; }
-          SIZE=$(stat -c%s firmware/.pio/build/crowpanel_5inch/firmware.bin)
-          echo "::notice::Firmware $SIZE of 1966080 bytes ($((SIZE * 100 / 1966080))% of an update slot, $(((1966080 - SIZE) / 1024)) KB free)"
-      - name: Make the factory image and manifest
+          pio run -d firmware -e crowpanel_7inch -e crowpanel_5inch
+          for E in crowpanel_7inch crowpanel_5inch; do
+            grep -q "$VERSION" firmware/.pio/build/$E/firmware.bin || { echo "version $VERSION not in $E firmware"; exit 1; }
+            SIZE=$(stat -c%s firmware/.pio/build/$E/firmware.bin)
+            echo "::notice::$E firmware $SIZE of 1966080 bytes ($((SIZE * 100 / 1966080))% of an update slot, $(((1966080 - SIZE) / 1024)) KB free)"
+          done
+      - name: Make the factory images and manifests
         run: |
-          B=firmware/.pio/build/crowpanel_5inch
           mkdir -p dist
-          esptool.py --chip esp32s3 merge_bin -o dist/factory.bin \
-            --flash_mode keep --flash_freq keep --flash_size 4MB \
-            0x0 $B/bootloader.bin \
-            0x8000 $B/partitions.bin \
-            0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
-            0x10000 $B/firmware.bin
-          cp $B/firmware.bin dist/firmware.bin
-          URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/firmware.bin"
-          printf '{"version":"%s","url":"%s"}\n' "$VERSION" "$URL" > dist/manifest.json
-          cat dist/manifest.json
+          for E in crowpanel_7inch crowpanel_5inch; do
+            B=firmware/.pio/build/$E
+            S=""; [ "$E" = crowpanel_5inch ] && S="-5inch"
+            esptool.py --chip esp32s3 merge_bin -o dist/factory$S.bin \
+              --flash_mode keep --flash_freq keep --flash_size 4MB \
+              0x0 $B/bootloader.bin \
+              0x8000 $B/partitions.bin \
+              0xe000 ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+              0x10000 $B/firmware.bin
+            cp $B/firmware.bin dist/firmware$S.bin
+            URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/firmware$S.bin"
+            printf '{"version":"%s","url":"%s"}\n' "$VERSION" "$URL" > dist/manifest$S.json
+            cat dist/manifest$S.json
+          done
           ls -l dist
       - uses: actions/upload-artifact@v4
         with:
           name: firmware
           path: dist/
+      - name: Keep test builds of other branches on a builds/ branch
+        # Lets a branch's firmware be fetched with plain git (no Actions login)
+        # before it is merged; overwritten by every push to that branch.
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        run: |
+          cd dist
+          git init -q -b build
+          git add -A
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+            commit -q -m "Firmware $VERSION from ${{ github.ref_name }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" \
+            "build:refs/heads/builds/${{ github.ref_name }}"
       - name: Publish release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2

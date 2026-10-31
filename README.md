@@ -14,8 +14,12 @@ never need a cable again.
 
 ## Hardware
 
-- **Elecrow CrowPanel ESP32 HMI 5.0"** (ESP32-S3-WROOM-1-N4R8, 800×480 RGB LCD,
-  GT911 capacitive touch, 4 MB flash, 8 MB PSRAM).
+- **Elecrow CrowPanel ESP32 HMI 7.0"** (ESP32-S3-WROOM-1-N4R8, 800×480 TN RGB
+  LCD with EK9716BD3 + EK73002ACGB, GT911 capacitive touch, 4 MB flash, 8 MB
+  PSRAM). The **5.0"** CrowPanel works too, but it wires the LCD to different
+  pins, so it needs its own build: use the files ending in `-5inch`
+  (`factory-5inch.bin`, `firmware-5inch.bin`) or `pio run -e crowpanel_5inch`.
+  A 5" image on a 7" board (or the other way round) shows lines and flicker.
 - Optional: a microSD card (keeps an offline copy, so the display shows your
   data straight after boot or when the internet is down).
 - Optional: a small 8 Ω speaker on the speaker connector for meeting chimes.
@@ -71,7 +75,8 @@ You add the URL and token to the display in step 3 below.
 
 Every push to the repo builds the firmware on GitHub. Open the repo's
 **Actions** tab, click the latest green *Build firmware* run, and download the
-**firmware** artifact. Unzip it; you need `factory.bin`.
+**firmware** artifact. Unzip it; you need `factory.bin` for the 7" board
+(`factory-5inch.bin` for the 5" board).
 
 **Option A: from the browser (no install).**
 
@@ -90,7 +95,7 @@ Every push to the repo builds the firmware on GitHub. Open the repo's
 ```sh
 pip install platformio
 cd firmware
-pio run -t upload        # builds and flashes over USB
+pio run -t upload        # builds and flashes the 7" build over USB (-e crowpanel_5inch for 5")
 pio device monitor       # optional: see the log
 ```
 
