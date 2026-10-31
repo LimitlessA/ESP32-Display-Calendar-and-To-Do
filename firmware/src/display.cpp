@@ -234,6 +234,15 @@ void display_init() {
   lv_indev_drv_register(&indev_drv);
 }
 
+static uint8_t brightness = 200;
+static bool blanked = false;
+
 void display_set_brightness(uint8_t level) {
-  lcd.setBrightness(level);
+  brightness = level;
+  if (!blanked) lcd.setBrightness(level);
+}
+
+void display_blank(bool blank) {
+  blanked = blank;
+  lcd.setBrightness(blank ? 0 : brightness);
 }
