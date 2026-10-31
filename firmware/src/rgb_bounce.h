@@ -58,10 +58,15 @@ public:
   void readPixels(void *, lgfx::pixelcopy_t *, uint32_t) override {}
 
 private:
-  bool initHere();
   static void vsyncIsr(void *arg);
   static void eofIsr(void *arg);
+  struct Refill {
+    uint8_t *dst, *src;
+  };
+  static constexpr int kRefillSlots = 16;
+  static void copyTask(void *arg);
   void fill(int buf, int chunk);
+  void copy(const Refill &r);
 
   config_t _cfg;
   uint8_t *_frame_buffer = nullptr;  // whole frame, PSRAM
@@ -77,4 +82,7 @@ private:
   intr_handle_t _lcd_intr = nullptr;
   intr_handle_t _dma_intr = nullptr;
   async_memcpy_t _copier = nullptr;
+  TaskHandle_t _copy_task = nullptr;
+  Refill _refills[kRefillSlots] = {};  // queued by the interrupt for copyTask
+  volatile int _refill_head = 0, _refill_tail = 0;
 };

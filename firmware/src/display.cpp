@@ -143,8 +143,10 @@ static LGFX lcd;
 
 static constexpr int SCREEN_W = 800;
 static constexpr int SCREEN_H = 480;
-// Two draw buffers of 24 lines (2 x 38 KB) in internal RAM. 48 lines took
-// 154 KB and, with Wi-Fi, left too little for a scan to start.
+// One draw buffer of 24 lines (38 KB) in internal RAM. flush_cb copies it
+// into the frame before returning, so a second buffer would never be drawn
+// into while the first is flushed; it only took the internal RAM that HTTPS
+// needs for its handshake.
 static constexpr int BUF_LINES = 24;
 
 static lv_disp_draw_buf_t draw_buf;
@@ -217,7 +219,7 @@ void display_init() {
 
   lv_init();
   const size_t px = SCREEN_W * BUF_LINES;
-  lv_disp_draw_buf_init(&draw_buf, alloc_buf(px), alloc_buf(px), px);
+  lv_disp_draw_buf_init(&draw_buf, alloc_buf(px), nullptr, px);
 
   lv_disp_drv_init(&disp_drv);
   disp_drv.hor_res = SCREEN_W;

@@ -32,13 +32,53 @@ void pinSignal(uint32_t pin, uint32_t sig) {
 
 }  // namespace
 
+// DMA copies queued and not finished yet. esp_async_memcpy also fails (and
+// logs) when its queue is full; this keeps it far from full.
+namespace {
+int copiesInFlight = 0;
+// One DMA copy normally finishes long before the next is due. When copies
+// back up (heavy PSRAM traffic, e.g. during an HTTPS handshake) a queued copy
+// could land after the LCD has read the buffer, so the CPU copies instead.
+constexpr int kMaxCopiesInFlight = 2;
+
+IRAM_ATTR bool copyDone(async_memcpy_t, async_memcpy_event_t *, void *) {
+  __atomic_sub_fetch(&copiesInFlight, 1, __ATOMIC_RELAXED);
+  return false;
+}
+}  // namespace
+
 // Copies a part of the frame into a bounce buffer with the DMA engine, so it
-// costs no CPU time; the CPU copies only if the DMA queue is full.
-IRAM_ATTR void BusRgbBounce::fill(int buf, int chunk) {
-  uint8_t *src = _frame_buffer + chunk * _chunk_bytes;
-  if (esp_async_memcpy(_copier, _bounce[buf], src, _chunk_bytes, nullptr, nullptr) != ESP_OK) {
-    memcpy(_bounce[buf], src, _chunk_bytes);
+// costs no CPU time, or with the CPU if the DMA engine is behind.
+void BusRgbBounce::copy(const Refill &r) {
+  if (__atomic_add_fetch(&copiesInFlight, 1, __ATOMIC_RELAXED) <= kMaxCopiesInFlight &&
+      esp_async_memcpy(_copier, r.dst, r.src, _chunk_bytes, copyDone, nullptr) == ESP_OK) {
+    return;
   }
+  __atomic_sub_fetch(&copiesInFlight, 1, __ATOMIC_RELAXED);
+  memcpy(r.dst, r.src, _chunk_bytes);
+}
+
+// esp_async_memcpy takes locks, so it must not be called from an interrupt
+// (it asserts when the interrupt lands in a critical section). The interrupt
+// queues the refill; this task, at top priority, starts the copy.
+void BusRgbBounce::copyTask(void *arg) {
+  auto *me = static_cast<BusRgbBounce *>(arg);
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    while (me->_refill_tail != me->_refill_head) {
+      me->copy(me->_refills[me->_refill_tail]);
+      me->_refill_tail = (me->_refill_tail + 1) % kRefillSlots;
+    }
+  }
+}
+
+IRAM_ATTR void BusRgbBounce::fill(int buf, int chunk) {
+  const int head = _refill_head;
+  _refills[head] = {_bounce[buf], _frame_buffer + chunk * _chunk_bytes};
+  _refill_head = (head + 1) % kRefillSlots;
+  BaseType_t woken = pdFALSE;
+  vTaskNotifyGiveFromISR(_copy_task, &woken);
+  if (woken) portYIELD_FROM_ISR();
 }
 
 // A bounce buffer has gone out to the LCD: load the next part of the frame.
@@ -78,28 +118,11 @@ void BusRgbBounce::writeBack(int y, int h) {
   Cache_WriteBack_Addr((uint32_t)(_frame_buffer + y * line), h * line);
 }
 
-// The interrupts run on the core they are set up on: set up on core 0 and
-// leave core 1 to LVGL and touch.
+// The interrupts and the copy task run on the core that sets them up, the
+// one running LVGL (core 1): the copies are done by DMA, so they cost LVGL
+// little, while core 0 runs Wi-Fi and HTTPS, whose handshakes held the
+// refills off long enough to shift the picture.
 bool BusRgbBounce::init() {
-  struct Job {
-    BusRgbBounce *bus;
-    SemaphoreHandle_t done;
-    bool ok;
-  } job = {this, xSemaphoreCreateBinary(), false};
-  xTaskCreatePinnedToCore(
-      [](void *arg) {
-        auto *j = static_cast<Job *>(arg);
-        j->ok = j->bus->initHere();
-        xSemaphoreGive(j->done);
-        vTaskDelete(nullptr);
-      },
-      "rgb_init", 4096, &job, configMAX_PRIORITIES - 1, nullptr, 0);
-  xSemaphoreTake(job.done, portMAX_DELAY);
-  vSemaphoreDelete(job.done);
-  return job.ok;
-}
-
-bool BusRgbBounce::initHere() {
   const int w = _cfg.panel->width();
   const int h = _cfg.panel->height();
   constexpr int pixel_bytes = 2;  // RGB565
@@ -190,7 +213,7 @@ bool BusRgbBounce::initHere() {
   _restart.dw0.size -= skip;
 
   async_memcpy_config_t copier_cfg = ASYNC_MEMCPY_DEFAULT_CONFIG();
-  copier_cfg.backlog = 4 * kBounceBufs;
+  copier_cfg.backlog = 48;  // descriptors: 3 per copy, plenty for 2 queued copies
   copier_cfg.psram_trans_align = 64;
   copier_cfg.sram_trans_align = 4;
   if (esp_async_memcpy_install(&copier_cfg, &_copier) != ESP_OK) {
@@ -198,6 +221,7 @@ bool BusRgbBounce::initHere() {
     return false;
   }
   for (int i = 0; i < kBounceBufs; ++i) memcpy(_bounce[i], _frame_buffer + i * _chunk_bytes, _chunk_bytes);
+  xTaskCreatePinnedToCore(copyTask, "rgb_copy", 3072, this, configMAX_PRIORITIES - 1, &_copy_task, xPortGetCoreID());
   _next_buf = 0;
   _next_chunk = kBounceBufs;
   ch.link.addr = (uintptr_t)_desc;
