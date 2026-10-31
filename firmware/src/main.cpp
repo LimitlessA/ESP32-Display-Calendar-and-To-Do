@@ -50,6 +50,7 @@ void loop() {
     lastTick = millis();
     ui_tick();
   }
+  settings_flush();
   const uint32_t idle = lv_timer_handler();
   delay(idle < 5 ? idle : 5);  // yield, but never longer than LVGL asks for
 }

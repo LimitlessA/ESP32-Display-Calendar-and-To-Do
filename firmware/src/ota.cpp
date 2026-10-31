@@ -124,6 +124,7 @@ void otaTask(void *) {
     if (bits & kInstall) install();
     if (bits & kReboot) {
       delay(kRestartDelayMs);
+      settings_flush(true);
       ESP.restart();
     }
   }
