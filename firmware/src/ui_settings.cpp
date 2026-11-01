@@ -23,12 +23,14 @@ constexpr const char *kSignalAndIp = "%s \xC2\xB7 %s";
 constexpr const char *kConnecting = "Connecting...";
 constexpr const char *kNotConnected = "Not connected";
 
-constexpr const char *kCardAccounts = "GOOGLE ACCOUNTS";
+constexpr const char *kCardAccounts = "ACCOUNTS";
 constexpr const char *kManageAccounts = "Manage accounts  " ICON_RIGHT;
 constexpr const char *kConnectedCount = "%d connected";
 constexpr const char *kNeedsAttention = "%s needs attention";
 constexpr const char *kAllSynced = "All synced";
-constexpr const char *kSyncsEvery = "Syncs every %d min";
+constexpr const char *kAccountKinds = "%d Google \xC2\xB7 %d ICS \xC2\xB7 desk %s";
+constexpr const char *kDeskOn = "on";
+constexpr const char *kDeskOff = "off";
 
 constexpr const char *kCardDevice = "DEVICE";
 constexpr const char *kSdFree = ICON_SD "  SD card: %.1f GB free";
@@ -59,7 +61,9 @@ constexpr const char *k12h = "12 h";
 
 constexpr const char *kCardSync = "SYNC";
 constexpr const char *kLastSynced = "Last synced %s";
-constexpr const char *kNextSync = "Next sync in %d min";
+constexpr const char *kNextSync = "Every %d min \xC2\xB7 next in %d min";
+constexpr const char *kEvery = "Every %d min";
+constexpr const char *kInterval = ICON_CLOCK "  %d min";
 constexpr const char *kSavedCopy = "Showing saved copy";
 constexpr const char *kNotSynced = "Not synced yet";
 constexpr const char *kAutoUpdate = "Auto-update";
@@ -80,7 +84,7 @@ constexpr int WIDE_W = 2 * CARD_W + CARD_GAP;
 lv_obj_t *wifiName, *wifiInfo;
 lv_obj_t *accCount, *accProblem, *accEvery;
 lv_obj_t *sdInfo, *batInfo;
-lv_obj_t *syncLast, *syncNext;
+lv_obj_t *syncLast, *syncNext, *intervalLabel;
 lv_obj_t *swNight, *swChime, *swDim, *swAuto, *fmt24, *fmt12, *themeName, *featuresOn;
 
 // ---- Code --------------------------------------------------------------------
@@ -101,7 +105,7 @@ lv_obj_t *card(lv_obj_t *scr, int x, int y, int w, int h, const char *heading, b
 lv_obj_t *line(lv_obj_t *parent, const lv_font_t *font, uint32_t color, int w) {
   lv_obj_t *l = mk_label(parent, font, color, "");
   lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(l, w);
+  lv_obj_set_size(l, w, lv_font_get_line_height(font));  // one line: long names end in "..."
   return l;
 }
 
@@ -157,6 +161,17 @@ void toggled(lv_event_t *e) {
   if (sw == swDim) s.dimIdle = on;
   if (sw == swAuto) s.autoUpdate = on;
   ui_save_settings(s);
+}
+
+// Steps through the sync intervals on each tap.
+void nextInterval(lv_event_t *) {
+  Settings s = g_settings;
+  const size_t n = sizeof(kSyncChoices) / sizeof(kSyncChoices[0]);
+  size_t i = 0;
+  while (i < n && kSyncChoices[i] <= s.refreshMinutes) i++;
+  s.refreshMinutes = kSyncChoices[i < n ? i : 0];
+  ui_save_settings(s);
+  settings_refresh();
 }
 
 void setFormat(bool use24h) {
@@ -293,7 +308,17 @@ lv_obj_t *settings_create() {
   lv_obj_set_flex_grow(spacer, 1);
   swAuto = mk_switch(controlRow(sync, kAutoUpdate, kAutoUpdateSub), g_settings.autoUpdate,
                      toggled);
-  lv_obj_t *now = mk_text_button(sync, kSyncNow, true, inner);
+  lv_obj_t *buttons2 = mk_box(sync, 0, 0);
+  lv_obj_set_style_bg_opa(buttons2, LV_OPA_TRANSP, 0);
+  lv_obj_set_width(buttons2, inner);
+  set_flex(buttons2, LV_FLEX_FLOW_ROW, 8);
+  lv_obj_t *every = mk_button(buttons2, t.raised, TOUCH / 2);
+  lv_obj_set_size(every, 92, TOUCH);
+  intervalLabel = mk_label(every, &font_14, t.text, "");  // font_14 has the clock icon
+  lv_obj_center(intervalLabel);
+  on_click(every, nextInterval);
+  lv_obj_t *now = mk_text_button(buttons2, kSyncNow, true, inner - 92 - 8);
+  lv_obj_set_style_pad_hor(now, 8, 0);
   on_click(now, [](lv_event_t *) {
     sync_refresh();
     toast(kSyncing);
@@ -315,8 +340,8 @@ void settings_refresh() {
     lv_label_set_text(wifiInfo, ws == WifiState::Connecting ? kConnecting : kNotConnected);
   }
 
-  const size_t n = g_settings.accounts.size();
-  lv_label_set_text(accCount, strf(kConnectedCount, (int)n).c_str());
+  const size_t n = g_settings.accounts.size(), nIcs = g_settings.ics.size();
+  lv_label_set_text(accCount, strf(kConnectedCount, (int)(n + nIcs)).c_str());
   String problem;
   for (size_t i = 0; i < n && i < g_snap.accounts.size(); i++) {
     if (g_snap.accounts[i].error.length()) {
@@ -324,10 +349,14 @@ void settings_refresh() {
       break;
     }
   }
+  for (size_t i = 0; !problem.length() && i < nIcs && i < g_snap.ics.size(); i++) {
+    if (g_snap.ics[i].error.length()) problem = strf(kNeedsAttention, g_settings.ics[i].label.c_str());
+  }
   lv_label_set_text(accProblem, problem.c_str());
   lv_obj_set_style_text_color(accProblem, c(problem.length() ? t.badFg : t.good), 0);
   if (!problem.length() && n) lv_label_set_text(accProblem, kAllSynced);
-  lv_label_set_text(accEvery, strf(kSyncsEvery, (int)g_settings.refreshMinutes).c_str());
+  lv_label_set_text(accEvery, strf(kAccountKinds, (int)n, (int)nIcs, g_settings.desk ? kDeskOn : kDeskOff).c_str());
+  lv_label_set_text(intervalLabel, strf(kInterval, (int)g_settings.refreshMinutes).c_str());
 
   if (storage_ok()) {
     const double gb = storage_free_bytes() / 1e9;
@@ -346,10 +375,10 @@ void settings_refresh() {
   if (g_snap.syncedAt) {
     lv_label_set_text(syncLast, strf(kLastSynced, fmt_time(g_snap.syncedAt).c_str()).c_str());
     const long left = (long)(g_snap.syncedAt + g_settings.refreshMinutes * 60 - ui_now()) / 60;
-    lv_label_set_text(syncNext, strf(kNextSync, (int)(left > 0 ? left : 0)).c_str());
+    lv_label_set_text(syncNext, strf(kNextSync, (int)g_settings.refreshMinutes, (int)(left > 0 ? left : 0)).c_str());
   } else {
     lv_label_set_text(syncLast, g_snap.offline ? kSavedCopy : kNotSynced);
-    lv_label_set_text(syncNext, "");
+    lv_label_set_text(syncNext, strf(kEvery, (int)g_settings.refreshMinutes).c_str());
   }
   if (g_snap.error.length()) {
     lv_label_set_text(syncNext, g_snap.error.c_str());

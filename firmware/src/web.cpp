@@ -24,6 +24,11 @@ constexpr const char *kTooMany = "Too many accounts";
 constexpr const char *kAdded = "Account added. It syncs within a few seconds.";
 constexpr const char *kRemoved = "Account removed.";
 constexpr const char *kLinkSaved = "Update link saved.";
+constexpr const char *kBadIcs = "The calendar link should start with https:// or webcal://";
+constexpr const char *kTooManyIcs = "Too many calendar links";
+constexpr const char *kIcsAdded = "Calendar added. It shows up with the next sync.";
+constexpr const char *kIcsRemoved = "Calendar removed.";
+constexpr const char *kSyncSaved = "Sync interval saved.";
 constexpr const char *kDeskSaved = "Desk settings saved. Turn the desk on in Settings > Features > Smart desk.";
 constexpr const char *kInstalled = "Installed. The display is restarting.";
 constexpr const char *kUpdateFailed = "Update failed: ";
@@ -69,6 +74,18 @@ const char kAddSection[] PROGMEM =
     "<label for=token>Token</label><input id=token name=token required>"
     "<label for=pin1>PIN from the display</label><input id=pin1 name=pin inputmode=numeric required>"
     "<button>Add account</button></form></div>";
+// Published calendars (ICS). Kept minimal: the page is getting a new layout.
+const char kIcsHeading[] PROGMEM =
+    "<h2>Other calendars (Outlook, iCloud, ICS)</h2>"
+    "<p class=muted>Paste a published calendar link. Outlook: Settings &rsaquo; Calendar &rsaquo; Shared calendars &rsaquo; "
+    "Publish a calendar &rsaquo; ICS. iCloud: share the calendar as a Public Calendar. "
+    "The first Google account's script reads them, so add a Google account first.</p>";
+const char kIcsAdd[] PROGMEM =
+    "<div class=card><form method=post action=/ics/add>"
+    "<label for=ilabel>Name shown on the display</label><input id=ilabel name=label placeholder='Work (Outlook)' maxlength=20 required>"
+    "<label for=iurl>Calendar link (.ics)</label><input id=iurl name=url placeholder='https://outlook.office365.com/owa/calendar/.../calendar.ics' required>"
+    "<label for=pin5>PIN from the display</label><input id=pin5 name=pin inputmode=numeric required>"
+    "<button>Add calendar</button></form></div>";
 // Smart desk: address and the desk web UI login. Values go between the parts.
 const char kDeskStart[] PROGMEM =
     "<h2>Smart desk</h2><div class=card><p>The display talks to the desk's own web UI. "
@@ -185,6 +202,21 @@ void handleRoot() {
   }
 
   h += FPSTR(kAddSection);
+
+  h += FPSTR(kIcsHeading);
+  for (size_t i = 0; i < s.ics.size(); i++) {
+    const IcsCalendar &c = s.ics[i];
+    const IcsStatus st = i < snap.ics.size() ? snap.ics[i] : IcsStatus();
+    h += "<div class='card row'><span class=dot style='background:" + hex(c.color) +
+         "'></span><div style='flex:1;min-width:200px;overflow-wrap:anywhere'><b>" + esc(c.label) + "</b><div class=muted>" +
+         esc(c.url) + "</div>";
+    if (st.error.length()) h += "<div class=err>" + esc(st.error) + "</div>";
+    else if (st.synced) h += "<div class=ok>" + String(kSynced) + " &middot; " + String((int)st.events) + " events</div>";
+    h += "</div><form method=post action=/ics/remove class=row><input type=hidden name=i value=" + String(i) +
+         "><input name=pin placeholder=PIN inputmode=numeric style='width:110px' aria-label=PIN required>"
+         "<button class=ghost>" + String(kRemove) + "</button></form></div>";
+  }
+  h += FPSTR(kIcsAdd);
   h += FPSTR(kDeskStart);
   h += esc(s.deskHost);
   h += FPSTR(kDeskUser);
@@ -226,6 +258,48 @@ void handleRemoveAccount() {
     settings_save(s);
   }
   redirectHome(kRemoved);
+}
+
+void handleAddIcs() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  String url = server.arg("url");
+  url.trim();
+  if (!url.startsWith("https://") && !url.startsWith("webcal://") && !url.startsWith("http://")) {
+    server.send(400, "text/plain", kBadIcs);
+    return;
+  }
+  if (s.ics.size() >= kMaxIcs) {
+    server.send(400, "text/plain", kTooManyIcs);
+    return;
+  }
+  String label = server.arg("label");
+  label.trim();
+  const size_t n = sizeof(kAccountColors) / sizeof(kAccountColors[0]);
+  s.ics.push_back({label.substring(0, kMaxLabel), url, kAccountColors[(s.accounts.size() + s.ics.size()) % n]});
+  settings_save(s);
+  sync_refresh();
+  redirectHome(kIcsAdded);
+}
+
+void handleRemoveIcs() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  const size_t i = server.arg("i").toInt();
+  if (i < s.ics.size()) {
+    s.ics.erase(s.ics.begin() + i);
+    settings_save(s);
+  }
+  redirectHome(kIcsRemoved);
+}
+
+// Sync interval in minutes (Settings > Sync on the display): minutes=2..60.
+void handleSyncInterval() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  s.refreshMinutes = constrain((int)server.arg("minutes").toInt(), 1, 60);
+  settings_save(s);
+  redirectHome(kSyncSaved);
 }
 
 void handleUpdateUrl() {
@@ -301,6 +375,9 @@ void web_begin() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/account/add", HTTP_POST, handleAddAccount);
   server.on("/account/remove", HTTP_POST, handleRemoveAccount);
+  server.on("/ics/add", HTTP_POST, handleAddIcs);
+  server.on("/ics/remove", HTTP_POST, handleRemoveIcs);
+  server.on("/settings/sync", HTTP_POST, handleSyncInterval);
   server.on("/settings/update-url", HTTP_POST, handleUpdateUrl);
   server.on("/settings/desk", HTTP_POST, handleDesk);
   server.on("/update", HTTP_POST, handleUploadDone, handleUpload);
