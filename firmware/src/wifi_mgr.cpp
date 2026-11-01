@@ -32,6 +32,9 @@ bool tryConnect(const String &ssid, const String &password) {
 
 void wifi_begin() {
   lock = xSemaphoreCreateMutex();
+  // The login is kept in Settings; Wi-Fi itself does not save it to flash,
+  // so connecting (from the sync task, whose stack is in PSRAM) never writes flash.
+  WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(HOSTNAME);
   WiFi.setAutoReconnect(true);

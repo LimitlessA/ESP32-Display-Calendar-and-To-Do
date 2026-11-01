@@ -2,6 +2,7 @@
 #include "audio.h"
 #include "config.h"
 #include "battery.h"
+#include "crashlog.h"
 #include "storage.h"
 #include "sync.h"
 #include "ui_internal.h"
@@ -193,7 +194,14 @@ lv_obj_t *settings_create() {
   sdInfo = line(dev, &font_12, t.muted, inner);
   batInfo = line(dev, &font_12, t.muted, inner);
   lv_obj_t *fw = line(dev, &font_12, t.muted, inner);
-  lv_label_set_text(fw, strf(kFirmware, FIRMWARE_VERSION).c_str());
+  // Why the display last restarted, if it was not asked to (details: serial port, harness "crash").
+  const String crash = crashlog_summary();
+  if (crash.length()) {
+    lv_label_set_text(fw, crash.c_str());  // instead of the version, until the next restart
+    lv_obj_set_style_text_color(fw, c(t.badFg), 0);
+  } else {
+    lv_label_set_text(fw, strf(kFirmware, FIRMWARE_VERSION).c_str());
+  }
   lv_obj_t *devSpacer = mk_box(dev, 0, 0);
   lv_obj_set_style_bg_opa(devSpacer, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(devSpacer, 1);
