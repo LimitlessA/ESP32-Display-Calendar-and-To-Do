@@ -107,7 +107,6 @@ void calendars_dialog_show(uint8_t account);
 lv_obj_t *mk_check(lv_obj_t *parent, const Task &task, int size);
 void complete_with_undo(lv_obj_t *box, const Task &task);
 
-void layout_picker_show();
 void quick_add_show();
 void summary_show();
 void review_show();

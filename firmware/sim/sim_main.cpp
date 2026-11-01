@@ -276,15 +276,19 @@ static void renderVariants(const char *dir) {
     render(dir, name);
     clearTop();
   }
-  for (uint8_t v = 0; v < 3; v++) {
-    snprintf(name, sizeof(name), "r9-features-%c", abc[v]);
-    setLayout(Layout::Features, v);
-    ui_show(Screen::Features);
-    render(dir, name);
-  }
+  // Features: the tile grid, then holding a tile (Focus timer) opens its options.
   setLayout(Layout::Features, kDefaultLayouts[(int)Layout::Features]);
-  layout_picker_show();
-  render(dir, "r9-layouts");
+  ui_show(Screen::Features);
+  render(dir, "r9-features");
+  {
+    lv_obj_t *body = lv_obj_get_child(lv_scr_act(), 1);
+    lv_obj_t *grid = lv_obj_get_child(body, 1);
+    lv_event_send(lv_obj_get_child(grid, 7), LV_EVENT_LONG_PRESSED, nullptr);
+  }
+  render(dir, "r9-features-options");
+  clearTop();
+  lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 1), 16), LV_EVENT_LONG_PRESSED, nullptr);
+  render(dir, "r9-features-desk");
   clearTop();
 
   // Round 4. During the design review (14:00-15:00, 6 people).
