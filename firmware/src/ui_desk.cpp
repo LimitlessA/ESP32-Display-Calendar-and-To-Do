@@ -134,11 +134,11 @@ String timerText(const DeskStatus &st) {
   if (!st.timerRunning) return kTimerOff;
   if (st.timerPaused) return kTimerPaused;
   const long m = (st.timerLeft + 59) / 60;
-  return strf(st.timerPhase == "SIT" ? kStandIn : kSitIn, m);
+  return strf(st.timerPhase.startsWith("SIT") ? kStandIn : kSitIn, m);
 }
 
 int timerProgress(const DeskStatus &st) {  // 0-1000
-  const long len = (st.timerPhase == "SIT" ? st.sitMinutes : st.standMinutes) * 60L;
+  const long len = (st.timerPhase.startsWith("SIT") ? st.sitMinutes : st.standMinutes) * 60L;
   if (!st.timerRunning || len <= 0) return 0;
   return (int)(1000 - std::min(st.timerLeft, len) * 1000 / len);
 }
@@ -307,7 +307,7 @@ void setTimerLength(int v, void *user) {
 
 int timerSig(const DeskStatus &st) {  // what the card looks like; it is rebuilt only when this changes
   if (!st.timerRunning) return 0;
-  return 1 + (st.timerPaused ? 1 : 0) + (st.timerPhase == "SIT" ? 2 : 0) + (st.timerLeft <= 60 ? 4 : 0);
+  return 1 + (st.timerPaused ? 1 : 0) + (st.timerPhase.startsWith("SIT") ? 2 : 0) + (st.timerLeft <= 60 ? 4 : 0);
 }
 
 String numText(int v) { return String(v); }
@@ -331,7 +331,7 @@ void buildTimerCard(const DeskStatus &st) {
   lv_obj_clean(live.card);
   live.sig = timerSig(st);
   live.shown = -1;
-  const bool run = st.timerRunning, sit = st.timerPhase == "SIT", last = run && st.timerLeft <= 60;
+  const bool run = st.timerRunning, sit = st.timerPhase.startsWith("SIT"), last = run && st.timerLeft <= 60;
   const uint32_t col = last ? t.warnFg : sit ? t.accent : t.good;
   lv_obj_t *wrap = transparent(live.card);
   lv_obj_set_size(wrap, 100, 100);
@@ -411,7 +411,7 @@ void updateTimerCard(Live &live, const DeskStatus &st) {
   if (shown == live.shown) return;
   live.shown = shown;
   lv_label_set_text(live.ringNum, (last ? strf(kClock, shown / 60, shown % 60) : String(shown)).c_str());
-  const long len = (st.timerPhase == "SIT" ? st.sitMinutes : st.standMinutes) * 60L;
+  const long len = (st.timerPhase.startsWith("SIT") ? st.sitMinutes : st.standMinutes) * 60L;
   lv_arc_set_value(live.ring, last ? (int)(st.timerLeft * 1000 / 60) : len > 0 ? (int)(std::min(st.timerLeft, len) * 1000 / len) : 0);
 }
 

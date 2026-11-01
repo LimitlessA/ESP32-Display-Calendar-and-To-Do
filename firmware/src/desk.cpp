@@ -240,7 +240,10 @@ void send(const String &base, const Settings &s, const Command &c) {
       const int sit = st.memoryMm[s.deskSitSlot - 1], stand = st.memoryMm[s.deskStandSlot - 1];
       if (sit > 0 && stand > 0) body += "\"sit_target_mm\":" + String(sit) + ",\"stand_target_mm\":" + String(stand) + ",";
       if (body.endsWith(",")) body.remove(body.length() - 1);
-      authed(base, s, "/interval/start", "POST", body + "}");
+      const int code = authed(base, s, "/interval/start", "POST", body + "}");
+      // The desk refuses the timer outside its working hours (403): say so instead of doing nothing.
+      if (code == 403) update([](DeskStatus &st) { st.error = "The desk's working hours do not allow the timer now"; });
+      else if (code >= 400 && code != 401) update([](DeskStatus &st) { st.error = "The desk did not start the timer"; });
       break;
     }
     case Cmd::TimerOff: authed(base, s, "/interval/stop", "POST", "{}"); break;
