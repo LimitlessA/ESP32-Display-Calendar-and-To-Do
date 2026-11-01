@@ -44,6 +44,8 @@ constexpr uint32_t kReplyTimeoutMs = 25000;  // Apps Script can take a while on 
 constexpr uint32_t kIdleLoopMs = 1000;       // how often the worker wakes when online
 constexpr uint32_t kOfflineLoopMs = 5000;    // ...and when offline
 constexpr uint32_t kTaskStack = 16384;
+constexpr uint8_t kActionTries = 3;  // a failed connection is retried before it counts as an error
+constexpr const char *kLocalPrefix = "new:";  // id of a task added here that Google has not answered for yet
 
 // ---- State -------------------------------------------------------------------
 
@@ -54,6 +56,12 @@ struct Action {
   uint8_t account;
   String hiddenKey;  // entry in `hidden` this action covers, if any
   String query;      // extra query string for the Apps Script call
+  // Task actions: list=...&task=... is added when the action is sent, so a
+  // task added on the display can be completed or moved before Google has
+  // given it a real id. For AddTask, taskId is the temporary "new:" id.
+  String taskId;
+  String listId;
+  uint8_t tries = 0;
 };
 
 SemaphoreHandle_t lock;
@@ -63,6 +71,8 @@ std::deque<Action> pending;
 // Items removed on screen but not yet confirmed by a fresh sync. Value is
 // true once the action has been sent, so the next sync can drop the entry.
 std::map<String, bool> hidden;
+// Tasks added on the display: temporary "new:" id -> Google's task id and list id.
+std::map<String, std::pair<String, String>> addedIds;
 volatile bool refreshRequested = true;
 volatile time_t weekRequested = 0;
 String timezone;  // POSIX TZ built from the feed's UTC offset
@@ -119,7 +129,7 @@ String accountUrl(const Account &a, const String &query) {
 
 // Apps Script answers on script.google.com with a redirect to
 // script.googleusercontent.com, so redirects must be followed.
-bool httpGet(const String &url, String &body, String &err) {
+bool httpGet(const String &url, String &body, String &err, int *status = nullptr) {
   WiFiClientSecure client;
   client.setCACert(GOOGLE_ROOT_CAS);
   HTTPClient http;
@@ -131,6 +141,7 @@ bool httpGet(const String &url, String &body, String &err) {
     return false;
   }
   const int code = http.GET();
+  if (status) *status = code;
   if (code != HTTP_CODE_OK) {
     err = code < 0 ? HTTPClient::errorToString(code) : strf(kErrHttp, code);
     // HTTPClient says "connection refused" for any failed connect, a failed
@@ -148,7 +159,18 @@ bool httpGet(const String &url, String &body, String &err) {
 bool parseResponse(const String &body, JsonDocument &doc, String &err) {
   const DeserializationError jerr = deserializeJson(doc, body);
   if (jerr) {
+    // Usually a Google error page (e.g. an old or wrongly shared deployment):
+    // show its title so the reason is visible on the display.
+    String hint = body;
+    const int t = body.indexOf("<title>");
+    if (t >= 0) {
+      const int e = body.indexOf("</title>", t);
+      hint = body.substring(t + 7, e > t ? e : t + 7 + 60);
+    }
+    hint = hint.substring(0, 60);
+    hint.trim();
     err = strf(kErrBadReply, jerr.c_str());
+    if (hint.length()) err += " (" + hint + ")";
     return false;
   }
   if (doc["error"].is<const char *>()) {
@@ -425,6 +447,52 @@ const char *actionName(ActionType t) {
   return kActOther;
 }
 
+bool isLocal(const String &taskId) { return taskId.startsWith(kLocalPrefix); }
+
+// Puts Google's ids into an action on a task added on the display. Returns
+// false if that task was never created (its add failed): nothing to send.
+// Call with the lock held.
+bool resolveTask(Action &a) {
+  if (!isLocal(a.taskId)) return true;
+  auto it = addedIds.find(a.taskId);
+  if (it == addedIds.end()) {
+    if (a.hiddenKey.length()) hidden.erase(a.hiddenKey);
+    return false;
+  }
+  a.taskId = it->second.first;
+  a.listId = it->second.second;
+  if (a.hiddenKey.length()) {
+    // The next sync lists the task under its real id: hide that one.
+    hidden.erase(a.hiddenKey);
+    a.hiddenKey = taskHiddenKey(a.account, a.taskId);
+    hidden[a.hiddenKey] = false;
+    const String id = a.taskId;
+    const uint8_t account = a.account;
+    auto &list = snapshot.tasks;
+    list.erase(std::remove_if(list.begin(), list.end(), [&](const Task &t) {
+      return t.account == account && t.id == id;
+    }), list.end());
+    snapshot.version++;
+  }
+  return true;
+}
+
+// A task added here now has Google's ids: use them on screen and for later actions.
+void taskAdded(const Action &a, JsonDocument &doc) {
+  const char *id = doc["id"].as<const char *>();
+  if (!id || !*id) return;
+  const char *list = doc["listId"].as<const char *>();
+  const String listId = list && *list ? String(list) : a.listId;
+  addedIds[a.taskId] = {String(id), listId};
+  for (Task &t : snapshot.tasks) {
+    if (t.account == a.account && t.id == a.taskId) {
+      t.id = id;
+      t.listId = listId;
+    }
+  }
+  snapshot.version++;
+}
+
 // Returns true if any action was sent, so the caller re-syncs.
 bool runPendingActions(const Settings &s) {
   bool ran = false;
@@ -435,15 +503,30 @@ bool runPendingActions(const Settings &s) {
       if (pending.empty()) break;
       a = pending.front();
       pending.pop_front();
+      if (a.account >= s.accounts.size()) continue;
+      if (a.type != ActionType::AddTask && a.taskId.length() && !resolveTask(a)) continue;
     }
-    if (a.account >= s.accounts.size()) continue;
+    String query = a.query;
+    if (a.type != ActionType::AddTask && a.taskId.length()) {
+      query += "&list=" + urlEncode(a.listId) + "&task=" + urlEncode(a.taskId);
+    }
     String body, err;
     JsonDocument doc;
-    const bool ok = httpGet(accountUrl(s.accounts[a.account], a.query), body, err) &&
+    int code = 0;
+    const bool ok = httpGet(accountUrl(s.accounts[a.account], query), body, err, &code) &&
                     parseResponse(body, doc, err);
     ran = true;
 
     Guard g;
+    // No connection (Wi-Fi hiccup, TLS short on memory): try again shortly.
+    // Not for adds: the script may have run before the reply was lost, and a
+    // second try would add the task twice. Every other action is idempotent.
+    if (!ok && code < 0 && a.type != ActionType::AddTask && ++a.tries < kActionTries) {
+      pending.push_front(a);
+      log_w("action failed, will retry: %s", err.c_str());
+      break;
+    }
+    if (ok && a.type == ActionType::AddTask) taskAdded(a, doc);
     if (a.hiddenKey.length()) {
       if (ok) {
         hidden[a.hiddenKey] = true;
@@ -496,6 +579,7 @@ void workerLoop(void *) {
         snapshot.accounts.assign(s.accounts.size(), AccountStatus());
         hidden.clear();
         pending.clear();
+        addedIds.clear();
         snapshot.version++;
         refreshRequested = true;
       }
@@ -594,8 +678,7 @@ void sync_complete_task(const Task &task) {
       return t.account == task.account && t.id == task.id;
     }), list.end());
     hidden[hk] = false;
-    pending.push_back({ActionType::Complete, task.account, hk,
-                       "action=complete&list=" + urlEncode(task.listId) + "&task=" + urlEncode(task.id)});
+    pending.push_back({ActionType::Complete, task.account, hk, "action=complete", task.id, task.listId});
     snapshot.version++;
   }
   wake();
@@ -612,8 +695,7 @@ void sync_uncomplete_task(const Task &task) {
     if (queued != pending.end()) {
       pending.erase(queued);
     } else {
-      pending.push_back({ActionType::Uncomplete, task.account, "",
-                         "action=uncomplete&list=" + urlEncode(task.listId) + "&task=" + urlEncode(task.id)});
+      pending.push_back({ActionType::Uncomplete, task.account, "", "action=uncomplete", task.id, task.listId});
     }
     hidden.erase(hk);
     snapshot.tasks.push_back(task);
@@ -645,7 +727,7 @@ void sync_add_task(uint8_t account, const String &listId, const String &title, c
     // Shown straight away; the next sync replaces it with the real task.
     Task t;
     t.account = account;
-    t.id = "new:" + String(millis());
+    t.id = kLocalPrefix + String(millis());
     t.listId = listId;
     t.title = title;
     t.dueKey = dueKey;
@@ -658,7 +740,7 @@ void sync_add_task(uint8_t account, const String &listId, const String &title, c
     String q = "action=add&title=" + urlEncode(title);
     if (listId.length()) q += "&list=" + urlEncode(listId);
     if (dueKey.length()) q += "&due=" + dueKey;
-    pending.push_back({ActionType::AddTask, account, "", q});
+    pending.push_back({ActionType::AddTask, account, "", q, t.id, listId});
     snapshot.version++;
   }
   wake();
@@ -672,8 +754,7 @@ void sync_set_task_due(const Task &task, const String &dueKey) {
     }
     std::vector<Event> none;
     sortAndFilter(none, snapshot.tasks);
-    pending.push_back({ActionType::SetDue, task.account, "",
-                       "action=due&list=" + urlEncode(task.listId) + "&task=" + urlEncode(task.id) + "&due=" + dueKey});
+    pending.push_back({ActionType::SetDue, task.account, "", "action=due&due=" + dueKey, task.id, task.listId});
     snapshot.version++;
   }
   wake();

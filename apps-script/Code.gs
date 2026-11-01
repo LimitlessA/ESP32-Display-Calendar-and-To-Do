@@ -8,7 +8,7 @@
  * All calls are GET <web app URL>?token=T[&action=...]:
  *   (no action)                        feed: upcoming events, open tasks, calendars
  *   action=range&from=MS&to=MS         events in a time range (week view)
- *   action=complete&list=L&task=ID     mark a task done
+ *   action=complete&list=L&task=ID     mark a task done (a task deleted elsewhere counts as done)
  *   action=uncomplete&list=L&task=ID   undo that
  *   action=dismiss&event=KEY&until=MS  hide one event occurrence on the display
  *   action=showcal&id=CAL&shown=0|1    choose which calendars the display shows
@@ -216,10 +216,32 @@ function getTasks_() {
   }));
 }
 
+// The list that holds the task: the one the display sent if it is right,
+// otherwise the first list that has it (no list sent, or the task was moved
+// to another list elsewhere). null if the task is gone.
+function findTaskList_(listId, taskId) {
+  const ids = [listId].concat(taskLists_().map(l => l.id))
+    .filter((id, i, all) => id && all.indexOf(id) === i);
+  for (const id of ids) {
+    try {
+      const t = Tasks.Tasks.get(id, taskId);
+      if (t && !t.deleted) return id;
+    } catch (err) {
+      // not in this list
+    }
+  }
+  return null;
+}
+
 function setTaskStatus_(listId, taskId, done) {
-  if (!listId || !taskId) throw new Error('missing list or task');
+  if (!taskId) throw new Error('missing task');
+  const list = findTaskList_(listId, taskId);
+  if (!list) {
+    if (done) return { ok: true, gone: true };  // already deleted elsewhere: nothing left to do
+    throw new Error('task not found');
+  }
   Tasks.Tasks.patch(done ? { status: 'completed' } : { status: 'needsAction', completed: null },
-    listId, taskId);
+    list, taskId);
   return { ok: true };
 }
 
@@ -243,8 +265,10 @@ function addTask_(title, listId, due) {
 }
 
 function setTaskDue_(listId, taskId, due) {
-  if (!listId || !taskId) throw new Error('missing list or task');
-  Tasks.Tasks.patch({ due: dueValue_(due) }, listId, taskId);
+  if (!taskId) throw new Error('missing task');
+  const list = findTaskList_(listId, taskId);
+  if (!list) throw new Error('task not found');
+  Tasks.Tasks.patch({ due: dueValue_(due) }, list, taskId);
   return { ok: true };
 }
 

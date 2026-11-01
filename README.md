@@ -69,6 +69,11 @@ Do this once per account you want on the display.
 6. *Deploy › New deployment › Web app*, with *Execute as: Me* and
    *Who has access: Anyone*. Copy the web app URL (it ends in `/exec`).
 
+When `Code.gs` changes later, paste the new version over it (keep your
+`CONFIG` values), then *Deploy › Manage deployments*, edit the web app,
+pick *Version: New version* and *Deploy*. The URL stays the same; saving
+alone does not change what the display talks to.
+
 You add the URL and token to the display in step 3 below.
 
 ## 2. Flash the first firmware (once, over USB)
