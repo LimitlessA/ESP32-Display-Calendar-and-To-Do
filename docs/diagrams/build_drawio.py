@@ -128,18 +128,18 @@ andrei = p.add(c4label("Andrei", "Person"), PERSON, 440, 90, 220, 90)
 screen = p.add(c4label("Touch screen and speaker", "Hardware: 800x480 RGB LCD, GT911 touch, I2S amplifier",
                        "Shows the UI, reads taps, plays the chime."), CONTAINER, 80, 290, 280, 140)
 setup = p.add(c4label("Setup web page", "HTML served by the firmware at http://calendar.local",
-                      "Add or remove accounts, upload firmware, change the update link. Needs the PIN on screen."),
+                      "Tabs: Accounts (Google, ICS links), Desk & sync (desk, sync interval), Device (update link, upload). The PIN changes at every restart and is shown on the Accounts screen."),
               CONTAINER, 420, 290, 300, 150)
 fw = p.add(c4label("Firmware", "C++, Arduino, FreeRTOS, LVGL 8, LovyanGFX on the ESP32-S3",
                    "UI on core 1; Wi-Fi, sync, web page and updates on core 0."), CONTAINER, 380, 540, 340, 160)
-nvs = p.add(c4label("Settings", "NVS flash (Preferences)", "Wi-Fi, accounts, display options as JSON."), STORE, 80, 800, 220, 130)
-sd = p.add(c4label("microSD card", "FAT, JSON files", "Offline copy of each account's feed, settings backup."), STORE, 340, 800, 220, 130)
+nvs = p.add(c4label("Settings", "NVS flash (Preferences)", "Wi-Fi, accounts, display options as JSON, saved 5 s after the last change."), STORE, 80, 800, 220, 130)
+sd = p.add(c4label("microSD card", "FAT, JSON files", "Offline copy of each account's feed, settings backup, radar counts. Optional."), STORE, 340, 800, 220, 130)
 script = p.add(c4label("Apps Script web app", "Google Apps Script (one copy per Google account)",
                        "Returns meetings, tasks, calendars, travel times, birthdays, holidays and frequent tasks as JSON; "
                        "dismisses, completes, adds and moves tasks, stars meetings."),
                CONTAINER, 800, 540, 340, 160)
 ci = p.add(c4label("Build pipeline", "GitHub Actions, PlatformIO, esptool",
-                   "Builds on every push; numbers the version; publishes a release from main."), CONTAINER, 880, 800, 260, 150)
+                   "Builds 7 inch and 5 inch on every push; version 0.2.<run>; a release from main, a builds/<branch> branch for the rest."), CONTAINER, 880, 800, 260, 150)
 rel_store = p.add(c4label("Firmware releases", "GitHub Releases", "firmware.bin, factory.bin, manifest.json"),
                   STORE, 610, 800, 230, 130)
 gcal = p.add(c4label("Google Calendar", "External system"), EXTERNAL, 1260, 480, 220, 90)
@@ -181,26 +181,26 @@ p.add("<b>Core 1 · UI task</b> (Arduino loop)", BOUNDARY, 30, 100, 640, 760)
 p.add("<b>Core 0 · background tasks</b>", BOUNDARY, 720, 100, 620, 760)
 main = p.add(c4label("Main loop", "main.cpp", "Starts every module; every loop: new snapshot to UI, UI tick, LVGL draw."),
              COMPONENT, 60, 130, 260, 110)
-uicore = p.add(c4label("UI core", "ui.cpp", "Navigation, reminders, night mode, dimming, auto-update timing, toasts."),
+uicore = p.add(c4label("UI core", "ui.cpp", "Navigation, reminders, night mode, dimming, auto-update timing, toasts, rebuild when a layout setting changes."),
                COMPONENT, 370, 130, 270, 120)
 screens = p.add(c4label("Screens", "ui_home, ui_detail, ui_week, ui_tasks, ui_night, ui_wifi, ui_accounts, "
                         "ui_settings, ui_features, ui_dates, ui_desk",
-                        "Built once; data parts rebuilt only when changed. Layout A, B or C per feature."),
+                        "Built once; data parts rebuilt only when changed. Settings is a tile dashboard, Features a grid of 18 cards (tap = on/off, hold = options and layout A, B or C), Accounts a master/detail list."),
                 COMPONENT, 370, 300, 270, 150)
 overlays = p.add(c4label("Overlays", "ui_overlays, ui_quickadd, ui_focus, ui_daily, ui_alerts, "
                          "ui_meeting, ui_radar, ui_roulette, ui_presence",
                          "Reminder, update, theme and layout pickers, quick add, focus timer, daily summary, "
                          "end-of-day review, conflicts, leave-by."),
                  COMPONENT, 370, 490, 270, 150)
-theme = p.add(c4label("Themes", "theme.cpp", "Six colour sets."), COMPONENT, 60, 490, 240, 90)
+theme = p.add(c4label("Themes", "theme.cpp", "Six colour sets (Midnight, Ocean, Forest, Sunset, Paper, High contrast)."), COMPONENT, 60, 490, 240, 90)
 disp = p.add(c4label("Display driver", "display.cpp, LovyanGFX", "RGB panel, touch, backlight, LVGL flush with DMA."),
              COMPONENT, 60, 300, 260, 120)
 batt = p.add(c4label("Battery", "battery.cpp", "Optional MAX17048 fuel gauge."), COMPONENT, 60, 660, 240, 90)
 sens = p.add(c4label("Sensors", "sensors.cpp", "Optional BH1750 room light and PIR motion."), COMPONENT, 60, 780, 240, 90)
-sync = p.add(c4label("Sync worker", "sync.cpp", "Fetches every account, queues taps as actions, keeps the snapshot, offline cache."),
+sync = p.add(c4label("Sync worker", "sync.cpp", "Fetches every account (feed v2 with a hash), queues taps as actions, keeps the snapshot, week fetch, offline cache."),
              COMPONENT, 760, 130, 270, 130)
 wifi = p.add(c4label("Wi-Fi manager", "wifi_mgr.cpp", "Connect, reconnect, scan."), COMPONENT, 1060, 130, 250, 100)
-web = p.add(c4label("Web server", "web.cpp", "Setup page, PIN check, firmware upload."), COMPONENT, 1060, 320, 250, 110)
+web = p.add(c4label("Web server", "web.cpp", "Setup page, PIN check (5 wrong = 1 min lock), accounts, ICS links, desk, firmware upload, harness routes."), COMPONENT, 1060, 320, 250, 110)
 ota = p.add(c4label("Updater", "ota.cpp", "Reads the manifest, installs to the other app slot, restarts."),
             COMPONENT, 760, 320, 270, 120)
 audio = p.add(c4label("Audio", "audio.cpp", "Chime generator on I2S."), COMPONENT, 760, 500, 210, 90)
@@ -213,6 +213,9 @@ lcd = p.add(c4label("Touch screen", "Hardware"), CONTAINER, 60, 920, 200, 80)
 nvs = p.add(c4label("NVS flash", "Container"), STORE, 760, 920, 200, 100)
 sdc = p.add(c4label("microSD card", "Container"), STORE, 1060, 920, 200, 100)
 browser = p.add(c4label("Browser", "Phone or PC"), EXTERNAL, 1420, 335, 200, 80)
+harness = p.add(c4label("Test harness", "harness.cpp, tools/harness.py",
+                        "Serial and HTTP commands (tap, screen, shot, heap, log). Runs on the UI task."),
+                COMPONENT, 370, 690, 270, 110)
 p.link(main, uicore, rel("ui_update, ui_tick"))
 p.link(main, disp, rel("lv_timer_handler"))
 p.link(uicore, screens, rel("show, refresh"))
@@ -542,11 +545,11 @@ flow("Choose calendars",
       ("done", "sync", "")])
 
 flow("Save settings",
-     "Every change in Settings (sliders on release, switches, theme, 24/12 h) goes the same way.",
+     "Every change in Settings or Features (sliders on release, switches, theme, 24/12 h, layouts) goes the same way. The write waits until nothing has changed for 5 seconds.",
      [SCREEN, "Settings store", "NVS flash", "SD card", "Other modules"],
      [("chg", SCREEN, 0, "User changes a setting", "start"),
       ("save", "Settings store", 1, "settings_save: copy under lock, version + 1", "step"),
-      ("nvs", "NVS flash", 2, "Write JSON to Preferences", "step"),
+      ("nvs", "NVS flash", 2, "After 5 s without changes: write JSON to Preferences", "step"),
       ("sd", "SD card", 3, "Write settings.json backup (atomic)", "step"),
       ("see", "Other modules", 4, "Sync worker, UI and updater notice the new version", "end")],
      [("chg", "save", ""), ("save", "nvs", ""), ("nvs", "sd", ""), ("sd", "see", "")])
@@ -582,9 +585,9 @@ flow("Automatic update after a push to main",
      "Every push to main becomes a release; each display installs it the next time nobody is using it.",
      [UI, "GitHub Actions", "GitHub Releases", SCREEN, OTA],
      [("push", UI, 0, "Pushes to main", "start"),
-      ("build", "GitHub Actions", 1, "Build with version 1.0.<run number>", "step"),
+      ("build", "GitHub Actions", 1, "Build with version 0.2.<run number>", "step"),
       ("pack", "GitHub Actions", 2, "Make factory.bin, firmware.bin, manifest.json", "step"),
-      ("rel", "GitHub Releases", 3, "Publish release v1.0.N as latest", "step"),
+      ("rel", "GitHub Releases", 3, "Publish release v0.2.N as latest", "step"),
       ("timer", SCREEN, 4, "Every 3 h (first after 1 min): auto-update on?", "decide"),
       ("check", OTA, 5, "Read releases/latest/download/manifest.json", "step"),
       ("newer", OTA, 6, "Version newer than the running one?", "decide"),
@@ -793,15 +796,50 @@ flow("Smart desk",
      [("tap", "q", ""), ("auto", "q", "rule on"), ("q", "login", ""), ("login", "auth", "yes"), ("auth", "send", "token"),
       ("login", "send", "no"), ("send", "move", "HTTP"), ("move", "poll", ""), ("poll", "show", "")])
 
+flow("Restore a completed task (Done tab)",
+     "The Done tab lists tasks finished in the last 7 days (up to 20). Restore puts one back in the open list.",
+     [UI, SCREEN, SYNC, SCRIPT],
+     [("tab", UI, 0, "Opens Tasks > Done", "start"),
+      ("list", SCREEN, 1, "Show completed tasks, newest first", "step"),
+      ("tap", UI, 2, "Taps Restore on a row", "step"),
+      ("back", SYNC, 3, "Move the task to the open list; queue 'uncomplete' (or cancel a 'complete' not yet sent)", "step"),
+      ("patch", SCRIPT, 4, "GET ?action=uncomplete&list=L&task=ID: status = needsAction, due date kept", "step"),
+      ("end", SYNC, 5, "Next sync confirms the state", "end")],
+     [("tab", "list", ""), ("list", "tap", ""), ("tap", "back", ""), ("back", "patch", ""), ("patch", "end", "")])
+
+flow("Add an Outlook, iCloud or other calendar link",
+     "A published ICS link is read by the first Google account's script, so a Google account must exist first.",
+     [UI, WEB, "Settings store", SYNC, SCRIPT],
+     [("link", UI, 0, "Copies the published ICS link (Outlook, iCloud, any .ics)", "start"),
+      ("form", UI, 1, "Setup page, Accounts tab: name, link and the PIN", "step"),
+      ("pin", WEB, 2, "PIN right, link starts with https://, http:// or webcal://, fewer than 6?", "decide"),
+      ("save", "Settings store", 3, "Add the link with the next colour; save", "step"),
+      ("ask", SYNC, 4, "Add &ics=URL to the first account's feed and week requests", "step"),
+      ("read", SCRIPT, 5, "Fetch the link (cached 10 min), expand recurring events, return them like Google events", "step"),
+      ("show", UI, 6, "Events appear on Home and Week", "end"),
+      ("err", WEB, 3, "Show the error", "end")],
+     [("link", "form", ""), ("form", "pin", ""), ("pin", "save", "yes"), ("pin", "err", "no"), ("save", "ask", ""),
+      ("ask", "read", ""), ("read", "show", "")])
+
+flow("Test build of another branch",
+     "A push to any branch other than main is built for both boards but not released. Its files are kept on a builds/ branch.",
+     [UI, "GitHub Actions", "GitHub (builds branch)"],
+     [("push", UI, 0, "Pushes a branch", "start"),
+      ("build", "GitHub Actions", 1, "Build 7 inch and 5 inch with version 0.2.<run number>", "step"),
+      ("pack", "GitHub Actions", 2, "Make factory, firmware and manifest files in dist/", "step"),
+      ("keep", "GitHub (builds branch)", 3, "Force-push dist/ to builds/<branch>", "step"),
+      ("get", UI, 4, "Fetches the files from that branch, or from the Actions artifact", "end")],
+     [("push", "build", ""), ("build", "pack", ""), ("pack", "keep", ""), ("keep", "get", "")])
+
 flow("First flash over USB",
      "Done once. After this every update arrives over Wi-Fi.",
      [UI, "Browser (esptool-js)", "Board"],
-     [("dl", UI, 0, "Downloads factory.bin from a release or Actions run", "start"),
+     [("dl", UI, 0, "Downloads factory.bin (7 inch) or factory-5inch.bin (5 inch)", "start"),
       ("plug", UI, 1, "Connects the board by USB-C", "step"),
       ("conn", "Browser (esptool-js)", 2, "Connect; board found?", "decide"),
       ("boot", UI, 3, "Hold BOOT, tap RESET, release BOOT", "step"),
       ("flash", "Browser (esptool-js)", 4, "Write factory.bin at 0x0", "step"),
-      ("reset", "Board", 5, "Press RESET; firmware starts (see Start-up)", "end")],
+      ("reset", "Board", 5, "Press RESET; firmware starts. Screen black? Flash again", "end")],
      [("dl", "plug", ""), ("plug", "conn", ""), ("conn", "flash", "yes"), ("conn", "boot", "no"), ("boot", "conn", ""),
       ("flash", "reset", "")])
 
