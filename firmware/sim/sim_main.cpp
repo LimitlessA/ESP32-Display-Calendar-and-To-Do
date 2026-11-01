@@ -135,6 +135,12 @@ static void sampleData() {
   work.syncedAt = personal.syncedAt;
   work.calendars = {{"w", "Work", W, true}, {"o", "Office rooms", 0xE57CD8, false}};
   g_sim.accounts = {personal, work};
+  IcsStatus outlook;
+  outlook.synced = true;
+  outlook.events = 14;
+  IcsStatus icloud;
+  icloud.error = "HTTP 404";
+  g_sim.ics = {outlook, icloud};
   g_sim.syncedAt = personal.syncedAt;
   g_sim.version = 1;
 }
@@ -438,6 +444,8 @@ int main(int argc, char **argv) {
   Settings s;
   s.accounts = {{"Personal", "https://script.google.com/macros/s/a/exec", "x", 0x7BD88F},
                 {"Work", "https://script.google.com/macros/s/b/exec", "y", 0x6C8CFF}};
+  s.ics = {{"Work (Outlook)", "https://outlook.office365.com/owa/calendar/abc/calendar.ics", 0xF5A524},
+           {"Family (iCloud)", "webcal://p23-caldav.icloud.com/published/2/xyz", 0xE57CD8}};
   s.wifiSsid = "Popescu-5G";
   sim_set_settings(s);
   sampleData();
@@ -477,6 +485,22 @@ int main(int argc, char **argv) {
   render(dir, "07-wifi");
   ui_show(Screen::Accounts);
   render(dir, "08-accounts");
+  {
+    // B1: an account with a problem, B2: the desk (list items: label, Personal, Work, ...)
+    lv_obj_t *accList = lv_obj_get_child(lv_scr_act(), 1);
+    g_sim.accounts[1].error = "Token rejected - 14:02";
+    g_sim.version++;
+    if (sync_get_if_newer(snap.version, snap)) ui_update(snap);
+    lv_event_send(lv_obj_get_child(accList, 2), LV_EVENT_CLICKED, nullptr);
+    render(dir, "08b-accounts-problem");
+    const uint32_t n = lv_obj_get_child_cnt(accList);
+    lv_event_send(lv_obj_get_child(accList, n - 2), LV_EVENT_CLICKED, nullptr);
+    render(dir, "08c-accounts-desk");
+    lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 1), LV_EVENT_CLICKED, nullptr);
+    g_sim.accounts[1].error = "";
+    g_sim.version++;
+    if (sync_get_if_newer(snap.version, snap)) ui_update(snap);
+  }
   ui_show(Screen::Settings);
   render(dir, "09-settings");
 
