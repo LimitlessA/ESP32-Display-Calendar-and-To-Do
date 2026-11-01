@@ -370,13 +370,17 @@ lv_obj_t *mk_slider(lv_obj_t *parent, const char *title, int value, int min, int
   set_flex(head, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
   mk_label(head, &font_14b, t.text, title);
   lv_obj_t *val = mk_label(head, &font_14b, t.accent, strf("%d%s", value, unit).c_str());
-  // The scale: lowest value, slider, highest value.
+  // The track with a small bar at each end, no min/max text.
   lv_obj_t *scale = mk_box(wrap, 0, 0);
   lv_obj_set_style_bg_opa(scale, LV_OPA_TRANSP, 0);
   lv_obj_set_size(scale, lv_pct(100), 24);
   set_flex(scale, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_hor(scale, 8, 0);
-  mk_label(scale, &font_12, t.muted, strf("%d%s", min, unit).c_str());
+  auto endMark = [&]() {
+    lv_obj_t *m = mk_box(scale, t.muted, 1);
+    lv_obj_set_size(m, 3, 16);
+  };
+  endMark();
   lv_obj_t *s = lv_slider_create(scale);
   lv_obj_set_flex_grow(s, 1);
   lv_obj_set_height(s, 8);
@@ -387,7 +391,7 @@ lv_obj_t *mk_slider(lv_obj_t *parent, const char *title, int value, int min, int
   lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_KNOB);
   lv_obj_set_style_pad_all(s, 6, LV_PART_KNOB);
   lv_obj_set_ext_click_area(s, 16);
-  mk_label(scale, &font_12, t.muted, strf("%d%s", max, unit).c_str());
+  endMark();
   SliderState *st = attach(s, SliderState{val, unit});
   lv_obj_add_event_cb(s, [](lv_event_t *e) {
     SliderState *ss = static_cast<SliderState *>(lv_event_get_user_data(e));
