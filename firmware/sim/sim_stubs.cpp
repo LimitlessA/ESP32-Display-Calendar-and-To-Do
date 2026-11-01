@@ -166,6 +166,10 @@ void desk_recall(uint8_t slot) { g_sim_desk.heightMm = g_sim_desk.memoryMm[slot 
 void desk_hold(int) {}
 void desk_stop() {}
 void desk_timer(bool on) { g_sim_desk.timerRunning = on; }
+void desk_timer_cmd(int what) {
+  g_sim_desk.timerRunning = what != 0;
+  g_sim_desk.timerPaused = what == 2;
+}
 void desk_away(bool) {}
 void desk_timer_apply() {}
 void desk_test(const String &, const String &, const String &) {}

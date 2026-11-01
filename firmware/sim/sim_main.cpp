@@ -276,15 +276,19 @@ static void renderVariants(const char *dir) {
     render(dir, name);
     clearTop();
   }
-  for (uint8_t v = 0; v < 3; v++) {
-    snprintf(name, sizeof(name), "r9-features-%c", abc[v]);
-    setLayout(Layout::Features, v);
-    ui_show(Screen::Features);
-    render(dir, name);
-  }
+  // Features: the tile grid, then holding a tile (Focus timer) opens its options.
   setLayout(Layout::Features, kDefaultLayouts[(int)Layout::Features]);
-  layout_picker_show();
-  render(dir, "r9-layouts");
+  ui_show(Screen::Features);
+  render(dir, "r9-features");
+  {
+    lv_obj_t *body = lv_obj_get_child(lv_scr_act(), 1);
+    lv_obj_t *grid = lv_obj_get_child(body, 0);
+    lv_event_send(lv_obj_get_child(grid, 7), LV_EVENT_LONG_PRESSED, nullptr);
+  }
+  render(dir, "r9-features-options");
+  clearTop();
+  lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 0), 16), LV_EVENT_LONG_PRESSED, nullptr);
+  render(dir, "r9-features-desk");
   clearTop();
 
   // Round 4. During the design review (14:00-15:00, 6 people).
@@ -404,6 +408,23 @@ static void renderVariants(const char *dir) {
     render(dir, name);
     clearTop();
   }
+  // The timer card in its four states (layout B): running sitting is the default above.
+  setLayout(Layout::Desk, 1);
+  const DeskStatus base = g_sim_desk;
+  for (int k = 0; k < 5; k++) {
+    g_sim_desk = base;
+    const char *tn[] = {"sitting", "standing", "stopped", "lastmin", "paused"};
+    if (k == 1) { g_sim_desk.timerPhase = "STAND"; g_sim_desk.timerLeft = 22 * 60; g_sim_desk.heightMm = 1120; }
+    if (k == 2) g_sim_desk.timerRunning = false;
+    if (k == 3) g_sim_desk.timerLeft = 42;
+    if (k == 4) g_sim_desk.timerPaused = true;
+    ui_show(Screen::Desk);
+    desk_refresh();
+    tick();
+    snprintf(name, sizeof(name), "r15-desk-timer-%s", tn[k]);
+    render(dir, name);
+  }
+  g_sim_desk = base;
   ui_show(Screen::Features);
   render(dir, "r15-desk-features");
   desk_settings_show();

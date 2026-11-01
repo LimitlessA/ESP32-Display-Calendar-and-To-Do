@@ -21,13 +21,15 @@
 #include "web.h"
 #include "wifi_mgr.h"
 
-// malloc(), new and String go to PSRAM first, whatever their size (ESP-IDF
-// keeps blocks under CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL, 4 KB, in internal
-// RAM). The calendar's thousands of small strings, copied for the UI and the
-// sync, used up the internal RAM that Wi-Fi, TLS, Bluetooth and the screen
-// need. Those ask for internal RAM explicitly, so they are not affected; and
-// malloc() still falls back to internal RAM if PSRAM is ever full.
-static constexpr size_t kInternalMallocMax = 0;
+// malloc() keeps blocks up to 4 KB in internal RAM by default. The calendar
+// and task data (many small strings, JSON) filled it until Wi-Fi and HTTPS
+// ran short (the 7" went down to 1.4 KB free). Only blocks under 512 bytes
+// stay internal now; the rest goes to PSRAM (measured lowest free internal
+// RAM over a screen tour: 7" 7 KB -> 28 KB, 5" 41 KB -> 58 KB). Wi-Fi, TLS,
+// Bluetooth and the screen ask for the memory they need by capability, so
+// they are not affected; JSON documents use PSRAM whatever their size
+// (psram_json()).
+static constexpr size_t kInternalMallocMax = 512;
 
 static uint32_t snapVersion;
 static uint32_t lastTick;
