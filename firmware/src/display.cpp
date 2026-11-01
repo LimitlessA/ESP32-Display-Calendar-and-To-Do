@@ -46,10 +46,11 @@ static constexpr bool kTouchRotated180 = false;
 
 static constexpr int SCREEN_W = 800;
 static constexpr int SCREEN_H = 480;
-// One draw buffer of 24 lines (38 KB) in internal RAM. flush_cb copies it
+// One draw buffer of 12 lines (19 KB) in internal RAM. flush_cb copies it
 // into the frame before returning, so a second buffer would never be drawn
-// into while the first is flushed.
-static constexpr int BUF_LINES = 24;
+// into while the first is flushed. 12 lines, not 24, leaves enough internal
+// RAM for Bluetooth (phone presence) next to Wi-Fi and HTTPS.
+static constexpr int BUF_LINES = 12;
 // The LCD reads two bounce buffers of 10 lines in internal RAM (2 x 16 KB),
 // refilled from the frame in PSRAM, as Espressif recommends against drift.
 static constexpr int BOUNCE_LINES = 10;
