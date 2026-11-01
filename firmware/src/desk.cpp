@@ -1,6 +1,7 @@
 #include "desk.h"
 
 #include <ArduinoJson.h>
+#include <esp_heap_caps.h>
 #include <ESPmDNS.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
@@ -446,8 +447,16 @@ void desk_test(const String &host, const String &user, const String &password) {
   testResult = DeskTestResult();
   testResult.running = true;
   xSemaphoreGive(lock);
+  // The test needs an 8 KB stack; internal RAM is short (with Bluetooth on
+  // the task could not be created), so its stack lives in PSRAM, reused.
+  constexpr uint32_t kTestStack = 8192;
+  static StackType_t *stack = (StackType_t *)heap_caps_malloc(kTestStack, MALLOC_CAP_SPIRAM);
+  static StaticTask_t tcb;
+  static TaskHandle_t handle = nullptr;
   TestJob *job = new TestJob{host, user, password};
-  if (xTaskCreate(testTask, "desktest", 8192, job, 1, nullptr) != pdPASS) {
+  const bool previousGone = !handle || eTaskGetState(handle) == eDeleted;
+  if (stack && previousGone) handle = xTaskCreateStatic(testTask, "desktest", kTestStack, job, 1, stack, &tcb);
+  if (!stack || !previousGone || !handle) {
     delete job;
     finishTest(false, "Could not start the test");
   }
