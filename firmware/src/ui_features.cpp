@@ -24,8 +24,7 @@ constexpr const char *kPhoneRow = "Phone";
 constexpr const char *kDeskRow = "Desk";
 constexpr const char *kSitRow = "Sit";
 constexpr const char *kStandRow = "Stand";
-constexpr const char *kSlotChip = "M%d";
-constexpr const char *kDeskSetup = "Set the desk address and login on the setup page (Settings > Accounts).";
+constexpr const char *kDeskLogin = "Desk address, login and connection test";
 constexpr const char *kPair = "Pair a phone";
 constexpr const char *kForget = "Forget";
 constexpr const char *kForgotten = "Paired phones removed. Also remove \"Calendar display\" in your phone's Bluetooth settings.";
@@ -92,14 +91,6 @@ const Feature kFeatures[] = {
 constexpr int kFeatureCount = sizeof(kFeatures) / sizeof(kFeatures[0]);
 constexpr const char *kNeedsLightSensor = "Needs a BH1750 light sensor on I2C";
 
-// Values the option chip steps through.
-const uint16_t kSummaryTimes[] = {6 * 60, 6 * 60 + 30, 7 * 60, 7 * 60 + 30, 8 * 60, 8 * 60 + 30, 9 * 60};
-const uint16_t kReviewTimes[] = {17 * 60, 18 * 60, 19 * 60, 20 * 60, 20 * 60 + 30, 21 * 60, 22 * 60};
-const uint8_t kLeadMinutes[] = {5, 10, 15, 20, 30};
-const uint8_t kFocusMinutes[] = {15, 20, 25, 30, 45, 50, 60};
-const uint16_t kCostRates[] = {20, 30, 45, 60, 80, 100, 150};
-const uint8_t kAwayMinutes[] = {5, 10, 15, 30};
-const uint8_t kRadarMoves[] = {2, 3, 4, 5};
 constexpr const char *kMinutes = "%d min";
 constexpr const char *kMoney = "\u20AC%d";
 
@@ -132,40 +123,103 @@ const char *optionLabel(Opt o) {
   }
 }
 
+String fmtMin(int v) { return strf(kMinutes, v); }
+String fmtMoney(int v) { return strf(kMoney, v); }
+String fmtCount(int v) { return String(v); }
+String fmtClock(int v) { return fmtMinutes((uint16_t)v); }
+
+// What a -/+ stepper does for each option: range, step and how the value reads.
+struct OptRange {
+  int min, max, step;
+  StepFmt fmt;
+};
+
+OptRange optRange(Opt o) {
+  switch (o) {
+    case Opt::SummaryAt: return {5 * 60, 11 * 60, 30, fmtClock};
+    case Opt::ReviewAt: return {16 * 60, 23 * 60, 30, fmtClock};
+    case Opt::LeaveLead: return {5, 60, 5, fmtMin};
+    case Opt::FocusMinutes: return {5, 90, 5, fmtMin};
+    case Opt::CostRate: return {5, 500, 5, fmtMoney};
+    case Opt::AwayMinutes: return {5, 60, 5, fmtMin};
+    case Opt::RadarMoves: return {2, 10, 1, fmtCount};
+    default: return {0, 0, 1, fmtCount};
+  }
+}
+
+int optionNumber(Opt o, const Settings &s) {
+  switch (o) {
+    case Opt::SummaryAt: return s.summaryAt;
+    case Opt::ReviewAt: return s.reviewAt;
+    case Opt::LeaveLead: return s.leaveLead;
+    case Opt::FocusMinutes: return s.focusMinutes;
+    case Opt::CostRate: return s.costRate;
+    case Opt::AwayMinutes: return s.awayMinutes;
+    case Opt::RadarMoves: return s.radarMoves;
+    default: return 0;
+  }
+}
+
+void applyOption(Settings &s, Opt o, int v) {
+  switch (o) {
+    case Opt::SummaryAt: s.summaryAt = v; break;
+    case Opt::ReviewAt: s.reviewAt = v; break;
+    case Opt::LeaveLead: s.leaveLead = v; break;
+    case Opt::FocusMinutes: s.focusMinutes = v; break;
+    case Opt::CostRate: s.costRate = v; break;
+    case Opt::AwayMinutes: s.awayMinutes = v; break;
+    case Opt::RadarMoves: s.radarMoves = v; break;
+    default: break;
+  }
+}
+
+// Steps are collected and saved a moment after the last one, so holding + or - does not
+// rebuild every screen on each step.
+Settings pending;
+bool havePending = false;
+lv_timer_t *saveTimer = nullptr;
+lv_obj_t *dialogSub = nullptr;  // the dialog's subtitle, kept up to date while stepping
+
+const Settings &cur() { return havePending ? pending : g_settings; }
+
 String optionValue(Opt o) {
-  switch (o) {
-    case Opt::SummaryAt: return fmtMinutes(g_settings.summaryAt);
-    case Opt::ReviewAt: return fmtMinutes(g_settings.reviewAt);
-    case Opt::LeaveLead: return strf(kMinutes, g_settings.leaveLead);
-    case Opt::FocusMinutes: return strf(kMinutes, g_settings.focusMinutes);
-    case Opt::CostRate: return strf(kMoney, (int)g_settings.costRate);
-    case Opt::AwayMinutes: return strf(kMinutes, g_settings.awayMinutes);
-    case Opt::RadarMoves: return String((int)g_settings.radarMoves);
-    default: return "";
-  }
+  const OptRange r = optRange(o);
+  return r.fmt ? r.fmt(optionNumber(o, cur())) : String("");
 }
 
-template <typename T, size_t N>
-T nextOf(const T (&values)[N], T current) {
-  for (size_t i = 0; i < N; i++) {
-    if (values[i] > current) return values[i];
+bool available(int i);
+String subText(int i);
+
+void flushPending() {
+  if (saveTimer) {
+    lv_timer_del(saveTimer);
+    saveTimer = nullptr;
   }
-  return values[0];
+  if (!havePending) return;
+  havePending = false;
+  ui_save_settings(pending);
+  features_refresh();
 }
 
-void stepOption(Opt o) {
-  Settings s = g_settings;
-  switch (o) {
-    case Opt::SummaryAt: s.summaryAt = nextOf(kSummaryTimes, s.summaryAt); break;
-    case Opt::ReviewAt: s.reviewAt = nextOf(kReviewTimes, s.reviewAt); break;
-    case Opt::LeaveLead: s.leaveLead = nextOf(kLeadMinutes, s.leaveLead); break;
-    case Opt::FocusMinutes: s.focusMinutes = nextOf(kFocusMinutes, s.focusMinutes); break;
-    case Opt::CostRate: s.costRate = nextOf(kCostRates, s.costRate); break;
-    case Opt::AwayMinutes: s.awayMinutes = nextOf(kAwayMinutes, s.awayMinutes); break;
-    case Opt::RadarMoves: s.radarMoves = nextOf(kRadarMoves, s.radarMoves); break;
-    default: return;
+void stepped(int value, void *user) {
+  const int feature = (int)(intptr_t)user;
+  if (!havePending) {
+    pending = g_settings;
+    havePending = true;
   }
-  ui_save_settings(s);
+  applyOption(pending, kFeatures[feature].opt, value);
+  if (dialogSub) lv_label_set_text(dialogSub, subText(feature).c_str());
+  if (saveTimer) {
+    lv_timer_reset(saveTimer);
+  } else {
+    saveTimer = lv_timer_create([](lv_timer_t *) {
+      saveTimer = nullptr;  // one shot: LVGL deletes it after this run
+      ui_save_settings(pending);
+      havePending = false;
+      features_refresh();
+    }, 600, nullptr);
+    lv_timer_set_repeat_count(saveTimer, 1);
+  }
 }
 
 bool available(int i) {
@@ -187,6 +241,7 @@ String subText(int i) {
 void setFeature(int i, bool on) {
   lv_async_call([](void *p) {
     const intptr_t v = (intptr_t)p;
+    flushPending();
     Settings s = g_settings;
     s.*(kFeatures[v >> 1].on) = v & 1;
     ui_save_settings(s);
@@ -196,14 +251,6 @@ void setFeature(int i, bool on) {
 
 void showDialog(int i);
 void showPicker();
-
-void stepOptionLater(int i) {
-  lv_async_call([](void *p) {
-    stepOption(kFeatures[(intptr_t)p].opt);
-    features_refresh();
-    if (dialog) showDialog((intptr_t)p);
-  }, (void *)(intptr_t)i);
-}
 
 lv_obj_t *featureSwitch(lv_obj_t *parent, int i) {
   lv_obj_t *sw = mk_switch(parent, isOn(i), [](lv_event_t *e) {
@@ -285,7 +332,7 @@ void buildTabs() {
       lv_obj_t *chip = mk_chip(row, optionValue(kFeatures[i].opt).c_str(), false);
       lv_obj_set_style_border_color(chip, c(t.line), 0);
       lv_obj_set_style_border_width(chip, 1, 0);
-      on_click(chip, [](lv_event_t *e) { stepOptionLater((intptr_t)lv_event_get_user_data(e)); }, (void *)(intptr_t)i);
+      on_click(chip, [](lv_event_t *e) { showDialog((intptr_t)lv_event_get_user_data(e)); }, (void *)(intptr_t)i);
     }
     featureSwitch(row, i);
   }
@@ -349,6 +396,7 @@ void buildTiles() {
 // Options for one feature: on/off, its setting and its layout.
 void showDialog(int i) {
   close_overlay(&dialog);
+  dialogSub = nullptr;
   dialogFeature = i;
   const Theme &t = theme();
   const Feature &f = kFeatures[i];
@@ -366,6 +414,7 @@ void showDialog(int i) {
   set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
   lv_obj_t *col = textColumn(head, i, 380);
   lv_obj_set_style_text_font(lv_obj_get_child(col, 0), &font_20b, 0);
+  dialogSub = lv_obj_get_child(col, 1);
   featureSwitch(head, i);
 
   if (f.opt != Opt::None) {
@@ -375,7 +424,8 @@ void showDialog(int i) {
     set_flex(row, LV_FLEX_FLOW_ROW, 10);
     lv_obj_t *l = mk_label(row, &font_14b, t.muted, optionLabel(f.opt));
     lv_obj_set_width(l, 70);
-    on_click(mk_chip(row, optionValue(f.opt).c_str(), true), [](lv_event_t *) { stepOptionLater(dialogFeature); });
+    const OptRange r = optRange(f.opt);
+    mk_stepper(row, optionNumber(f.opt, cur()), r.min, r.max, r.step, r.fmt, stepped, (void *)(intptr_t)i, 96);
   }
   if (f.on == &Settings::desk) {
     lv_obj_t *row = mk_box(card, 0, 0);
@@ -388,28 +438,34 @@ void showDialog(int i) {
     lv_obj_t *status = mk_label(row, &font_14, t.text, st.c_str());
     lv_obj_set_width(status, 420);
     lv_label_set_long_mode(status, LV_LABEL_LONG_DOT);
-    // Which memory buttons mean sitting and standing.
-    lv_obj_t *slots = mk_box(card, 0, 0);
-    lv_obj_set_style_bg_opa(slots, LV_OPA_TRANSP, 0);
-    lv_obj_set_width(slots, 504);
-    set_flex(slots, LV_FLEX_FLOW_ROW, 10);
+    // Which memory buttons mean sitting and standing: each one is tapped directly.
+    static const char *const kSlotNames[] = {"M1", "M2", "M3", "M4"};
     for (int stand = 0; stand < 2; stand++) {
+      lv_obj_t *slots = mk_box(card, 0, 0);
+      lv_obj_set_style_bg_opa(slots, LV_OPA_TRANSP, 0);
+      lv_obj_set_width(slots, 504);
+      set_flex(slots, LV_FLEX_FLOW_ROW, 10);
       lv_obj_t *sl = mk_label(slots, &font_14b, t.muted, stand ? kStandRow : kSitRow);
-      lv_obj_set_width(sl, stand ? 60 : 70);
+      lv_obj_set_width(sl, 70);
       const uint8_t v = stand ? g_settings.deskStandSlot : g_settings.deskSitSlot;
-      on_click(mk_chip(slots, strf(kSlotChip, v).c_str(), true), [](lv_event_t *e) {
+      mk_segmented(slots, kSlotNames, 4, v - 1, 64, [](int idx, void *user) {
         lv_async_call([](void *p) {
+          const intptr_t v = (intptr_t)p;  // slot * 2 + (stand ? 1 : 0)
+          flushPending();
           Settings s = g_settings;
-          uint8_t &slot = p ? s.deskStandSlot : s.deskSitSlot;
-          slot = slot % 4 + 1;
+          (v & 1 ? s.deskStandSlot : s.deskSitSlot) = (uint8_t)(v >> 1);
           ui_save_settings(s);
-          showDialog(dialogFeature);
-        }, lv_event_get_user_data(e));
+          if (dialog) showDialog(dialogFeature);
+        }, (void *)(intptr_t)(((idx + 1) << 1) | (user ? 1 : 0)));
       }, (void *)(intptr_t)stand);
     }
-    lv_obj_t *hint = mk_label(card, &font_12, t.muted, kDeskSetup);
-    lv_obj_set_width(hint, 504);
-    lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
+    lv_obj_t *login = mk_text_button(card, kDeskLogin, false, 504);
+    on_click(login, [](lv_event_t *) {
+      lv_async_call([](void *) {
+        flushPending();
+        desk_settings_show();
+      }, nullptr);
+    });
   }
   if (f.on == &Settings::presence) {
     lv_obj_t *row = mk_box(card, 0, 0);
@@ -447,6 +503,7 @@ void showDialog(int i) {
       lv_obj_t *chip = mk_chip(row, kLayoutInfo[f.layout].variants[v], g_settings.layouts[f.layout] == v);
       on_click(chip, [](lv_event_t *e) {
         lv_async_call([](void *p) {
+          flushPending();
           Settings s = g_settings;
           s.layouts[kFeatures[dialogFeature].layout] = (uint8_t)(intptr_t)p;
           ui_save_settings(s);
@@ -457,6 +514,8 @@ void showDialog(int i) {
   }
   lv_obj_t *done = mk_text_button(card, kDone, true, 504);
   on_click(done, [](lv_event_t *) {
+    flushPending();
+    dialogSub = nullptr;
     close_overlay(&dialog);
     features_refresh();
   });

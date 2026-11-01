@@ -71,6 +71,8 @@ struct Settings {
   String deskHost = "smartdesk-a43c.local";
   String deskUser;              // desk web UI account; empty = guest (memory buttons only)
   String deskPassword;
+  uint8_t deskSitMin = 0;       // sit/stand timer lengths sent to the desk; 0 = as saved on the desk
+  uint8_t deskStandMin = 0;
   uint8_t deskSitSlot = 1;      // memory button for sitting (M1-M4)
   uint8_t deskStandSlot = 2;    // ...and for standing
   bool deskMeetings = true;     // layout C: stand for meetings of 15 min or more

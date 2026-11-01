@@ -394,6 +394,10 @@ static void renderVariants(const char *dir) {
   }
   ui_show(Screen::Features);
   render(dir, "r15-desk-features");
+  desk_settings_show();
+  tick();
+  render(dir, "r15-desk-settings");
+  clearTop();
   desk.desk = false;
   ui_save_settings(desk);
 

@@ -159,6 +159,15 @@ void desk_hold(int) {}
 void desk_stop() {}
 void desk_timer(bool on) { g_sim_desk.timerRunning = on; }
 void desk_away(bool) {}
+void desk_timer_apply() {}
+void desk_test(const String &, const String &, const String &) {}
+DeskTestResult desk_test_result() {
+  DeskTestResult r;
+  r.done = true;
+  r.ok = true;
+  r.message = "Desk found (80.2 cm). Login accepted.";
+  return r;
+}
 
 
 void battery_begin() {}

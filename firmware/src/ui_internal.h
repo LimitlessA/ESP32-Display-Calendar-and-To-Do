@@ -198,9 +198,25 @@ lv_obj_t *mk_textarea(lv_obj_t *parent, const char *placeholder);
 // Chip button: rounded, small, selected = accent.
 lv_obj_t *mk_chip(lv_obj_t *parent, const char *text, bool selected, int h = 40);
 void set_chip(lv_obj_t *chip, bool selected);
+// -/+ stepper that shows its value; tap steps once, holding repeats. fmt turns the value into text,
+// cb runs after every change (it may save settings, but should not delete the stepper itself).
+typedef String (*StepFmt)(int value);
+typedef void (*StepCb)(int value, void *user);
+lv_obj_t *mk_stepper(lv_obj_t *parent, int value, int min, int max, int step, StepFmt fmt, StepCb cb, void *user = nullptr,
+                     int valueW = 84);
+// Row of options that are each tapped directly (instead of one button that cycles). itemW is the width of each option.
+typedef void (*SegCb)(int index, void *user);
+lv_obj_t *mk_segmented(lv_obj_t *parent, const char *const *labels, int count, int selected, int itemW, SegCb cb,
+                       void *user = nullptr);
+// Slider with title, current value, and its lowest and highest value at the ends, e.g. "10%" ... "100%".
+// Add VALUE_CHANGED / RELEASED handlers on the returned slider.
+lv_obj_t *mk_slider(lv_obj_t *parent, const char *title, int value, int min, int max, const char *unit = "%");
 // Full-screen layer for an overlay. *owner is set to it, and back to nullptr when it is deleted.
 lv_obj_t *mk_overlay(bool dim = false, lv_obj_t **owner = nullptr);
 void close_overlay(lv_obj_t **layer);
+
+// Desk address, login and connection test (ui_desk_settings.cpp). The Accounts screen can link here.
+void desk_settings_show();
 
 void toast(const String &msg, const char *action = nullptr, lv_event_cb_t cb = nullptr, void *user = nullptr);
 

@@ -73,6 +73,8 @@ String toJson(const Settings &s) {
   doc["deskHost"] = s.deskHost;
   doc["deskUser"] = s.deskUser;
   doc["deskPassword"] = s.deskPassword;
+  doc["deskSitMin"] = s.deskSitMin;
+  doc["deskStandMin"] = s.deskStandMin;
   doc["deskSitSlot"] = s.deskSitSlot;
   doc["deskStandSlot"] = s.deskStandSlot;
   doc["deskMeetings"] = s.deskMeetings;
@@ -137,6 +139,8 @@ bool fromJson(const String &json, Settings &s) {
   s.deskHost = doc["deskHost"] | d.deskHost;
   s.deskUser = doc["deskUser"] | d.deskUser;
   s.deskPassword = doc["deskPassword"] | d.deskPassword;
+  s.deskSitMin = doc["deskSitMin"] | d.deskSitMin;
+  s.deskStandMin = doc["deskStandMin"] | d.deskStandMin;
   s.deskSitSlot = constrain(doc["deskSitSlot"] | d.deskSitSlot, 1, 4);
   s.deskStandSlot = constrain(doc["deskStandSlot"] | d.deskStandSlot, 1, 4);
   s.deskMeetings = doc["deskMeetings"] | d.deskMeetings;

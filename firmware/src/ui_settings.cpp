@@ -127,27 +127,6 @@ lv_obj_t *controlRow(lv_obj_t *parent, const char *title, const char *sub) {
   return row;
 }
 
-lv_obj_t *slider(lv_obj_t *parent, const char *title, int value, int min) {
-  const Theme &t = theme();
-  lv_obj_t *wrap = mk_box(parent, 0, 0);
-  lv_obj_set_style_bg_opa(wrap, LV_OPA_TRANSP, 0);
-  lv_obj_set_size(wrap, lv_pct(100), 46);
-  set_flex(wrap, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  mk_label(wrap, &font_14b, t.text, title);
-  lv_obj_t *s = lv_slider_create(wrap);
-  lv_obj_set_width(s, lv_pct(94));
-  lv_obj_set_height(s, 8);
-  lv_obj_set_style_align(s, LV_ALIGN_CENTER, 0);
-  lv_slider_set_range(s, min, 100);
-  lv_slider_set_value(s, value, LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(s, c(t.raised), LV_PART_MAIN);
-  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_KNOB);
-  lv_obj_set_style_pad_all(s, 6, LV_PART_KNOB);
-  lv_obj_set_ext_click_area(s, 16);
-  return s;
-}
-
 void toggled(lv_event_t *e) {
   lv_obj_t *sw = lv_event_get_target(e);
   const bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
@@ -216,7 +195,7 @@ lv_obj_t *settings_create() {
   lv_obj_set_width(right, half);
   set_flex(right, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-  lv_obj_t *bright = slider(left, kBrightness, g_settings.brightness, kMinBrightness);
+  lv_obj_t *bright = mk_slider(left, kBrightness, g_settings.brightness, kMinBrightness, 100);
   lv_obj_add_event_cb(bright, [](lv_event_t *e) {
     ui_set_backlight(lv_slider_get_value(lv_event_get_target(e)));
   }, LV_EVENT_VALUE_CHANGED, nullptr);
@@ -226,7 +205,7 @@ lv_obj_t *settings_create() {
     ui_save_settings(s);
   }, LV_EVENT_RELEASED, nullptr);
 
-  lv_obj_t *vol = slider(left, kVolume, g_settings.volume, 0);
+  lv_obj_t *vol = mk_slider(left, kVolume, g_settings.volume, 0, 100);
   lv_obj_add_event_cb(vol, [](lv_event_t *e) {
     Settings s = g_settings;
     s.volume = lv_slider_get_value(lv_event_get_target(e));
