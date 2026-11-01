@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 #include "display.h"
+#include "harness.h"
 
 #include "config.h"
 
@@ -73,7 +74,12 @@ static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *px) 
 
 static void touch_cb(lv_indev_drv_t *, lv_indev_data_t *data) {
   lgfx::touch_point_t tp;
-  if (touch.getTouchRaw(&tp, 1)) {
+  int16_t hx, hy;
+  if (harness_touch(&hx, &hy)) {  // a tap sent over serial or HTTP
+    data->state = LV_INDEV_STATE_PR;
+    data->point.x = hx;
+    data->point.y = hy;
+  } else if (touch.getTouchRaw(&tp, 1)) {
     int x = std::min<int>(std::max<int>(tp.x, 0), SCREEN_W - 1);
     int y = std::min<int>(std::max<int>(tp.y, 0), SCREEN_H - 1);
     if (kTouchRotated180) {
@@ -211,6 +217,14 @@ void display_init() {
   lv_indev_drv_register(&indev_drv);
 
   light.setBrightness(200);
+}
+
+const uint16_t *display_frame(int *w, int *h) {
+  void *fb = nullptr;
+  if (!panel || esp_lcd_rgb_panel_get_frame_buffer(panel, 1, &fb) != ESP_OK) return nullptr;
+  *w = SCREEN_W;
+  *h = SCREEN_H;
+  return static_cast<const uint16_t *>(fb);
 }
 
 static uint8_t brightness = 200;
