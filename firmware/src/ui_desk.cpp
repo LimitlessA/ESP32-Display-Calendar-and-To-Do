@@ -28,7 +28,11 @@ constexpr const char *kStop = "Stop";
 constexpr const char *kMemories = "MEMORY POSITIONS";
 constexpr const char *kRaise = "Hold to raise";
 constexpr const char *kLower = "Hold to lower";
-constexpr const char *kNeedsLogin = "Add the desk login on the setup page (Settings > Accounts) to raise, lower and run the timer.";
+constexpr const char *kNeedsLogin = "Add the desk login in Desk settings to raise, lower and run the timer.";
+constexpr const char *kDeskSettings = "Desk settings";
+constexpr const char *kSitLabel = "Sit";
+constexpr const char *kStandLabel = "Stand";
+constexpr int kTimerMin = 5, kTimerMax = 90, kTimerStep = 5, kTimerDefault = 30;
 constexpr const char *kTimerTitle = "Sit/stand timer";
 constexpr const char *kTimerSub = "%d min sitting, %d min standing";
 constexpr const char *kTimerSubUnknown = "Uses the lengths saved on the desk";
@@ -210,6 +214,27 @@ void updateLive(Live &live, const DeskStatus &st) {
   }
 }
 
+// Timer lengths: what was set here, else what the desk reports, else a default.
+int timerLength(bool stand, const DeskStatus &st) {
+  int v = stand ? g_settings.deskStandMin : g_settings.deskSitMin;
+  if (!v) v = stand ? st.standMinutes : st.sitMinutes;
+  if (v <= 0) v = kTimerDefault;
+  return std::max(kTimerMin, std::min(kTimerMax, v));
+}
+
+String minutesText(int v) { return strf(kMinutes, v); }
+
+void setTimerLength(int v, void *user) {
+  Settings s = g_settings;
+  if (user) s.deskStandMin = (uint8_t)v;
+  else s.deskSitMin = (uint8_t)v;
+  // Keeps the other length fixed too, so both are sent together.
+  if (!s.deskSitMin) s.deskSitMin = (uint8_t)timerLength(false, desk_status());
+  if (!s.deskStandMin) s.deskStandMin = (uint8_t)timerLength(true, desk_status());
+  ui_save_settings(s);
+  desk_timer_apply();
+}
+
 // ---- B: Desk screen ----
 
 void buildScreenB(const DeskStatus &st) {
@@ -218,6 +243,9 @@ void buildScreenB(const DeskStatus &st) {
   lv_obj_t *left = mk_box(deskBody, t.panel, 18);
   lv_obj_set_size(left, 300, BODY_H);
   lv_obj_clear_flag(left, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *cfg = mk_chip(left, kDeskSettings, false, 32);
+  lv_obj_set_pos(cfg, 10, 8);
+  on_click(cfg, [](lv_event_t *) { lv_async_call([](void *) { desk_settings_show(); }, nullptr); });
   // A drawn desk: the top moves up and down with the real one.
   for (int i = 0; i < 2; i++) {
     live.legs[i] = mk_box(left, t.line, 2);
@@ -278,29 +306,39 @@ void buildScreenB(const DeskStatus &st) {
   lv_obj_t *timer = mk_box(right, t.card, 14);
   lv_obj_set_width(timer, rw);
   lv_obj_set_style_pad_all(timer, 12, 0);
-  set_flex(timer, LV_FLEX_FLOW_ROW, 12);
-  lv_obj_t *tc = transparent(timer);
-  lv_obj_set_flex_grow(tc, 1);
-  set_flex(tc, LV_FLEX_FLOW_COLUMN, 4, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *tt = transparent(tc);
-  set_flex(tt, LV_FLEX_FLOW_ROW, 6);
-  mk_label(tt, &font_14b, t.text, kTimerTitle);
-  mk_label(tt, &font_14b, t.text, "\xC2\xB7");
-  live.timer = mk_label(tt, &font_14b, t.accent, "");
-  mk_label(tc, &font_12, t.muted,
-           st.sitMinutes > 0 ? strf(kTimerSub, st.sitMinutes, st.standMinutes).c_str() : kTimerSubUnknown);
-  live.timerBar = lv_bar_create(tc);
-  lv_obj_set_size(live.timerBar, rw - 180, 6);
-  lv_bar_set_range(live.timerBar, 0, 1000);
-  lv_obj_set_style_bg_color(live.timerBar, c(t.line), LV_PART_MAIN);
-  lv_obj_set_style_bg_color(live.timerBar, c(t.good), LV_PART_INDICATOR);
+  set_flex(timer, LV_FLEX_FLOW_COLUMN, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_t *th = transparent(timer);
+  lv_obj_set_size(th, rw - 24, TOUCH);
+  set_flex(th, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_t *tl = transparent(th);
+  lv_obj_set_height(tl, LV_SIZE_CONTENT);
+  lv_obj_set_flex_grow(tl, 1);
+  set_flex(tl, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  mk_label(tl, &font_14b, t.text, kTimerTitle);
+  mk_label(tl, &font_14b, t.text, "\xC2\xB7");
+  live.timer = mk_label(tl, &font_14b, t.accent, "");
   if (st.hasLogin) {
-    lv_obj_t *b = mk_text_button(timer, st.timerRunning ? kStopTimer : kStartTimer, !st.timerRunning, 140);
+    lv_obj_t *b = mk_text_button(th, st.timerRunning ? kStopTimer : kStartTimer, !st.timerRunning, 130);
     on_click(b, [](lv_event_t *) {
       desk_timer(!desk_status().timerRunning);
       lv_async_call([](void *) { desk_refresh(); }, nullptr);
     });
+    // Sit and stand lengths: -/+ (hold to repeat). A running timer restarts with the new lengths.
+    lv_obj_t *steps = transparent(timer);
+    lv_obj_set_size(steps, rw - 24, TOUCH);
+    set_flex(steps, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    for (int stand = 0; stand < 2; stand++) {
+      lv_obj_t *l = mk_label(steps, &font_14b, t.muted, stand ? kStandLabel : kSitLabel);
+      lv_obj_set_width(l, stand ? 46 : 30);
+      mk_stepper(steps, timerLength(stand, st), kTimerMin, kTimerMax, kTimerStep, minutesText, setTimerLength,
+                 (void *)(intptr_t)stand, 62);
+    }
   }
+  live.timerBar = lv_bar_create(timer);
+  lv_obj_set_size(live.timerBar, rw - 24, 6);
+  lv_bar_set_range(live.timerBar, 0, 1000);
+  lv_obj_set_style_bg_color(live.timerBar, c(t.line), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(live.timerBar, c(t.good), LV_PART_INDICATOR);
   live.today = mk_label(right, &font_12, t.muted, "");
   lv_obj_add_event_cb(right, [](lv_event_t *) { forget(&screenLive); }, LV_EVENT_DELETE, nullptr);
 }

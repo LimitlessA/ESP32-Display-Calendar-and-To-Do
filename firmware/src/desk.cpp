@@ -22,7 +22,13 @@ constexpr uint32_t kResolveEveryMs = 60000;  // look the .local name up again af
 constexpr uint16_t kTimeoutMs = 1500;
 constexpr const char *kNotFound = "Desk not found at %s";
 constexpr const char *kLoginFailed = "The desk did not accept the login";
-constexpr const char *kNeedsLogin = "Needs a desk login on the setup page";
+constexpr const char *kNeedsLogin = "Needs a desk login (Features > Smart desk > Desk address and login)";
+constexpr const char *kTestNoWifi = "The display is not on Wi-Fi";
+constexpr const char *kTestNoHost = "Enter the desk address first";
+constexpr const char *kTestHttp = "The desk answered with error %s";
+constexpr const char *kTestGuest = "Desk found (%s cm). No login set: memory buttons and Stop work.";
+constexpr const char *kTestLoginOk = "Desk found (%s cm). Login accepted.";
+constexpr const char *kTestLoginBad = "Desk found, but it did not accept the login.";
 
 enum class Cmd : uint8_t { Recall, HoldStop, Stop, TimerOn, TimerOff, AwayOn, AwayOff };
 struct Command {
@@ -37,6 +43,10 @@ DeskStatus status;
 std::deque<Command> queue;
 volatile int holding = 0;  // +1 / -1 while a button is held
 String token;              // desk session; desks forget sessions when they restart
+String loginKey;           // host + login the session belongs to; a change means a new session
+volatile uint32_t timerApplyAt = 0;  // millis() of the last change of the timer lengths, 0 = none
+DeskTestResult testResult;
+volatile bool testBusy = false;
 IPAddress ip;
 String resolvedFor;
 uint32_t lastResolve = 0, lastPoll = 0, lastMemory = 0, lastBeat = 0;
@@ -184,10 +194,12 @@ void send(const String &base, const Settings &s, const Command &c) {
     case Cmd::Stop: request(base + "/api/desk/emergency-stop", "POST", "{}", out, false); break;
     case Cmd::HoldStop: authed(base, s, "/api/desk/hold/stop", "POST", "{}"); break;
     case Cmd::TimerOn: {
-      // Uses the timer lengths saved on the desk, between the sit and stand memories.
+      // The lengths set on the display, else the ones saved on the desk, between the sit and stand memories.
       const DeskStatus st = desk_status();
+      const int sitMin = s.deskSitMin ? s.deskSitMin : st.sitMinutes;
+      const int standMin = s.deskStandMin ? s.deskStandMin : st.standMinutes;
       String body = "{";
-      if (st.sitMinutes > 0) body += "\"sit_min\":" + String(st.sitMinutes) + ",\"stand_min\":" + String(st.standMinutes) + ",";
+      if (sitMin > 0 && standMin > 0) body += "\"sit_min\":" + String(sitMin) + ",\"stand_min\":" + String(standMin) + ",";
       const int sit = st.memoryMm[s.deskSitSlot - 1], stand = st.memoryMm[s.deskStandSlot - 1];
       if (sit > 0 && stand > 0) body += "\"sit_target_mm\":" + String(sit) + ",\"stand_target_mm\":" + String(stand) + ",";
       if (body.endsWith(",")) body.remove(body.length() - 1);
@@ -206,6 +218,20 @@ void task(void *) {
     vTaskDelay(pdMS_TO_TICKS(50));
     const Settings s = settings_get();
     update([&](DeskStatus &st) { st.hasLogin = s.deskUser.length() > 0; });
+    // New address or login (edited on the display or the setup page): start over with it.
+    const String key = s.deskHost + "|" + s.deskUser + "|" + s.deskPassword;
+    if (key != loginKey) {
+      loginKey = key;
+      token = "";
+      ip = IPAddress();
+      resolvedFor = "";
+      lastMemory = 0;
+      lastPoll = 0;
+      update([&](DeskStatus &st) {
+        st.loggedIn = false;
+        st.error = "";
+      });
+    }
     String base;
     if (!s.desk || WiFi.status() != WL_CONNECTED) {
       vTaskDelay(pdMS_TO_TICKS(1000));
@@ -225,6 +251,11 @@ void task(void *) {
     if (dir && millis() - lastBeat >= kHoldBeatMs) {
       lastBeat = millis();
       authed(base, s, "/api/desk/hold", "POST", dir > 0 ? "{\"direction\":\"up\"}" : "{\"direction\":\"down\"}");
+    }
+
+    if (timerApplyAt && millis() - timerApplyAt > 1200) {
+      timerApplyAt = 0;
+      if (desk_status().timerRunning) send(base, s, {Cmd::TimerOn, 0});
     }
 
     bool have = false;
@@ -249,6 +280,75 @@ void task(void *) {
       fetchMemory(base, s);
     }
   }
+}
+
+// ---- Connection test ---------------------------------------------------------
+
+struct TestJob {
+  String host, user, password;
+};
+
+void finishTest(bool ok, const String &message) {
+  xSemaphoreTake(lock, portMAX_DELAY);
+  testResult.running = false;
+  testResult.done = true;
+  testResult.ok = ok;
+  testResult.message = message;
+  xSemaphoreGive(lock);
+  testBusy = false;
+}
+
+void testTask(void *arg) {
+  TestJob *job = static_cast<TestJob *>(arg);
+  String host = job->host;
+  host.trim();
+  String base, out;
+  bool ok = false;
+  String message;
+  if (WiFi.status() != WL_CONNECTED) {
+    message = kTestNoWifi;
+  } else if (!host.length()) {
+    message = kTestNoHost;
+  } else {
+    bool found = true;
+    if (host.endsWith(".local")) {
+      const IPAddress addr = MDNS.queryHost(host.substring(0, host.length() - 6), 2000);
+      found = addr != IPAddress();
+      base = "http://" + addr.toString();
+    } else {
+      base = "http://" + host;
+    }
+    JsonDocument doc;
+    const int code = found ? request(base + "/api/desk/status", "GET", "", out, false) : -1;
+    if (!found || code <= 0) {
+      message = strfmt(kNotFound, host.c_str());
+    } else if (code != 200 || deserializeJson(doc, out)) {
+      message = strfmt(kTestHttp, String(code).c_str());
+    } else {
+      const int mm = doc["height_mm"] | 0;
+      const String cmText = String(mm / 10) + "." + String(mm % 10);
+      if (!job->user.length()) {
+        ok = true;
+        message = strfmt(kTestGuest, cmText.c_str());
+      } else {
+        JsonDocument creds;
+        creds["username"] = job->user;
+        creds["password"] = job->password;
+        String body;
+        serializeJson(creds, body);
+        JsonDocument reply;
+        String got;
+        const int lc = request(base + "/api/auth/login", "POST", body, got, false);
+        String tok;
+        if (lc == 200 && !deserializeJson(reply, got)) tok = reply["token"] | "";
+        ok = tok.length() > 0;
+        message = ok ? strfmt(kTestLoginOk, cmText.c_str()) : String(kTestLoginBad);
+      }
+    }
+  }
+  delete job;
+  finishTest(ok, message);
+  vTaskDelete(nullptr);
 }
 
 void push(Cmd cmd, uint8_t slot = 0) {
@@ -292,3 +392,29 @@ void desk_stop() {
 void desk_timer(bool on) { push(on ? Cmd::TimerOn : Cmd::TimerOff); }
 
 void desk_away(bool away) { push(away ? Cmd::AwayOn : Cmd::AwayOff); }
+
+void desk_timer_apply() {
+  uint32_t now = millis();
+  timerApplyAt = now ? now : 1;
+}
+
+void desk_test(const String &host, const String &user, const String &password) {
+  if (testBusy) return;
+  testBusy = true;
+  xSemaphoreTake(lock, portMAX_DELAY);
+  testResult = DeskTestResult();
+  testResult.running = true;
+  xSemaphoreGive(lock);
+  TestJob *job = new TestJob{host, user, password};
+  if (xTaskCreate(testTask, "desktest", 8192, job, 1, nullptr) != pdPASS) {
+    delete job;
+    finishTest(false, "Could not start the test");
+  }
+}
+
+DeskTestResult desk_test_result() {
+  xSemaphoreTake(lock, portMAX_DELAY);
+  const DeskTestResult copy = testResult;
+  xSemaphoreGive(lock);
+  return copy;
+}

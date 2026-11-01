@@ -261,6 +261,138 @@ void set_chip(lv_obj_t *chip, bool selected) {
   if (l) lv_obj_set_style_text_color(l, c(selected ? t.onAccent : t.text), 0);
 }
 
+// ---- Controls: steppers, segmented choices, sliders with end labels ------------
+
+namespace {
+
+struct StepState {
+  lv_obj_t *label, *minus, *plus;
+  int value, min, max, step;
+  StepFmt fmt;
+  StepCb cb;
+  void *user;
+};
+
+void stepShow(StepState *st) {
+  lv_label_set_text(st->label, st->fmt(st->value).c_str());
+  lv_obj_set_style_opa(st->minus, st->value <= st->min ? LV_OPA_40 : LV_OPA_COVER, 0);
+  lv_obj_set_style_opa(st->plus, st->value >= st->max ? LV_OPA_40 : LV_OPA_COVER, 0);
+}
+
+void stepBy(lv_event_t *e, int dir) {
+  StepState *st = static_cast<StepState *>(lv_event_get_user_data(e));
+  int v = st->value + dir * st->step;
+  if (v < st->min) v = st->min;
+  if (v > st->max) v = st->max;
+  if (v == st->value) return;
+  st->value = v;
+  stepShow(st);
+  if (st->cb) st->cb(v, st->user);
+}
+
+struct SegItem {
+  SegCb cb;
+  void *user;
+  int index;
+};
+
+struct SliderState {
+  lv_obj_t *value;
+  const char *unit;
+};
+
+}  // namespace
+
+lv_obj_t *mk_stepper(lv_obj_t *parent, int value, int min, int max, int step, StepFmt fmt, StepCb cb, void *user,
+                     int valueW) {
+  const Theme &t = theme();
+  lv_obj_t *row = mk_box(parent, 0, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  set_flex(row, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_t *minus = mk_button(row, t.raised, TOUCH / 2);
+  lv_obj_set_size(minus, TOUCH, TOUCH);
+  lv_obj_center(mk_label(minus, &font_20b, t.text, "-"));
+  lv_obj_t *label = mk_label(row, &font_16, t.text, "");
+  lv_obj_set_width(label, valueW);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_t *plus = mk_button(row, t.raised, TOUCH / 2);
+  lv_obj_set_size(plus, TOUCH, TOUCH);
+  lv_obj_center(mk_label(plus, &font_20b, t.text, "+"));
+  StepState *st = attach(row, StepState{label, minus, plus, value, min, max, step, fmt, cb, user});
+  stepShow(st);
+  // A tap steps once; holding repeats (LVGL sends no click after a long press).
+  auto down = [](lv_event_t *e) { stepBy(e, -1); };
+  auto up = [](lv_event_t *e) { stepBy(e, 1); };
+  lv_obj_add_event_cb(minus, down, LV_EVENT_CLICKED, st);
+  lv_obj_add_event_cb(minus, down, LV_EVENT_LONG_PRESSED_REPEAT, st);
+  lv_obj_add_event_cb(plus, up, LV_EVENT_CLICKED, st);
+  lv_obj_add_event_cb(plus, up, LV_EVENT_LONG_PRESSED_REPEAT, st);
+  return row;
+}
+
+lv_obj_t *mk_segmented(lv_obj_t *parent, const char *const *labels, int count, int selected, int itemW, SegCb cb,
+                       void *user) {
+  const Theme &t = theme();
+  lv_obj_t *seg = mk_box(parent, t.bg, 22);
+  lv_obj_set_style_pad_all(seg, 2, 0);
+  set_flex(seg, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  for (int i = 0; i < count; i++) {
+    lv_obj_t *chip = mk_chip(seg, labels[i], i == selected, 40);
+    lv_obj_set_width(chip, itemW);
+    SegItem *item = attach(chip, SegItem{cb, user, i});
+    on_click(chip, [](lv_event_t *e) {
+      SegItem *it = static_cast<SegItem *>(lv_event_get_user_data(e));
+      lv_obj_t *me = lv_event_get_target(e);
+      lv_obj_t *box = lv_obj_get_parent(me);
+      for (uint32_t k = 0; k < lv_obj_get_child_cnt(box); k++) {
+        lv_obj_t *ch = lv_obj_get_child(box, k);
+        set_chip(ch, ch == me);
+      }
+      if (it->cb) it->cb(it->index, it->user);
+    }, item);
+  }
+  return seg;
+}
+
+lv_obj_t *mk_slider(lv_obj_t *parent, const char *title, int value, int min, int max, const char *unit) {
+  const Theme &t = theme();
+  lv_obj_t *wrap = mk_box(parent, 0, 0);
+  lv_obj_set_style_bg_opa(wrap, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(wrap, lv_pct(100), 46);
+  set_flex(wrap, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  // Title on the left, current value on the right.
+  lv_obj_t *head = mk_box(wrap, 0, 0);
+  lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(head, lv_pct(100), 18);
+  set_flex(head, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
+  mk_label(head, &font_14b, t.text, title);
+  lv_obj_t *val = mk_label(head, &font_14b, t.accent, strf("%d%s", value, unit).c_str());
+  // The scale: lowest value, slider, highest value.
+  lv_obj_t *scale = mk_box(wrap, 0, 0);
+  lv_obj_set_style_bg_opa(scale, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(scale, lv_pct(100), 24);
+  set_flex(scale, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_hor(scale, 8, 0);
+  mk_label(scale, &font_12, t.muted, strf("%d%s", min, unit).c_str());
+  lv_obj_t *s = lv_slider_create(scale);
+  lv_obj_set_flex_grow(s, 1);
+  lv_obj_set_height(s, 8);
+  lv_slider_set_range(s, min, max);
+  lv_slider_set_value(s, value, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(s, c(t.raised), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_KNOB);
+  lv_obj_set_style_pad_all(s, 6, LV_PART_KNOB);
+  lv_obj_set_ext_click_area(s, 16);
+  mk_label(scale, &font_12, t.muted, strf("%d%s", max, unit).c_str());
+  SliderState *st = attach(s, SliderState{val, unit});
+  lv_obj_add_event_cb(s, [](lv_event_t *e) {
+    SliderState *ss = static_cast<SliderState *>(lv_event_get_user_data(e));
+    lv_label_set_text(ss->value, strf("%d%s", (int)lv_slider_get_value(lv_event_get_target(e)), ss->unit).c_str());
+  }, LV_EVENT_VALUE_CHANGED, st);
+  return s;
+}
+
 lv_obj_t *mk_overlay(bool dim, lv_obj_t **owner) {
   const Theme &t = theme();
   lv_obj_t *layer = mk_box(lv_layer_top(), t.dark ? 0x07090B : t.bg, 0);
