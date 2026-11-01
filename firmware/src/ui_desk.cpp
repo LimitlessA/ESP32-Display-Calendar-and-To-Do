@@ -14,6 +14,7 @@ constexpr const char *kCmShort = "%d cm";
 constexpr const char *kSit = "Sit";
 constexpr const char *kStand = "Stand";
 constexpr const char *kSlot = "M%d";
+constexpr const char *kSlotRole = "M%d \xC2\xB7 %s";
 constexpr const char *kSitting = "Sitting";
 constexpr const char *kStanding = "Standing";
 constexpr const char *kMoving = "Moving";
@@ -75,6 +76,8 @@ struct Live {
   lv_obj_t *deskTop = nullptr;   // B: the drawn desk top moves with the height...
   lv_obj_t *legs[2] = {};        // ...and the legs grow under it
   lv_obj_t *today = nullptr;
+  int curMm = 0;                 // height the drawing is at right now
+  int shownMm = 0;               // height the drawing is at (or gliding to)
 };
 Live dockLive, screenLive;
 lv_obj_t *deskBody = nullptr;
@@ -111,8 +114,9 @@ String duration(long secs) {
 }
 
 String slotName(uint8_t slot) {
-  if (slot == g_settings.deskSitSlot) return kSit;
-  if (slot == g_settings.deskStandSlot) return kStand;
+  // Always the desk's own name (M1-M4); sit/stand is only a hint beside it.
+  if (slot == g_settings.deskSitSlot) return strf(kSlotRole, slot, kSit);
+  if (slot == g_settings.deskStandSlot) return strf(kSlotRole, slot, kStand);
   return strf(kSlot, slot);
 }
 
@@ -136,7 +140,24 @@ int timerProgress(const DeskStatus &st) {  // 0-1000
   return (int)(1000 - std::min(st.timerLeft, len) * 1000 / len);
 }
 
-void forget(Live *live) { *live = Live(); }
+// The drawn desk: 650-1300 mm maps onto 150 px of travel. Only the top and the two thin legs move.
+void placeDesk(Live &live, int mm) {
+  live.curMm = mm;
+  const int y = 190 - (std::max(650, std::min(1300, mm)) - 650) * 150 / 650;
+  if (lv_obj_get_y(live.deskTop) == y) return;
+  lv_obj_set_y(live.deskTop, y);
+  for (lv_obj_t *leg : live.legs) {
+    lv_obj_set_y(leg, y + 14);
+    lv_obj_set_height(leg, 256 - y - 14);
+  }
+}
+
+void deskGlide(void *var, int32_t mm) { placeDesk(*static_cast<Live *>(var), mm); }
+
+void forget(Live *live) {
+  lv_anim_del(live, deskGlide);
+  *live = Live();
+}
 
 lv_obj_t *transparent(lv_obj_t *parent) {
   lv_obj_t *o = mk_box(parent, 0, 0);
@@ -196,17 +217,25 @@ void updateLive(Live &live, const DeskStatus &st) {
     lv_obj_set_style_text_color(lv_obj_get_child(live.mem[i], 0), c(here ? t.onAccent : t.text), 0);
     lv_obj_t *sub = lv_obj_get_child(live.mem[i], 1);
     lv_obj_set_style_text_color(sub, c(here ? t.onAccent : t.muted), 0);
-    const String name = slotName(i + 1);
-    lv_label_set_text(sub, mm > 0 ? cm(mm, false).c_str() : (name.startsWith("M") ? "" : strf(kSlot, i + 1).c_str()));
+    lv_label_set_text(sub, mm > 0 ? cm(mm, false).c_str() : "");
   }
   if (live.deskTop) {
-    // 650-1300 mm maps onto the drawing's 150 px of travel.
-    const int mm = std::max(650, std::min(1300, st.heightMm ? st.heightMm : 750));
-    const int y = 190 - (mm - 650) * 150 / 650;
-    lv_obj_set_y(live.deskTop, y);
-    for (lv_obj_t *leg : live.legs) {
-      lv_obj_set_y(leg, y + 14);
-      lv_obj_set_height(leg, 256 - y - 14);
+    // Glide from the height shown to the one reported, easing out, instead of jumping per poll.
+    const int mm = st.heightMm ? st.heightMm : 750;
+    if (!live.shownMm) {
+      live.shownMm = mm;
+      placeDesk(live, mm);
+    } else if (mm != live.shownMm) {
+      lv_anim_t a;
+      lv_anim_init(&a);
+      lv_anim_set_var(&a, &live);
+      lv_anim_set_exec_cb(&a, deskGlide);
+      lv_anim_set_values(&a, live.curMm, mm);
+      lv_anim_set_time(&a, 900);
+      lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+      lv_anim_del(&live, deskGlide);
+      lv_anim_start(&a);
+      live.shownMm = mm;
     }
   }
   if (live.today) {
