@@ -282,12 +282,12 @@ static void renderVariants(const char *dir) {
   render(dir, "r9-features");
   {
     lv_obj_t *body = lv_obj_get_child(lv_scr_act(), 1);
-    lv_obj_t *grid = lv_obj_get_child(body, 1);
+    lv_obj_t *grid = lv_obj_get_child(body, 0);
     lv_event_send(lv_obj_get_child(grid, 7), LV_EVENT_LONG_PRESSED, nullptr);
   }
   render(dir, "r9-features-options");
   clearTop();
-  lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 1), 16), LV_EVENT_LONG_PRESSED, nullptr);
+  lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 0), 16), LV_EVENT_LONG_PRESSED, nullptr);
   render(dir, "r9-features-desk");
   clearTop();
 

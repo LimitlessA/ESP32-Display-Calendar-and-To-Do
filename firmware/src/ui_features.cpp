@@ -11,6 +11,8 @@ namespace {
 constexpr const char *kTitle = "Features";
 constexpr const char *kOnCount = "%d of %d on";
 constexpr const char *kHint = "Tap to turn on/off \xC2\xB7 hold for options";
+constexpr const char *kOn = "ON";
+constexpr const char *kOff = "OFF";
 constexpr const char *kDone = "Done";
 constexpr const char *kLayoutRow = "Layout";
 constexpr const char *kOptionRow = "When";
@@ -80,13 +82,11 @@ constexpr const char *kMoney = "\u20AC%d";
 
 constexpr int BODY_Y = HEADER_H + GAP;
 constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
-constexpr int HINT_H = 16;
 constexpr int COLS = 5;
 constexpr int TILE_GAP = 8;
 constexpr int TILE_W = (SCREEN_W - 2 * PAD - (COLS - 1) * TILE_GAP) / COLS;
 constexpr int ROWS = (kFeatureCount + COLS - 1) / COLS;
-constexpr int GRID_H = BODY_H - HINT_H - TILE_GAP;
-constexpr int TILE_H = (GRID_H - (ROWS - 1) * TILE_GAP) / ROWS;  // every tile on one screen, no scrolling
+constexpr int TILE_H = (BODY_H - (ROWS - 1) * TILE_GAP) / ROWS;  // every tile on one screen, no scrolling
 constexpr int DIALOG_W = 640;
 constexpr int INNER_W = DIALOG_W - 56;
 
@@ -265,23 +265,28 @@ lv_obj_t *textColumn(lv_obj_t *parent, int i, int w) {
 // The grid: a tap toggles, holding opens the options (and the layout).
 void buildGrid() {
   const Theme &t = theme();
-  lv_obj_t *hint = mk_label(body, &font_12, t.muted, kHint);
-  lv_obj_set_height(hint, HINT_H);
-
   lv_obj_t *grid = mk_box(body, 0, 0);
   lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
-  lv_obj_set_size(grid, SCREEN_W - 2 * PAD, GRID_H);
+  lv_obj_set_size(grid, SCREEN_W - 2 * PAD, BODY_H);
   set_flex(grid, LV_FLEX_FLOW_ROW_WRAP, TILE_GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_set_style_pad_row(grid, TILE_GAP, 0);
   for (int i = 0; i < kFeatureCount; i++) {
     const bool on = isOn(i);
-    lv_obj_t *tile = mk_button(grid, t.card, 14);
+    lv_obj_t *tile = mk_button(grid, on ? t.warnBg : t.panel, 14);
     lv_obj_set_size(tile, TILE_W, TILE_H);
-    lv_obj_set_style_pad_hor(tile, 12, 0);
+    lv_obj_set_style_border_width(tile, 1, 0);
+    lv_obj_set_style_border_color(tile, c(on ? t.accent : t.line), 0);
+    lv_obj_set_style_pad_all(tile, 10, 0);
+    set_flex(tile, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START);
+    lv_obj_t *state = mk_label(tile, &font_12, on ? t.accent : t.muted, on ? kOn : kOff);
+    lv_obj_set_style_text_letter_space(state, 1, 0);
     lv_obj_t *name = mk_label(tile, &font_14b, on ? t.text : t.muted, kFeatures[i].name);
-    lv_obj_set_width(name, TILE_W - 24);  // two lines at most
-    lv_obj_align(name, LV_ALIGN_LEFT_MID, 0, 0);
-    lv_obj_align(mk_dot(tile, on ? t.good : t.line, 10), LV_ALIGN_TOP_RIGHT, 2, 0);
+    lv_obj_set_width(name, TILE_W - 20);  // two lines at most
+    const Opt o = kFeatures[i].opt;
+    lv_obj_t *sub = mk_label(tile, &font_12, available(i) ? t.muted : t.warnFg,
+                             (o != Opt::None && available(i) ? optionValue(o) : subText(i)).c_str());
+    lv_obj_set_size(sub, TILE_W - 20, lv_font_get_line_height(&font_12));  // one line, ends in "..."
+    lv_label_set_long_mode(sub, LV_LABEL_LONG_DOT);
     // LVGL sends SHORT_CLICKED only when the press was not a long press.
     lv_obj_add_event_cb(tile, [](lv_event_t *e) {
       const int i = (intptr_t)lv_event_get_user_data(e);
@@ -429,6 +434,7 @@ lv_obj_t *features_create() {
   const Theme &t = theme();
   lv_obj_t *scr = mk_screen();
   lv_obj_t *h = mk_back_header(scr, kTitle, Screen::Settings);
+  mk_label(h, &font_12, t.muted, kHint);
   countLabel = mk_label(h, &font_14b, t.accent, "");
 
   body = mk_box(scr, 0, 0);
