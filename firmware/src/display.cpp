@@ -66,29 +66,59 @@ static lv_disp_draw_buf_t draw_buf;
 static lv_disp_drv_t disp_drv;
 static lv_indev_drv_t indev_drv;
 
+// Touch is also sampled while a frame is being drawn (from flush_cb), and a
+// press seen there is held until LVGL has read it. Otherwise a quick tap that
+// starts and ends during a long redraw is never seen, and taps feel like they
+// need a long press.
+constexpr uint32_t kTouchPollMs = 10;
+static struct {
+  bool down = false;     // finger on the glass at the last sample
+  bool latched = false;  // a press LVGL has not seen yet
+  int16_t x = 0, y = 0;
+  uint32_t at = 0;
+} tch;
+
+static void touch_poll() {
+  if (millis() - tch.at < kTouchPollMs) return;
+  tch.at = millis();
+  lgfx::touch_point_t tp;
+  tch.down = touch.getTouchRaw(&tp, 1) > 0;
+  if (!tch.down) return;
+  int x = std::min<int>(std::max<int>(tp.x, 0), SCREEN_W - 1);
+  int y = std::min<int>(std::max<int>(tp.y, 0), SCREEN_H - 1);
+  if (kTouchRotated180) {
+    x = SCREEN_W - 1 - x;
+    y = SCREEN_H - 1 - y;
+  }
+  tch.x = x;
+  tch.y = y;
+  tch.latched = true;
+}
+
 static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *px) {
   // Copies into the frame (and writes the cache back) before it returns.
   esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px);
+  touch_poll();
   lv_disp_flush_ready(drv);
 }
 
 static void touch_cb(lv_indev_drv_t *, lv_indev_data_t *data) {
-  lgfx::touch_point_t tp;
   int16_t hx, hy;
   if (harness_touch(&hx, &hy)) {  // a tap sent over serial or HTTP
     data->state = LV_INDEV_STATE_PR;
     data->point.x = hx;
     data->point.y = hy;
-  } else if (touch.getTouchRaw(&tp, 1)) {
-    int x = std::min<int>(std::max<int>(tp.x, 0), SCREEN_W - 1);
-    int y = std::min<int>(std::max<int>(tp.y, 0), SCREEN_H - 1);
-    if (kTouchRotated180) {
-      x = SCREEN_W - 1 - x;
-      y = SCREEN_H - 1 - y;
-    }
+    return;
+  }
+  tch.at = 0;  // always sample fresh here
+  touch_poll();
+  if (tch.down || tch.latched) {
+    // Still down, or a tap that already ended: report it pressed once, so the
+    // next read (released) completes the click.
     data->state = LV_INDEV_STATE_PR;
-    data->point.x = x;
-    data->point.y = y;
+    data->point.x = tch.x;
+    data->point.y = tch.y;
+    tch.latched = false;
   } else {
     data->state = LV_INDEV_STATE_REL;
   }
