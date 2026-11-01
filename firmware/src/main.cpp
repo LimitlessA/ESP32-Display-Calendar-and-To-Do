@@ -9,6 +9,7 @@
 #include "battery.h"
 #include "desk.h"
 #include "display.h"
+#include "harness.h"
 #include "ota.h"
 #include "sensors.h"
 #include "settings.h"
@@ -38,6 +39,7 @@ void setup() {
   audio_begin();
   wifi_begin();
   ui_init();
+  harness_begin();
   sync_start();
   web_begin();
   ota_begin();
@@ -51,6 +53,7 @@ void loop() {
     ui_tick();
   }
   settings_flush();
+  harness_poll();
   const uint32_t idle = lv_timer_handler();
   delay(idle < 5 ? idle : 5);  // yield, but never longer than LVGL asks for
 }

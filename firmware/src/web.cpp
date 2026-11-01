@@ -7,6 +7,7 @@
 #include "settings.h"
 #include "sync.h"
 #include "web.h"
+#include "harness.h"
 
 namespace {
 
@@ -304,6 +305,13 @@ void web_begin() {
   server.on("/settings/update-url", HTTP_POST, handleUpdateUrl);
   server.on("/settings/desk", HTTP_POST, handleDesk);
   server.on("/update", HTTP_POST, handleUploadDone, handleUpload);
+  // Test harness (tools/harness.py): one command, or a screenshot.
+  server.on("/harness", HTTP_GET, [] {
+    if (pinOk()) server.send(200, "text/plain", harness_run(server.arg("cmd")));
+  });
+  server.on("/shot.bmp", HTTP_GET, [] {
+    if (pinOk()) harness_send_bmp(server);
+  });
   server.onNotFound([] { server.send(404, "text/plain", kNotFound); });
   server.begin();
   xTaskCreatePinnedToCore(webTask, "web", 8192, nullptr, 1, nullptr, 0);
