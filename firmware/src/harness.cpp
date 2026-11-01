@@ -7,7 +7,10 @@
 #include <lvgl.h>
 #include <stdarg.h>
 
+#include "crashlog.h"
 #include "display.h"
+#include "presence.h"
+#include "psram.h"
 #include "web.h"
 #include "ui_internal.h"
 
@@ -38,18 +41,22 @@ bool logWrapped = false;
 vprintf_like_t originalVprintf = nullptr;
 
 int logHook(const char *fmt, va_list args) {
-  char line[256];
+  char line[160];  // on the stack of whichever task logs: keep it small
   va_list copy;
   va_copy(copy, args);
   const int n = vsnprintf(line, sizeof(line), fmt, copy);
   va_end(copy);
   if (logRing && n > 0) {
+    // Any task may log, on either core, with no lock: check the index before
+    // every write so two at once garble a line but never write past the ring.
     for (int i = 0; i < n && i < (int)sizeof(line) - 1; i++) {
-      logRing[logHead++] = line[i];
-      if (logHead == kLogSize) {
-        logHead = 0;
+      size_t at = logHead;
+      if (at >= kLogSize) {
+        at = 0;
         logWrapped = true;
       }
+      logRing[at] = line[i];
+      logHead = at + 1;
     }
   }
   return originalVprintf ? originalVprintf(fmt, args) : vprintf(fmt, args);
@@ -58,10 +65,11 @@ int logHook(const char *fmt, va_list args) {
 String recentLog() {
   if (!logRing) return "";
   String out;
+  const size_t head = std::min(logHead, kLogSize);
   if (logWrapped) {
-    for (size_t i = logHead; i < kLogSize; i++) out += logRing[i];
+    for (size_t i = head; i < kLogSize; i++) out += logRing[i];
   }
-  for (size_t i = 0; i < logHead; i++) out += logRing[i];
+  for (size_t i = 0; i < head; i++) out += logRing[i];
   return out;
 }
 
@@ -127,12 +135,13 @@ String serialShot() {
 }
 
 String heapReport() {
-  return strf("internal free %u largest %u min %u | psram free %u largest %u",
+  return strf("internal free %u largest %u min %u | psram free %u largest %u | bluetooth took %u",
               heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
               heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
               heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
               heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-              heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+              heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM),
+              (unsigned)presence_ram_used());
 }
 
 const char *const kScreenNames[] = {"home", "detail", "week", "tasks", "night", "wifi",
@@ -174,10 +183,14 @@ String execute(const String &line, bool overSerial) {
   }
   if (name == "shot") return overSerial ? serialShot() : "use /shot.bmp";
   if (name == "heap") return heapReport();
+  if (name == "tasks") return psram_task_report();  // free stack bytes per task
+  if (name == "crash") return crashlog_details();
   // Serial only: whoever has the USB cable can already reflash the display.
   if (name == "pin") return overSerial ? web_pin() + " " + web_url() : "serial only";
   if (name == "log") return recentLog();
-  if (name == "help") return "tap X Y | press X Y MS | swipe X1 Y1 X2 Y2 [MS] | screen NAME | shot | heap | log | pin";
+  if (name == "help") {
+    return "tap X Y | press X Y MS | swipe X1 Y1 X2 Y2 [MS] | screen NAME | shot | heap | tasks | crash | log | pin";
+  }
   return "unknown command (help)";
 }
 

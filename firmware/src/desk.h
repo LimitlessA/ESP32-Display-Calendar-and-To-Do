@@ -40,7 +40,7 @@ void desk_away(bool away);       // the desk's away mode
 // this restarts a running timer with them a moment later (a held + or - sends only the last value).
 void desk_timer_apply();
 
-// "Test connection" for the desk settings: runs on its own task, with the address and login as typed
+// "Test connection" for the desk settings: runs on the desk task, with the address and login as typed
 // (not yet saved). Poll desk_test_result() for the outcome.
 struct DeskTestResult {
   bool running = false;

@@ -10,6 +10,11 @@
 #include <array>
 #include <vector>
 
+// nimconfig.h picks INTERNAL unless sdkconfig.h sets EXTERNAL.
+#ifdef CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL
+#warning "NimBLE keeps its buffers in internal RAM: check custom_sdkconfig"
+#endif
+
 // The Arduino core frees the Bluetooth controller's memory (about 36 KB of
 // internal RAM) at start-up unless bleInUse() says otherwise; NimBLE-Arduino
 // does not tell it, so turning presence on crashed the display in
@@ -47,7 +52,12 @@ constexpr uint32_t kStartStack = 6144;
 // The Bluetooth controller and NimBLE's tasks need internal RAM, which Wi-Fi
 // and the display's buffers share. NimBLE stops the program (the display
 // restarts) if it runs out while starting, so check first. Includes the
-// start task's stack, which is freed again afterwards.
+// start task's stack, which is freed again afterwards. The controller's own
+// memory (about 36 KB) is kept out of the heap at start-up (bleInUse()), so
+// this only covers NimBLE's tasks and buffers and leaves Wi-Fi and TLS some
+// room. The harness "heap" command shows what Bluetooth really took
+// (presence_ram_used()). Expected on the 7" with presence on: about 50-70 KB
+// free before it starts, now that the task stacks are in PSRAM.
 constexpr size_t kNeedInternal = 28 * 1024;  // heap left with the controller memory already kept
 constexpr size_t kNeedBlock = 16 * 1024;
 constexpr const char *kErrMemory = "Bluetooth could not start: only %u KB of internal memory free";
@@ -194,8 +204,13 @@ void begin() {
   loadIrks();
 }
 
+size_t ramBefore = 0, ramUsed = 0;  // internal RAM free before Bluetooth started, and what it took
+
 void startTask(void *) {
   begin();
+  // What stays taken once this task's own stack is freed again.
+  const size_t now = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) + kStartStack;
+  ramUsed = ramBefore > now ? ramBefore - now : 0;
   bt = Bt::Ready;
   vTaskDelete(nullptr);
 }
@@ -219,6 +234,7 @@ void startBluetooth() {
     return;
   }
   bt = Bt::Starting;
+  ramBefore = freeInternal;
   if (xTaskCreatePinnedToCore(startTask, "ble start", kStartStack, nullptr, 1, nullptr, 0) != pdPASS) {
     snprintf(errorText, sizeof(errorText), "%s", kErrTask);
     bt = Bt::Failed;
@@ -267,6 +283,8 @@ void presence_apply(bool on) {
 const char *presence_error() { return bt == Bt::Failed ? errorText : nullptr; }
 
 bool presence_ready() { return bt == Bt::Ready; }
+
+size_t presence_ram_used() { return ramUsed; }
 
 PhoneState presence_state(uint8_t awayMinutes) {
   if (!enabled) return PhoneState::Off;

@@ -3,6 +3,7 @@
 
 #include "audio.h"
 #include "config.h"
+#include "psram.h"
 
 namespace {
 
@@ -86,7 +87,7 @@ void audio_begin() {
     return;
   }
   queue = xQueueCreate(4, sizeof(Sound));
-  xTaskCreatePinnedToCore(audioTask, "audio", 4096, nullptr, 2, nullptr, 0);
+  psram_task(audioTask, "audio", 4096, nullptr, 2, nullptr, 0);  // stack in PSRAM: 4 KB of internal RAM saved
 }
 
 void audio_chime(uint8_t volume) {

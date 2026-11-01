@@ -9,6 +9,7 @@
 #include <deque>
 #include <functional>
 
+#include "psram.h"
 #include "settings.h"
 
 namespace {
@@ -108,13 +109,13 @@ int request(const String &url, const char *method, const String &body, String &o
 bool login(const String &base, const Settings &s) {
   token = "";
   if (!s.deskUser.length()) return false;
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   doc["username"] = s.deskUser;
   doc["password"] = s.deskPassword;
   String body, out;
   serializeJson(doc, body);
   const int code = request(base + "/api/auth/login", "POST", body, out, false);
-  JsonDocument reply;
+  JsonDocument reply(psram_json());
   if (code == 200 && !deserializeJson(reply, out)) token = reply["token"] | "";
   const bool ok = token.length() > 0;
   update([&](DeskStatus &st) {
@@ -139,7 +140,7 @@ int authed(const String &base, const Settings &s, const String &path, const char
 
 void poll(const String &base) {
   String out;
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   if (request(base + "/api/desk/status", "GET", "", out, false) != 200 || deserializeJson(doc, out)) {
     ip = IPAddress();  // look the name up again next time
     update([&](DeskStatus &st) {
@@ -151,7 +152,7 @@ void poll(const String &base) {
   const int height = doc["height_mm"] | 0;
   const bool moving = doc["is_moving"] | false;
   const String state = doc["state"] | "";
-  JsonDocument timer;
+  JsonDocument timer(psram_json());
   const bool haveTimer = request(base + "/interval/status", "GET", "", out, false) == 200 && !deserializeJson(timer, out);
   update([&](DeskStatus &st) {
     if (!st.online) st.error = "";
@@ -187,7 +188,7 @@ void fetchMemory(const String &base, const Settings &s) {
   int code = request(base + "/api/desk/memory", "GET", "", out);
   if (code == 401 && login(base, s)) code = request(base + "/api/desk/memory", "GET", "", out);
   Serial.printf("[desk] GET /api/desk/memory -> %d %s\n", code, out.substring(0, 300).c_str());
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   if (code != 200 || deserializeJson(doc, out)) return;
   // {"positions":{"M1":..}}, {"M1":..}, or a list of four.
   JsonVariantConst pos = doc["positions"].isNull() ? doc.as<JsonVariantConst>() : doc["positions"].as<JsonVariantConst>();
@@ -251,24 +252,34 @@ void send(const String &base, const Settings &s, const Command &c) {
   lastPoll = 0;  // show the result soon
 }
 
+void runTest();
+
 void task(void *) {
+  // A copy of the settings, taken again only when they change: copying them
+  // (a dozen strings) 20 times a second churned the heap for nothing.
+  Settings s;
+  uint32_t seenSettings = 0;
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(50));
-    const Settings s = settings_get();
-    update([&](DeskStatus &st) { st.hasLogin = s.deskUser.length() > 0; });
-    // New address or login (edited on the display or the setup page): start over with it.
-    const String key = s.deskHost + "|" + s.deskUser + "|" + s.deskPassword;
-    if (key != loginKey) {
-      loginKey = key;
-      token = "";
-      ip = IPAddress();
-      resolvedFor = "";
-      lastMemory = 0;
-      lastPoll = 0;
-      update([&](DeskStatus &st) {
-        st.loggedIn = false;
-        st.error = "";
-      });
+    runTest();
+    if (settings_version() != seenSettings) {
+      seenSettings = settings_version();
+      s = settings_get();
+      update([&](DeskStatus &st) { st.hasLogin = s.deskUser.length() > 0; });
+      // New address or login (edited on the display or the setup page): start over with it.
+      const String key = s.deskHost + "|" + s.deskUser + "|" + s.deskPassword;
+      if (key != loginKey) {
+        loginKey = key;
+        token = "";
+        ip = IPAddress();
+        resolvedFor = "";
+        lastMemory = 0;
+        lastPoll = 0;
+        update([&](DeskStatus &st) {
+          st.loggedIn = false;
+          st.error = "";
+        });
+      }
     }
     String base;
     if (!s.desk || WiFi.status() != WL_CONNECTED) {
@@ -336,8 +347,16 @@ void finishTest(bool ok, const String &message) {
   testBusy = false;
 }
 
-void testTask(void *arg) {
-  TestJob *job = static_cast<TestJob *>(arg);
+TestJob *testJob = nullptr;  // waiting for the desk task, guarded by lock
+
+// Runs a connection test asked for by desk_test(), on the desk task (a task
+// of its own would take another 8 KB of internal RAM while it runs).
+void runTest() {
+  xSemaphoreTake(lock, portMAX_DELAY);
+  TestJob *job = testJob;
+  testJob = nullptr;
+  xSemaphoreGive(lock);
+  if (!job) return;
   String host = job->host;
   host.trim();
   String base, out;
@@ -356,7 +375,7 @@ void testTask(void *arg) {
     } else {
       base = "http://" + host;
     }
-    JsonDocument doc;
+    JsonDocument doc(psram_json());
     const int code = found ? request(base + "/api/desk/status", "GET", "", out, false) : -1;
     if (!found || code <= 0) {
       message = strfmt(kNotFound, host.c_str());
@@ -369,12 +388,12 @@ void testTask(void *arg) {
         ok = true;
         message = strfmt(kTestGuest, cmText.c_str());
       } else {
-        JsonDocument creds;
+        JsonDocument creds(psram_json());
         creds["username"] = job->user;
         creds["password"] = job->password;
         String body;
         serializeJson(creds, body);
-        JsonDocument reply;
+        JsonDocument reply(psram_json());
         String got;
         const int lc = request(base + "/api/auth/login", "POST", body, got, false);
         String tok;
@@ -386,7 +405,6 @@ void testTask(void *arg) {
   }
   delete job;
   finishTest(ok, message);
-  vTaskDelete(nullptr);
 }
 
 void push(Cmd cmd, uint8_t slot = 0) {
@@ -401,10 +419,13 @@ void push(Cmd cmd, uint8_t slot = 0) {
 
 void desk_begin() {
   lock = xSemaphoreCreateMutex();
-  xTaskCreatePinnedToCore(task, "desk", 6144, nullptr, 1, nullptr, 0);
+  // Stack in PSRAM (no flash writes here): 8 KB, as HTTP, mDNS, JSON and the
+  // connection test all run on it, at no cost in internal RAM.
+  psram_task(task, "desk", 8192, nullptr, 1, nullptr, 0);
 }
 
 DeskStatus desk_status() {
+  if (!lock) return DeskStatus();
   xSemaphoreTake(lock, portMAX_DELAY);
   const DeskStatus copy = status;
   xSemaphoreGive(lock);
@@ -446,23 +467,13 @@ void desk_test(const String &host, const String &user, const String &password) {
   xSemaphoreTake(lock, portMAX_DELAY);
   testResult = DeskTestResult();
   testResult.running = true;
+  delete testJob;
+  testJob = new TestJob{host, user, password};
   xSemaphoreGive(lock);
-  // The test needs an 8 KB stack; internal RAM is short (with Bluetooth on
-  // the task could not be created), so its stack lives in PSRAM, reused.
-  constexpr uint32_t kTestStack = 8192;
-  static StackType_t *stack = (StackType_t *)heap_caps_malloc(kTestStack, MALLOC_CAP_SPIRAM);
-  static StaticTask_t tcb;
-  static TaskHandle_t handle = nullptr;
-  TestJob *job = new TestJob{host, user, password};
-  const bool previousGone = !handle || eTaskGetState(handle) == eDeleted;
-  if (stack && previousGone) handle = xTaskCreateStatic(testTask, "desktest", kTestStack, job, 1, stack, &tcb);
-  if (!stack || !previousGone || !handle) {
-    delete job;
-    finishTest(false, "Could not start the test");
-  }
 }
 
 DeskTestResult desk_test_result() {
+  if (!lock) return DeskTestResult();
   xSemaphoreTake(lock, portMAX_DELAY);
   const DeskTestResult copy = testResult;
   xSemaphoreGive(lock);

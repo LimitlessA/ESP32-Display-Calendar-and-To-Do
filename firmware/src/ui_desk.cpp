@@ -68,6 +68,10 @@ constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
 
 // Labels kept up to date every second, for whichever view is on screen.
 struct Live {
+  // Deleting this object forgets the others. It is deleted before any of
+  // them, and only a view that is still current clears the pointers: when
+  // every screen is rebuilt, the new view is built before the old one goes.
+  lv_obj_t *owner = nullptr;
   lv_obj_t *height = nullptr, *state = nullptr, *timer = nullptr, *timerBar = nullptr, *stop = nullptr;
   lv_obj_t *card = nullptr, *ring = nullptr, *ringNum = nullptr;  // B: the timer card
   int sig = 0, shown = -1;
@@ -142,8 +146,9 @@ int timerProgress(const DeskStatus &st) {  // 0-1000
 // The drawn desk: 650-1300 mm maps onto 150 px of travel. Only the top and the two thin legs move.
 void placeDesk(Live &live, int mm) {
   live.curMm = mm;
+  if (!live.deskTop) return;
   const int y = 190 - (std::max(650, std::min(1300, mm)) - 650) * 150 / 650;
-  if (lv_obj_get_y(live.deskTop) == y) return;
+  if (lv_obj_get_style_y(live.deskTop, LV_PART_MAIN) == y) return;  // moving redraws it
   lv_obj_set_y(live.deskTop, y);
   for (lv_obj_t *leg : live.legs) {
     lv_obj_set_y(leg, y + 14);
@@ -151,11 +156,41 @@ void placeDesk(Live &live, int mm) {
   }
 }
 
+// The glide animates `live` itself (not an object), so it must be stopped
+// whenever the view's objects go: own() and the owner's DELETE do that.
 void deskGlide(void *var, int32_t mm) { placeDesk(*static_cast<Live *>(var), mm); }
 
-void forget(Live *live) {
-  lv_anim_del(live, deskGlide);
-  *live = Live();
+// Starts a new view: call before any of its objects go into `live`. Nothing
+// of the view before stays in it, even if that view is still on screen
+// (it is about to be deleted). LVGL sends LV_EVENT_DELETE to an object
+// before it deletes its children.
+void own(Live &live, lv_obj_t *owner) {
+  lv_anim_del(&live, deskGlide);
+  live = Live();
+  live.owner = owner;
+  lv_obj_add_event_cb(owner, [](lv_event_t *e) {
+    Live *l = static_cast<Live *>(lv_event_get_user_data(e));
+    if (l->owner != lv_event_get_target(e)) return;
+    lv_anim_del(l, deskGlide);
+    *l = Live();
+  }, LV_EVENT_DELETE, &live);
+}
+
+// Only touch a label or a colour when it changes: each change redraws the
+// object, and this runs twice a second.
+void setText(lv_obj_t *label, const char *text) {
+  const char *now = lv_label_get_text(label);
+  if (!now || strcmp(now, text) != 0) lv_label_set_text(label, text);
+}
+
+void setBg(lv_obj_t *o, uint32_t rgb) {
+  const lv_color_t col = c(rgb);
+  if (lv_obj_get_style_bg_color(o, LV_PART_MAIN).full != col.full) lv_obj_set_style_bg_color(o, col, 0);
+}
+
+void setTextColor(lv_obj_t *o, uint32_t rgb) {
+  const lv_color_t col = c(rgb);
+  if (lv_obj_get_style_text_color(o, LV_PART_MAIN).full != col.full) lv_obj_set_style_text_color(o, col, 0);
 }
 
 lv_obj_t *transparent(lv_obj_t *parent) {
@@ -183,6 +218,9 @@ void holdButton(lv_obj_t *b, int dir) {
                       (void *)(intptr_t)dir);
   lv_obj_add_event_cb(b, [](lv_event_t *) { desk_hold(0); }, LV_EVENT_RELEASED, nullptr);
   lv_obj_add_event_cb(b, [](lv_event_t *) { desk_hold(0); }, LV_EVENT_PRESS_LOST, nullptr);
+  // The screen is rebuilt every minute and after each sync; a button deleted
+  // under the finger gets no RELEASED, and the desk would keep moving.
+  lv_obj_add_event_cb(b, [](lv_event_t *) { desk_hold(0); }, LV_EVENT_DELETE, nullptr);
 }
 
 lv_obj_t *roundButton(lv_obj_t *parent, const char *icon, int size) {
@@ -197,15 +235,15 @@ void updateTimerCard(Live &live, const DeskStatus &st);
 
 void updateLive(Live &live, const DeskStatus &st) {
   const Theme &t = theme();
-  if (live.height) lv_label_set_text(live.height, cm(st.heightMm, true).c_str());
+  if (live.height) setText(live.height, cm(st.heightMm, true).c_str());
   if (live.state) {
     String s = stateText(st);
     if (stateSince && st.online && !st.moving) s = strf(kStateFor, s.c_str(), duration(ui_now() - stateSince).c_str());
-    lv_label_set_text(live.state, s.c_str());
-    lv_obj_set_style_text_color(live.state, c(!st.online ? t.badFg : st.heightMm >= kStandingMm ? t.good : t.muted), 0);
+    setText(live.state, s.c_str());
+    setTextColor(live.state, !st.online ? t.badFg : st.heightMm >= kStandingMm ? t.good : t.muted);
   }
   updateTimerCard(live, st);
-  if (live.timer) lv_label_set_text(live.timer, timerText(st).c_str());
+  if (live.timer) setText(live.timer, timerText(st).c_str());
   if (live.timerBar) lv_bar_set_value(live.timerBar, timerProgress(st), LV_ANIM_OFF);
   if (live.stop) {
     if (st.moving) lv_obj_clear_flag(live.stop, LV_OBJ_FLAG_HIDDEN);
@@ -215,11 +253,11 @@ void updateLive(Live &live, const DeskStatus &st) {
     if (!live.mem[i]) continue;
     const int mm = st.memoryMm[i];
     const bool here = mm > 0 && !st.moving && abs(st.heightMm - mm) <= 10;
-    lv_obj_set_style_bg_color(live.mem[i], c(here ? t.accent : t.raised), 0);
-    lv_obj_set_style_text_color(lv_obj_get_child(live.mem[i], 0), c(here ? t.onAccent : t.text), 0);
+    setBg(live.mem[i], here ? t.accent : t.raised);
+    setTextColor(lv_obj_get_child(live.mem[i], 0), here ? t.onAccent : t.text);
     lv_obj_t *sub = lv_obj_get_child(live.mem[i], 1);
-    lv_obj_set_style_text_color(sub, c(here ? t.onAccent : t.muted), 0);
-    lv_label_set_text(sub, mm > 0 ? cm(mm, false).c_str() : "");
+    setTextColor(sub, here ? t.onAccent : t.muted);
+    setText(sub, mm > 0 ? cm(mm, false).c_str() : "");
   }
   if (live.deskTop) {
     // Glide from the height shown to the one reported, easing out, instead of jumping per poll.
@@ -241,7 +279,7 @@ void updateLive(Live &live, const DeskStatus &st) {
     }
   }
   if (live.today) {
-    lv_label_set_text(live.today, strf(kToday, duration(standMinutesToday * 60L).c_str(), changesToday).c_str());
+    setText(live.today, strf(kToday, duration(standMinutesToday * 60L).c_str(), changesToday).c_str());
   }
 }
 
@@ -383,6 +421,7 @@ void buildScreenB(const DeskStatus &st) {
   const Theme &t = theme();
   Live &live = screenLive;
   lv_obj_t *left = mk_box(deskBody, t.panel, 18);
+  own(live, left);  // the first child, so it goes first when the view is cleared
   lv_obj_set_size(left, 300, BODY_H);
   lv_obj_clear_flag(left, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_t *cfg = mk_chip(left, kDeskSettings, false, 32);
@@ -454,7 +493,6 @@ void buildScreenB(const DeskStatus &st) {
     buildTimerCard(st);
   }
   live.today = mk_label(right, &font_12, t.muted, "");
-  lv_obj_add_event_cb(right, [](lv_event_t *) { forget(&screenLive); }, LV_EVENT_DELETE, nullptr);
 }
 
 // ---- C: the desk follows the calendar ----
@@ -498,7 +536,7 @@ void buildScreenC(const DeskStatus &st) {
   lv_obj_t *col = transparent(deskBody);
   lv_obj_set_size(col, w, BODY_H);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_add_event_cb(col, [](lv_event_t *) { forget(&screenLive); }, LV_EVENT_DELETE, nullptr);
+  own(screenLive, col);
   lv_obj_t *h = mk_label(col, &font_12, t.muted, kTodayAtDesk);
   lv_obj_set_style_text_letter_space(h, 1, 0);
 
@@ -771,7 +809,7 @@ lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w) {
   lv_obj_set_style_pad_right(dock, 8, 0);
   set_flex(dock, LV_FLEX_FLOW_ROW, 10);
   lv_obj_clear_flag(dock, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_add_event_cb(dock, [](lv_event_t *) { forget(&dockLive); }, LV_EVENT_DELETE, nullptr);
+  own(live, dock);
   lv_obj_t *hc = transparent(dock);
   lv_obj_set_width(hc, 110);
   set_flex(hc, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);

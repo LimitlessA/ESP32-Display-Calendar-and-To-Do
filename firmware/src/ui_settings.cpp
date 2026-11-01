@@ -3,6 +3,7 @@
 #include "audio.h"
 #include "config.h"
 #include "battery.h"
+#include "crashlog.h"
 #include "storage.h"
 #include "sync.h"
 #include "ui_internal.h"
@@ -194,7 +195,17 @@ lv_obj_t *settings_create() {
   lv_obj_t *fw = row(dev, 18);
   lv_obj_set_width(fw, lv_pct(100));
   lv_obj_set_style_pad_column(fw, 6, 0);
-  mk_label(fw, &font_14, t.muted, strf(kFirmware, FIRMWARE_VERSION).c_str());
+  // Why the display last restarted, if it was not asked to, in place of the
+  // version until the next restart (details: serial port, harness "crash").
+  const String crash = crashlog_summary();
+  if (crash.length()) {
+    lv_obj_t *why = mk_label(fw, &font_14, t.badFg, crash.c_str());
+    lv_label_set_long_mode(why, LV_LABEL_LONG_DOT);
+    lv_obj_set_size(why, 1, lv_font_get_line_height(&font_14));  // one line, as wide as the row leaves
+    lv_obj_set_flex_grow(why, 1);
+  } else {
+    mk_label(fw, &font_14, t.muted, strf(kFirmware, FIRMWARE_VERSION).c_str());
+  }
   mk_label(fw, &font_14b, t.accent, kUpdate);
 
   lv_obj_t *sliders = mk_box(body, t.card, 14);

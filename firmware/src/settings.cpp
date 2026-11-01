@@ -1,6 +1,7 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
+#include "psram.h"
 #include "settings.h"
 #include "storage.h"
 
@@ -20,7 +21,7 @@ bool dirty = false;
 uint32_t changedAt = 0;
 
 String toJson(const Settings &s) {
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   doc["wifiSsid"] = s.wifiSsid;
   doc["wifiPassword"] = s.wifiPassword;
   JsonArray accounts = doc["accounts"].to<JsonArray>();
@@ -95,7 +96,7 @@ String toJson(const Settings &s) {
 }
 
 bool fromJson(const String &json, Settings &s) {
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   if (deserializeJson(doc, json)) return false;
   Settings d;  // defaults for anything missing
   s.wifiSsid = doc["wifiSsid"] | "";

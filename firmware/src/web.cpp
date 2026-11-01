@@ -7,6 +7,7 @@
 #include "config.h"
 #include "desk.h"
 #include "ota.h"
+#include "psram.h"
 #include "settings.h"
 #include "sync.h"
 #include "web.h"
@@ -123,7 +124,7 @@ void handleState() {
   const OtaStatus ota = ota_status();
   const esp_partition_t *slot = esp_ota_get_next_update_partition(nullptr);
 
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   doc["v"] = FIRMWARE_VERSION;
   doc["host"] = HOSTNAME ".local";
   doc["maxAccounts"] = MAX_ACCOUNTS;
@@ -298,7 +299,7 @@ void handleDeskTest() {
 void handleDeskTestResult() {
   if (!pinOk()) return;
   const DeskTestResult r = desk_test_result();
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   doc["running"] = r.running;
   doc["done"] = r.done;
   doc["ok"] = r.ok;
@@ -376,7 +377,8 @@ void web_begin() {
   });
   server.onNotFound([] { server.send(404, "text/plain", kNotFound); });
   server.begin();
-  xTaskCreatePinnedToCore(webTask, "web", 8192, nullptr, 1, nullptr, 0);
+  // Stack in PSRAM (8 KB of internal RAM saved); see ota_begin() about uploads.
+  psram_task(webTask, "web", 8192, nullptr, 1, nullptr, 0);
 }
 
 String web_pin() {
