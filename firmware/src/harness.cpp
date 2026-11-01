@@ -101,15 +101,23 @@ String serialShot() {
   const size_t px = (size_t)w * h;
   auto *rle = (uint16_t *)heap_caps_malloc(px * 4, MALLOC_CAP_SPIRAM);
   if (!rle) return "out of memory";
+  // Read the frame in slices of 8 rows with a pause between them: reading all
+  // of it from PSRAM in one go starves the LCD's own reads and the picture
+  // glitches. Runs stop at slice ends (a few more pairs, same picture).
+  const size_t slice = (size_t)w * 8;
   size_t pairs = 0;
-  for (size_t i = 0; i < px;) {
-    const uint16_t c = fb[i];
-    size_t run = 1;
-    while (i + run < px && fb[i + run] == c && run < 65535) run++;
-    rle[pairs * 2] = run;
-    rle[pairs * 2 + 1] = c;
-    pairs++;
-    i += run;
+  for (size_t start = 0; start < px; start += slice) {
+    const size_t end = std::min(px, start + slice);
+    for (size_t i = start; i < end;) {
+      const uint16_t c = fb[i];
+      size_t run = 1;
+      while (i + run < end && fb[i + run] == c && run < 65535) run++;
+      rle[pairs * 2] = run;
+      rle[pairs * 2 + 1] = c;
+      pairs++;
+      i += run;
+    }
+    delay(1);
   }
   Serial.printf("SHOT %d %d %u\n", w, h, (unsigned)(pairs * 4));
   printBase64((const uint8_t *)rle, pairs * 4);
