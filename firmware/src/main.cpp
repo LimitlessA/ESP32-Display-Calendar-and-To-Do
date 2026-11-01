@@ -3,6 +3,7 @@
 // the network. Wi-Fi, sync, the setup page and OTA run in their own tasks on
 // core 0 and hand data over through sync_get_if_newer().
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 #include <lvgl.h>
 
 #include "audio.h"
@@ -30,6 +31,11 @@ void ui_set_backlight(uint8_t percent) {
 }
 
 void setup() {
+  // malloc() keeps blocks up to 4 KB in internal RAM by default. The calendar
+  // and task data (many small strings, JSON) filled it until Wi-Fi and HTTPS
+  // ran short (the 7" went down to 1.4 KB free). Only blocks under 512 bytes
+  // stay internal now; the rest goes to PSRAM.
+  heap_caps_malloc_extmem_enable(512);
   Serial.begin(115200);
   storage_begin();  // first, so settings can fall back to the SD backup
   settings_begin();
