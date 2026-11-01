@@ -20,6 +20,7 @@ constexpr const char *kTabWeek = "Week";
 constexpr const char *kTabTasks = "Tasks";
 constexpr const char *kTabDates = "Dates";  // only with the "Dates tab" layout
 constexpr const char *kTabDesk = "Desk";    // only with the desk screen layouts
+constexpr const char *kSavedCopyHint = "Showing the copy saved on the SD card until the display syncs.";
 constexpr const char *kAm = " AM";
 constexpr const char *kPm = " PM";
 constexpr const char *kNoClock = "--:--";  // before the clock is set
@@ -326,7 +327,12 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   lv_obj_t *clock = mk_label(h, &font_26b, t.text, "");
   lv_obj_t *date = mk_label(h, &font_16, t.muted, "");
   register_clock(clock, date);
-  lv_obj_t *offline = mk_label(h, &font_16, t.warnFg, ICON_CLOUD);
+  // "Saved copy" badge while the data shown comes from the SD card (before
+  // the first sync, or when every account fails). An SD card, not a cloud,
+  // so it is not taken for the weather. Tap it for the reason.
+  lv_obj_t *offline = mk_label(h, &font_16, t.warnFg, ICON_SD);
+  lv_obj_set_ext_click_area(offline, 14);
+  on_click(offline, [](lv_event_t *) { toast(g_snap.error.length() ? g_snap.error : String(kSavedCopyHint)); });
   lv_obj_add_flag(offline, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_t *spacer = mk_box(h, 0, 0);
