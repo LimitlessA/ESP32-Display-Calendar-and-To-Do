@@ -10,10 +10,18 @@
 #include <memory>
 
 #include "google_root_cas.h"
+#include "psram.h"
 #include "settings.h"
 #include "storage.h"
 #include "sync.h"
 #include "wifi_mgr.h"
+
+// Each kept-open connection (conns below) holds a TLS session (tens of KB
+// during a handshake): in PSRAM only if mbedTLS allocates there
+// (custom_sdkconfig in platformio.ini).
+#if !CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC
+#warning "mbedTLS allocates in internal RAM: the two kept-open TLS connections will not fit"
+#endif
 
 namespace {
 
@@ -531,7 +539,7 @@ void weekFromFeed(time_t week) {
 bool applyFeed(const String &body, const Settings &s, uint8_t account, std::vector<Event> &events,
                std::vector<Task> &tasks, Extras &extras, AccountStatus &status, String &err, bool &same) {
   same = false;
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   if (!parseResponse(body, doc, err)) return false;
   if (doc["same"] | false) {
     same = true;
@@ -692,7 +700,7 @@ void fetchWeek(const Settings &s, time_t weekStart) {
   String errors;
   for (uint8_t i = 0; i < s.accounts.size(); i++) {
     String body, err;
-    JsonDocument doc;
+    JsonDocument doc(psram_json());
     String q = query;
     if (i == 0) q += icsQuery(s);
     if (httpGet(accountUrl(s.accounts[i], q), body, err) && parseResponse(body, doc, err)) {
@@ -790,7 +798,7 @@ bool runPendingActions(const Settings &s) {
       query += "&list=" + urlEncode(a.listId) + "&task=" + urlEncode(a.taskId);
     }
     String body, err;
-    JsonDocument doc;
+    JsonDocument doc(psram_json());
     int code = 0;
     const bool ok = httpGet(accountUrl(s.accounts[a.account], query), body, err, &code) &&
                     parseResponse(body, doc, err);
@@ -938,8 +946,10 @@ void sync_start() {
   const Settings s = settings_get();
   snapshot.accounts.resize(s.accounts.size());
   snapshot.ics.resize(s.ics.size());
-  // Core 0 alongside the Wi-Fi stack; LVGL runs in loop() on core 1.
-  xTaskCreatePinnedToCore(workerLoop, "sync", kTaskStack, nullptr, 1, &worker, 0);
+  // Core 0 alongside the Wi-Fi stack; LVGL runs in loop() on core 1. The
+  // stack is in PSRAM (16 KB of internal RAM saved): the sync never writes to
+  // flash (Wi-Fi does not store its login, see wifi_begin()).
+  psram_task(workerLoop, "sync", kTaskStack, nullptr, 1, &worker, 0);
 }
 
 bool sync_get_if_newer(uint32_t version, Snapshot &out) {

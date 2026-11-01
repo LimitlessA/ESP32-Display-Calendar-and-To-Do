@@ -5,6 +5,7 @@
 
 #include "audio.h"
 #include "battery.h"
+#include "crashlog.h"
 #include "ota.h"
 #include "desk.h"
 #include "presence.h"
@@ -138,6 +139,10 @@ void presence_pair(bool) {}
 bool presence_pairing() { return true; }
 int presence_paired_count() { return 1; }
 void presence_forget() {}
+size_t presence_ram_used() { return 0; }
+
+// Why the display last restarted: SIM_CRASH="Crash in sync (LoadProhibited)" shows it in Settings.
+String crashlog_summary() { return getenv("SIM_CRASH") ? getenv("SIM_CRASH") : ""; }
 
 // Smart desk: sitting at M1 with the timer running; sim_main can change it.
 DeskStatus g_sim_desk = [] {
