@@ -12,6 +12,18 @@ struct Account {
   uint32_t color;    // badge color on the Accounts screen
 };
 
+// A published calendar link (Outlook "Publish calendar" ICS, iCloud public
+// calendar, any .ics). The first Google account's script fetches and expands
+// it, so its events arrive in the same feed as that account's.
+struct IcsCalendar {
+  String label;      // "Work (Outlook)"
+  String url;        // https:// or webcal:// link to the .ics
+  uint32_t color;
+};
+constexpr uint8_t kMaxIcs = 6;
+// How often the display asks for changes (Settings > Sync), in minutes.
+constexpr uint8_t kSyncChoices[] = {2, 3, 5, 10, 15, 30};
+
 // Screens that come in three layouts (A, B, C), chosen like a theme.
 enum class Layout : uint8_t {
   QuickAdd, Focus, Summary, Conflicts, LeaveBy, Dates, Review, Features,
@@ -26,6 +38,7 @@ struct Settings {
   String wifiSsid;
   String wifiPassword;
   std::vector<Account> accounts;
+  std::vector<IcsCalendar> ics;
 
   uint8_t brightness = 80;      // percent
   uint8_t volume = 60;          // percent
@@ -37,7 +50,7 @@ struct Settings {
   bool dimIdle = false;         // dim the backlight after a while without touch
   uint8_t dimAfterMinutes = 2;
   bool use24h = true;
-  uint8_t refreshMinutes = 5;
+  uint8_t refreshMinutes = 3;   // polls are cheap: an unchanged feed is a few bytes
   uint8_t theme = 0;            // index into the theme table in theme.h
   String updateUrl = DEFAULT_UPDATE_URL;  // manifest for updates, empty = upload only
   bool autoUpdate = true;       // install new firmware by itself while nobody uses the display
