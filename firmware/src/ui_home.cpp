@@ -299,14 +299,12 @@ void home_refresh() {
     lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
     const String moved = radar_mark(card, task);
     if (moved.length()) lv_obj_set_width(title, colW - 48 - 14 - 40);  // room for the badge
-    Tone tone;
-    const String due = due_text(task.dueKey, tone);
     if (moved.length()) {
       lv_obj_t *l = mk_label(text, &font_12, t.accent, moved.c_str());
       lv_obj_set_width(l, colW - 48 - 14 - 40);
       lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    } else if (due.length()) {
-      mk_label(text, &font_12, tone == Tone::Bad ? t.badFg : tone == Tone::Warn ? t.warnFg : t.muted, due.c_str());
+    } else {
+      mk_due(text, task.dueKey);
     }
   }
   int open = 0;

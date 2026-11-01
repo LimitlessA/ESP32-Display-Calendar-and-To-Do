@@ -115,6 +115,12 @@ static void sampleData() {
       task(0, "t7", "Buy printer ink", "Shopping", ""),
       task(0, "t8", "Pay electricity bill", "My Tasks", "2026-10-29"),
   };
+  g_sim.done = {task(0, "d1", "Order printer ink", "Shopping", "2026-10-30"),
+                task(0, "d2", "Water the plants", "My Tasks", ""),
+                task(1, "d3", "Reply to Sam", "Work", "2026-11-01"),
+                task(0, "d4", "Call the landlord", "My Tasks", "2026-10-29")};
+  const time_t doneAt[] = {at(2026, 10, 29, 10, 5), at(2026, 10, 29, 9, 12), at(2026, 10, 29, 8, 40), at(2026, 10, 28, 17, 0)};
+  for (int i = 0; i < 4; i++) g_sim.done[i].completedAt = doneAt[i];
   g_sim.lists = {{0, "l1", "My Tasks"}, {1, "l2", "Work"}, {0, "l3", "Shopping"}, {0, "l4", "Projects"}};
   g_sim.dates = {
       {DateKind::Birthday, "Mihai's birthday", "2026-10-30", "", 0},
@@ -135,6 +141,12 @@ static void sampleData() {
   work.syncedAt = personal.syncedAt;
   work.calendars = {{"w", "Work", W, true}, {"o", "Office rooms", 0xE57CD8, false}};
   g_sim.accounts = {personal, work};
+  IcsStatus outlook;
+  outlook.synced = true;
+  outlook.events = 14;
+  IcsStatus icloud;
+  icloud.error = "HTTP 404";
+  g_sim.ics = {outlook, icloud};
   g_sim.syncedAt = personal.syncedAt;
   g_sim.version = 1;
 }
@@ -422,6 +434,18 @@ static void renderVariants(const char *dir) {
   }
 }
 
+// Clicks the button holding a label with this text.
+static bool clickLabel(lv_obj_t *o, const char *text) {
+  if (lv_obj_check_type(o, &lv_label_class) && !strcmp(lv_label_get_text(o), text)) {
+    lv_event_send(lv_obj_get_parent(o), LV_EVENT_CLICKED, nullptr);
+    return true;
+  }
+  for (uint32_t i = 0; i < lv_obj_get_child_cnt(o); i++) {
+    if (clickLabel(lv_obj_get_child(o, i), text)) return true;
+  }
+  return false;
+}
+
 int main(int argc, char **argv) {
   const char *dir = argc > 1 ? argv[1] : ".";
   setenv("TZ", "UTC-2", 1);
@@ -442,6 +466,8 @@ int main(int argc, char **argv) {
   Settings s;
   s.accounts = {{"Personal", "https://script.google.com/macros/s/a/exec", "x", 0x7BD88F},
                 {"Work", "https://script.google.com/macros/s/b/exec", "y", 0x6C8CFF}};
+  s.ics = {{"Work (Outlook)", "https://outlook.office365.com/owa/calendar/abc/calendar.ics", 0xF5A524},
+           {"Family (iCloud)", "webcal://p23-caldav.icloud.com/published/2/xyz", 0xE57CD8}};
   s.wifiSsid = "Popescu-5G";
   sim_set_settings(s);
   sampleData();
@@ -462,6 +488,9 @@ int main(int argc, char **argv) {
   render(dir, "03-week");
   ui_show(Screen::Tasks);
   render(dir, "04-tasks");
+  clickLabel(lv_scr_act(), "Done");
+  lv_timer_handler();
+  render(dir, "04b-tasks-done");
 
   ui_show(Screen::Home);
   reminder_show(g_sim.events[1]);
@@ -481,6 +510,22 @@ int main(int argc, char **argv) {
   render(dir, "07-wifi");
   ui_show(Screen::Accounts);
   render(dir, "08-accounts");
+  {
+    // B1: an account with a problem, B2: the desk (list items: label, Personal, Work, ...)
+    lv_obj_t *accList = lv_obj_get_child(lv_scr_act(), 1);
+    g_sim.accounts[1].error = "Token rejected - 14:02";
+    g_sim.version++;
+    if (sync_get_if_newer(snap.version, snap)) ui_update(snap);
+    lv_event_send(lv_obj_get_child(accList, 2), LV_EVENT_CLICKED, nullptr);
+    render(dir, "08b-accounts-problem");
+    const uint32_t n = lv_obj_get_child_cnt(accList);
+    lv_event_send(lv_obj_get_child(accList, n - 2), LV_EVENT_CLICKED, nullptr);
+    render(dir, "08c-accounts-desk");
+    lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 1), LV_EVENT_CLICKED, nullptr);
+    g_sim.accounts[1].error = "";
+    g_sim.version++;
+    if (sync_get_if_newer(snap.version, snap)) ui_update(snap);
+  }
   ui_show(Screen::Settings);
   render(dir, "09-settings");
 

@@ -30,6 +30,11 @@ constexpr const char *kTooMany = "Too many accounts";
 constexpr const char *kAdded = "Account added. It syncs within a few seconds.";
 constexpr const char *kRemoved = "Account removed.";
 constexpr const char *kLinkSaved = "Update link saved.";
+constexpr const char *kBadIcs = "The calendar link should start with https://, http:// or webcal://";
+constexpr const char *kTooManyIcs = "Too many calendar links";
+constexpr const char *kIcsAdded = "Calendar added. It shows up with the next sync.";
+constexpr const char *kIcsRemoved = "Calendar removed.";
+constexpr const char *kSyncSaved = "Sync interval saved.";
 constexpr const char *kDeskSaved = "Desk settings saved. Turn the desk on in Settings > Features > Smart desk.";
 constexpr const char *kInstalled = "Installed. The display is restarting.";
 constexpr const char *kUpdateFailed = "Update failed: ";
@@ -140,9 +145,19 @@ void handleState() {
     a["synced"] = st.syncedAt != 0;
     a["error"] = st.error;
   }
-  // TODO(ics): list the ICS calendars here once Settings has them, which turns on the page's ICS card:
-  //   doc["ics"] = array of {label, provider: "outlook" | "icloud" | "other", color "#RRGGBB", events, error}.
-  //   Without the "ics" key the page says "This firmware can't show ICS calendars yet".
+  // Published calendars; the page has no provider field to store, it is only a hint there.
+  JsonArray ics = doc["ics"].to<JsonArray>();
+  for (size_t i = 0; i < s.ics.size(); i++) {
+    const IcsStatus st = i < snap.ics.size() ? snap.ics[i] : IcsStatus();
+    JsonObject c = ics.add<JsonObject>();
+    c["label"] = s.ics[i].label;
+    c["color"] = hex(s.ics[i].color);
+    c["name"] = st.name;
+    c["synced"] = st.synced;
+    c["events"] = st.events;
+    c["error"] = st.error;
+  }
+  doc["maxIcs"] = kMaxIcs;
 
   JsonObject d = doc["desk"].to<JsonObject>();
   d["on"] = s.desk;
@@ -200,6 +215,48 @@ void handleRemoveAccount() {
   reply(kRemoved);
 }
 
+void handleAddIcs() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  String url = server.arg("url");
+  url.trim();
+  if (!url.startsWith("https://") && !url.startsWith("webcal://") && !url.startsWith("http://")) {
+    server.send(400, "text/plain", kBadIcs);
+    return;
+  }
+  if (s.ics.size() >= kMaxIcs) {
+    server.send(400, "text/plain", kTooManyIcs);
+    return;
+  }
+  String label = server.arg("label");
+  label.trim();
+  const size_t n = sizeof(kAccountColors) / sizeof(kAccountColors[0]);
+  s.ics.push_back({label.substring(0, kMaxLabel), url, kAccountColors[(s.accounts.size() + s.ics.size()) % n]});
+  settings_save(s);
+  sync_refresh();
+  reply(kIcsAdded);
+}
+
+void handleRemoveIcs() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  const size_t i = server.arg("i").toInt();
+  if (i < s.ics.size()) {
+    s.ics.erase(s.ics.begin() + i);
+    settings_save(s);
+  }
+  reply(kIcsRemoved);
+}
+
+// Sync interval in minutes (Settings > Sync on the display): minutes=2..60.
+void handleSyncInterval() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  s.refreshMinutes = constrain((int)server.arg("minutes").toInt(), 1, 60);
+  settings_save(s);
+  reply(kSyncSaved);
+}
+
 void handleUpdateUrl() {
   if (!pinOk()) return;
   Settings s = settings_get();
@@ -248,13 +305,6 @@ void handleDeskTestResult() {
   doc["message"] = r.message;
   sendJson(doc);
 }
-
-// TODO(ics): POST /ics/add (pin, provider = outlook | icloud | other, label, url; the page sends
-//   webcal:// links as typed) and POST /ics/remove (pin, i = index in the "ics" list of /state).
-// TODO(sync): POST /settings/sync (pin, minutes -> Settings::refreshMinutes; the page offers 5, 10,
-//   15, 30 and 60 and adds the current value if it is another one).
-// Reply to both with reply(text) or a 400 with the error text: the page shows it next to the form.
-// Until they exist the page shows "This firmware can't do that yet" from the 404.
 
 void handleUploadDone() {
   if (!uploadAuthorized) {
@@ -309,6 +359,9 @@ void web_begin() {
   server.on("/pin", HTTP_POST, handlePin);
   server.on("/account/add", HTTP_POST, handleAddAccount);
   server.on("/account/remove", HTTP_POST, handleRemoveAccount);
+  server.on("/ics/add", HTTP_POST, handleAddIcs);
+  server.on("/ics/remove", HTTP_POST, handleRemoveIcs);
+  server.on("/settings/sync", HTTP_POST, handleSyncInterval);
   server.on("/settings/update-url", HTTP_POST, handleUpdateUrl);
   server.on("/settings/desk", HTTP_POST, handleDesk);
   server.on("/settings/desk/test", HTTP_POST, handleDeskTest);

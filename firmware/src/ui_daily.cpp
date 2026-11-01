@@ -223,7 +223,8 @@ void summaryTimeline(const Day &d) {
       mk_dot(r, v == &d.overdue ? t.badFg : t.warnFg);
       lv_obj_t *l = mk_label(r, &font_16, t.text, task.title.c_str());
       lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
-      lv_obj_set_width(l, SCREEN_W - 80 - 240 - 30);
+      lv_obj_set_width(l, SCREEN_W - 80 - 240 - 30 - 200);
+      mk_due(r, task.dueKey);
     }
   }
   if (!n) mk_label(list, &font_16, t.muted, kNoTasks);
@@ -316,9 +317,7 @@ void reviewChecklist() {
     lv_obj_t *title = mk_label(row, &font_16s, t.text, task.title.c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(title, 1);
-    Tone tone;
-    const String due = due_text(task.dueKey, tone);
-    mk_label(row, &font_12, tone == Tone::Bad ? t.badFg : t.warnFg, due.c_str());
+    mk_due(row, task.dueKey);
     lv_obj_t *tm = mk_chip(row, kTomorrowBtn, false);
     Task *copy = attach(tm, task);
     on_click(tm, [](lv_event_t *e) {
@@ -364,9 +363,8 @@ void reviewOneByOne() {
   lv_obj_set_width(title, 560);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
-  Tone tone;
-  const String due = due_text(task.dueKey, tone);
-  mk_label(card, &font_14b, tone == Tone::Bad ? t.badFg : t.warnFg, (due + "  \xC2\xB7  " + task.list).c_str());
+  mk_due(card, task.dueKey);
+  mk_label(card, &font_14, t.muted, task.list.c_str());
 
   lv_obj_t *row = transparent(layer);
   lv_obj_set_size(row, 620, 64);

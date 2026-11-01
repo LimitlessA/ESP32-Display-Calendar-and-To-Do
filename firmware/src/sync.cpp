@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <deque>
 #include <map>
+#include <memory>
 
 #include "google_root_cas.h"
 #include "settings.h"
@@ -41,11 +42,18 @@ constexpr const char *kNtpServer1 = "time.google.com";
 constexpr const char *kNtpServer2 = "pool.ntp.org";
 constexpr uint32_t kConnectTimeoutMs = 10000;
 constexpr uint32_t kReplyTimeoutMs = 25000;  // Apps Script can take a while on a cold start
+constexpr uint32_t kKeepAliveMs = 30000;     // reuse a TLS connection only this long after its last reply
+constexpr int kMaxHops = 4;                  // redirects followed per request
 constexpr uint32_t kIdleLoopMs = 1000;       // how often the worker wakes when online
 constexpr uint32_t kOfflineLoopMs = 5000;    // ...and when offline
 constexpr uint32_t kTaskStack = 16384;
 constexpr uint8_t kActionTries = 3;  // a failed connection is retried before it counts as an error
 constexpr const char *kLocalPrefix = "new:";  // id of a task added here that Google has not answered for yet
+constexpr time_t kClockValid = 1700000000;   // the clock is set once it is past this (2023)
+// Feed format 2: short keys, no empty fields, calendar index instead of name
+// and color, the window the feed covers, and "same" when nothing changed.
+constexpr const char *kApiVersion = "v=2";
+constexpr const char *kErrRedirects = "too many redirects";
 
 // ---- State -------------------------------------------------------------------
 
@@ -74,7 +82,17 @@ std::map<String, bool> hidden;
 // Tasks added on the display: temporary "new:" id -> Google's task id and list id.
 std::map<String, std::pair<String, String>> addedIds;
 volatile bool refreshRequested = true;
+volatile bool fullRequested = false;  // ask for the whole feed even if it looks unchanged
 volatile time_t weekRequested = 0;
+
+// Kept-open HTTPS connections, one per host, used only by the worker task.
+struct Conn {
+  String host;
+  WiFiClientSecure client;
+  HTTPClient http;  // kept too: deleting an HTTPClient closes its connection
+  uint32_t usedAt = 0;
+};
+std::unique_ptr<Conn> conns[2];
 String timezone;  // POSIX TZ built from the feed's UTC offset
 
 // ---- Code --------------------------------------------------------------------
@@ -127,33 +145,124 @@ String accountUrl(const Account &a, const String &query) {
   return url;
 }
 
-// Apps Script answers on script.google.com with a redirect to
-// script.googleusercontent.com, so redirects must be followed.
-bool httpGet(const String &url, String &body, String &err, int *status = nullptr) {
-  WiFiClientSecure client;
-  client.setCACert(GOOGLE_ROOT_CAS);
-  HTTPClient http;
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+String hostOf(const String &url) {
+  if (!url.startsWith("https://")) return "";
+  const int from = 8;
+  int to = from;
+  while (to < (int)url.length() && url[to] != '/' && url[to] != '?' && url[to] != ':') to++;
+  return url.substring(from, to);
+}
+
+// The connection for this host: the open one if there is one, else the
+// least recently used slot. Connections idle too long are closed first, as
+// Google may already have dropped them.
+Conn &connFor(const String &host) {
+  Conn *pick = nullptr;
+  for (auto &c : conns) {
+    if (c && c->host == host) pick = c.get();
+  }
+  for (auto &c : conns) {
+    if (pick) break;
+    if (!c) {
+      c.reset(new Conn());
+      c->client.setCACert(GOOGLE_ROOT_CAS);
+      pick = c.get();
+    }
+  }
+  if (!pick) pick = conns[0]->usedAt <= conns[1]->usedAt ? conns[0].get() : conns[1].get();
+  if (pick->host != host || millis() - pick->usedAt > kKeepAliveMs) {
+    pick->client.stop();
+    pick->host = host;
+  }
+  return *pick;
+}
+
+void closeIdleConnections() {
+  for (auto &c : conns) {
+    if (c && c->usedAt && millis() - c->usedAt > kKeepAliveMs) {
+      c->client.stop();
+      c->usedAt = 0;
+    }
+  }
+}
+
+// One GET on a kept-open connection. Returns the HTTP code (negative:
+// HTTPClient error). The whole reply is read, also for redirects, so the
+// connection can carry the next request.
+int getOnce(Conn &c, const String &url, String &body, String &location, String &err) {
+  HTTPClient &http = c.http;
+  http.setReuse(true);
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
   http.setConnectTimeout(kConnectTimeoutMs);
   http.setTimeout(kReplyTimeoutMs);
-  if (!http.begin(client, url)) {
+  if (!http.begin(c.client, url)) {
     err = kErrBadUrl;
-    return false;
+    return HTTPC_ERROR_CONNECTION_REFUSED;
   }
+  static const char *kHeaders[] = {"Location"};
+  http.collectHeaders(kHeaders, 1);
   const int code = http.GET();
-  if (status) *status = code;
-  if (code != HTTP_CODE_OK) {
-    err = code < 0 ? HTTPClient::errorToString(code) : strf(kErrHttp, code);
+  c.usedAt = millis();
+  if (code > 0) {
+    String reply = http.getString();
+    if (code == HTTP_CODE_OK) {
+      if (!reply.length()) c.client.stop();  // cut short: don't reuse
+      body = std::move(reply);
+    } else {
+      location = http.header("Location");
+    }
+  } else {
+    err = HTTPClient::errorToString(code);
     // HTTPClient says "connection refused" for any failed connect, a failed
     // secure handshake (e.g. short on memory) included: add the TLS reason.
     char tls[96];
-    if (code < 0 && client.lastError(tls, sizeof(tls))) err += String(" (") + tls + ")";
-    http.end();
+    if (code == HTTPC_ERROR_CONNECTION_REFUSED && c.client.lastError(tls, sizeof(tls))) {
+      err += String(" (") + tls + ")";
+    }
+    c.client.stop();
+  }
+  http.end();
+  return code;
+}
+
+// Apps Script answers on script.google.com with a redirect to
+// script.googleusercontent.com. Both connections stay open between requests,
+// so a sync of several accounts, the week and any taps costs two TLS
+// handshakes instead of two per request.
+bool httpGet(const String &url, String &body, String &err, int *status = nullptr) {
+  String next = url;
+  for (int hop = 0; hop < kMaxHops; hop++) {
+    const String host = hostOf(next);
+    if (!host.length()) {
+      err = kErrBadUrl;
+      return false;
+    }
+    String location;
+    int code = 0;
+    for (int attempt = 0; attempt < 2; attempt++) {
+      Conn &c = connFor(host);
+      const bool reused = c.client.connected();
+      location = "";
+      err = "";
+      code = getOnce(c, next, body, location, err);
+      // Google may close a kept-open connection at any time: retry once on a new one.
+      if (code > 0 || !reused) break;
+    }
+    if (status) *status = code;
+    if (code == HTTP_CODE_OK) return true;
+    if (code >= 300 && code < 400 && location.length()) {
+      if (location.startsWith("/")) {
+        next = String("https://") + host + location;
+      } else {
+        next = location;
+      }
+      continue;
+    }
+    if (code > 0) err = strf(kErrHttp, code);
     return false;
   }
-  body = http.getString();
-  http.end();
-  return true;
+  err = kErrRedirects;
+  return false;
 }
 
 bool parseResponse(const String &body, JsonDocument &doc, String &err) {
@@ -185,10 +294,53 @@ uint32_t parseColor(const char *s) {
   return strtoul(s + 1, nullptr, 16);
 }
 
-void parseEvents(JsonArray arr, uint8_t account, std::vector<Event> &out) {
+// What an event's calendar index ("c") points at. Published (ICS) calendars
+// take their name and color from the display's settings.
+struct CalRef {
+  String name;
+  uint32_t color;
+};
+
+std::vector<CalRef> calRefs(JsonArray arr, const Settings &s) {
+  std::vector<CalRef> out;
+  for (JsonObject c : arr) {
+    const int ics = c["ics"] | 0;
+    if (ics > 0 && ics <= (int)s.ics.size() && s.ics[ics - 1].label.length()) {
+      out.push_back({s.ics[ics - 1].label, s.ics[ics - 1].color});
+    } else if (ics > 0 && ics <= (int)s.ics.size()) {
+      out.push_back({c["name"] | "", s.ics[ics - 1].color});
+    } else {
+      out.push_back({c["name"] | "", parseColor(c["color"])});
+    }
+  }
+  return out;
+}
+
+void parseEvents(JsonArray arr, const std::vector<CalRef> &cals, uint8_t account, std::vector<Event> &out) {
   for (JsonObject e : arr) {
     Event ev;
     ev.account = account;
+    if (e["k"].is<const char *>()) {  // format 2
+      ev.key = e["k"] | "";
+      ev.start = e["s"].as<int64_t>();
+      ev.end = e["e"].as<int64_t>();
+      ev.allDay = e["a"] | false;
+      ev.title = e["t"] | "";
+      const int ci = e["c"] | -1;
+      if (ci >= 0 && ci < (int)cals.size()) {
+        ev.calendar = cals[ci].name;
+        ev.color = cals[ci].color;
+      } else {
+        ev.color = parseColor(nullptr);
+      }
+      ev.location = e["l"] | "";
+      ev.description = e["d"] | "";
+      ev.organizer = e["o"] | "";
+      ev.guests = e["g"] | 0;
+      ev.travelMin = e["tr"] | 0;
+      out.push_back(ev);
+      continue;
+    }
     ev.key = e["key"].as<String>();
     ev.start = e["start"].as<int64_t>();
     ev.end = e["end"].as<int64_t>();
@@ -216,6 +368,7 @@ void parseTasks(JsonArray arr, uint8_t account, std::vector<Task> &out) {
     task.dueKey = t["dueKey"].as<String>();
     task.notes = t["notes"].as<String>();
     task.parent = t["parent"].as<String>();
+    task.completedAt = t["at"].as<long>();
     out.push_back(task);
   }
 }
@@ -246,18 +399,38 @@ void parseFrequent(JsonArray arr, std::vector<String> &out) {
 
 // Everything in a feed besides events and tasks.
 struct Extras {
+  std::vector<Task> done;
   std::vector<TaskList> lists;
   std::vector<DateItem> dates;
   std::vector<String> frequent;
+  std::vector<IcsStatus> ics;  // from the first account's feed
+  bool hasIcs = false;
 };
 
 void sortDates(std::vector<DateItem> &dates) {
   std::stable_sort(dates.begin(), dates.end(), [](const DateItem &a, const DateItem &b) { return a.day < b.day; });
 }
 
-void parseCalendars(JsonArray arr, std::vector<CalendarInfo> &out) {
+void sortDone(std::vector<Task> &done) {
+  std::stable_sort(done.begin(), done.end(), [](const Task &a, const Task &b) { return a.completedAt > b.completedAt; });
+}
+
+// Google calendars go to `out` (the "choose calendars" list); published (ICS)
+// ones only report how their fetch went.
+void parseCalendars(JsonArray arr, std::vector<CalendarInfo> &out, std::vector<IcsStatus> *ics) {
   out.clear();
   for (JsonObject c : arr) {
+    const int idx = c["ics"] | 0;
+    if (idx > 0) {
+      if (ics && idx <= (int)ics->size()) {
+        IcsStatus &st = (*ics)[idx - 1];
+        st.synced = true;
+        st.events = c["n"] | 0;
+        st.name = c["name"] | "";
+        st.error = c["err"] | "";
+      }
+      continue;
+    }
     out.push_back({c["id"].as<String>(), c["name"].as<String>(), parseColor(c["color"]), c["shown"].as<bool>()});
   }
 }
@@ -294,18 +467,92 @@ void sortAndFilter(std::vector<Event> &events, std::vector<Task> &tasks) {
   });
 }
 
-// Applies one account's feed reply to the snapshot fields passed in.
-bool applyFeed(const String &body, uint8_t account, std::vector<Event> &events,
-               std::vector<Task> &tasks, Extras &extras, AccountStatus &status, String &err) {
+time_t addDays(time_t day, int n) {
+  struct tm tm;
+  localtime_r(&day, &tm);
+  tm.tm_mday += n;
+  tm.tm_hour = tm.tm_min = tm.tm_sec = 0;
+  tm.tm_isdst = -1;
+  return mktime(&tm);
+}
+
+// Monday 00:00 of this week, local time; 0 while the clock is not set.
+time_t thisMonday() {
+  const time_t now = time(nullptr);
+  if (now < kClockValid) return 0;
+  struct tm tm;
+  localtime_r(&now, &tm);
+  return addDays(now, -((tm.tm_wday + 6) % 7));
+}
+
+// Published calendars ride along with the first account's requests.
+String icsQuery(const Settings &s) {
+  String q;
+  for (const IcsCalendar &c : s.ics) {
+    if (c.url.length()) q += "&ics=" + urlEncode(c.url);
+  }
+  return q;
+}
+
+// The feed starts on this week's Monday and covers this week and the next, so
+// the week view needs no request of its own for them. `since` is the last
+// feed's fingerprint: an unchanged feed then answers {"same":true}.
+String feedQuery(const Settings &s, uint8_t account, int64_t from, const String &since) {
+  String q = kApiVersion;
+  if (from > 0) q += "&from=" + String((long long)from);
+  if (since.length()) q += "&since=" + urlEncode(since);
+  if (account == 0) q += icsQuery(s);
+  return q;
+}
+
+// True if every account's last feed holds all events of this week.
+bool weekCovered(const std::vector<AccountStatus> &accounts, time_t week) {
+  if (!week || accounts.empty()) return false;
+  const int64_t a = int64_t(week) * 1000, b = int64_t(addDays(week, 7)) * 1000;
+  for (const AccountStatus &st : accounts) {
+    if (!st.from || st.from > a || st.to < b) return false;
+  }
+  return true;
+}
+
+// Fills the week view from the feed. Call with the lock held.
+void weekFromFeed(time_t week) {
+  const int64_t a = int64_t(week) * 1000, b = int64_t(addDays(week, 7)) * 1000;
+  snapshot.week.clear();
+  for (const Event &ev : snapshot.events) {
+    if ((ev.end > a || ev.start >= a) && ev.start < b) snapshot.week.push_back(ev);
+  }
+  snapshot.weekStart = week;
+  snapshot.weekLoading = false;
+}
+
+// Applies one account's feed reply to the snapshot fields passed in. `same`
+// is set when the script says nothing changed since the fingerprint we sent.
+bool applyFeed(const String &body, const Settings &s, uint8_t account, std::vector<Event> &events,
+               std::vector<Task> &tasks, Extras &extras, AccountStatus &status, String &err, bool &same) {
+  same = false;
   JsonDocument doc;
   if (!parseResponse(body, doc, err)) return false;
-  parseEvents(doc["events"].as<JsonArray>(), account, events);
+  if (doc["same"] | false) {
+    same = true;
+    return true;
+  }
+  JsonArray calendars = doc["calendars"].as<JsonArray>();
+  parseEvents(doc["events"].as<JsonArray>(), calRefs(calendars, s), account, events);
   parseTasks(doc["tasks"].as<JsonArray>(), account, tasks);
+  parseTasks(doc["done"].as<JsonArray>(), account, extras.done);
   parseLists(doc["lists"].as<JsonArray>(), account, extras.lists);
   parseDates(doc["dates"].as<JsonArray>(), account, extras.dates);
   parseFrequent(doc["frequent"].as<JsonArray>(), extras.frequent);
-  parseCalendars(doc["calendars"].as<JsonArray>(), status.calendars);
+  if (account == 0) {
+    extras.ics.assign(s.ics.size(), IcsStatus());
+    extras.hasIcs = true;
+  }
+  parseCalendars(calendars, status.calendars, account == 0 ? &extras.ics : nullptr);
   status.email = doc["account"].as<String>();
+  status.hash = doc["hash"] | "";
+  status.from = doc["from"].as<int64_t>();
+  status.to = doc["to"].as<int64_t>();
   if (doc["utcOffsetMin"].is<int>()) applyUtcOffset(doc["utcOffsetMin"].as<int>());
   return true;
 }
@@ -320,8 +567,9 @@ void loadCache(const Settings &s) {
   bool any = false;
   for (uint8_t i = 0; i < s.accounts.size(); i++) {
     String body, err;
+    bool same;
     if (storage_read(cachePath(s.accounts[i]).c_str(), body) &&
-        applyFeed(body, i, events, tasks, extras, accounts[i], err)) {
+        applyFeed(body, s, i, events, tasks, extras, accounts[i], err, same)) {
       any = true;
     }
   }
@@ -331,37 +579,48 @@ void loadCache(const Settings &s) {
   sortDates(extras.dates);
   snapshot.events = std::move(events);
   snapshot.tasks = std::move(tasks);
+  sortDone(extras.done);
+  snapshot.done = std::move(extras.done);
   snapshot.lists = std::move(extras.lists);
   snapshot.dates = std::move(extras.dates);
   snapshot.frequent = std::move(extras.frequent);
   snapshot.accounts = std::move(accounts);
+  if (extras.hasIcs) snapshot.ics = std::move(extras.ics);
   snapshot.offline = true;
   snapshot.version++;
 }
 
-void fetchAll(const Settings &s) {
+// One request per account. With `full` false each account sends its last
+// fingerprint, and an unchanged account answers in a few bytes: nothing is
+// downloaded, parsed or written to the card for it.
+void fetchAll(const Settings &s, bool full) {
   const size_t n = s.accounts.size();
   std::vector<Event> events;
   std::vector<Task> tasks;
   Extras extras;
   std::vector<AccountStatus> accounts;
-  std::vector<bool> fetched(n, false);
+  std::vector<bool> fresh(n, false);  // new data arrived for this account
   {
     Guard g;
     accounts = snapshot.accounts;
   }
   accounts.resize(n);
+  const int64_t from = int64_t(thisMonday()) * 1000;
 
   String errors;
+  bool anyOk = false;
   for (uint8_t i = 0; i < n; i++) {
     String body, err;
     AccountStatus status = accounts[i];
-    if (httpGet(accountUrl(s.accounts[i], ""), body, err) &&
-        applyFeed(body, i, events, tasks, extras, status, err)) {
-      fetched[i] = true;
+    bool same = false;
+    const String since = full ? String() : status.hash;
+    if (httpGet(accountUrl(s.accounts[i], feedQuery(s, i, from, since)), body, err) &&
+        applyFeed(body, s, i, events, tasks, extras, status, err, same)) {
+      anyOk = true;
+      fresh[i] = !same;
       status.syncedAt = time(nullptr);
       status.error = "";
-      if (s.offlineCopy) storage_write(cachePath(s.accounts[i]).c_str(), body);
+      if (!same && s.offlineCopy) storage_write(cachePath(s.accounts[i]).c_str(), body);
     } else {
       status.error = err;
       if (errors.length()) errors += kErrJoin;
@@ -372,18 +631,21 @@ void fetchAll(const Settings &s) {
   }
 
   Guard g;
-  // Keep showing the last good data for any account that failed this time.
+  // Keep the last good data for any account that failed or did not change.
   for (const Event &ev : snapshot.events) {
-    if (ev.account < n && !fetched[ev.account]) events.push_back(ev);
+    if (ev.account < n && !fresh[ev.account]) events.push_back(ev);
   }
   for (const Task &t : snapshot.tasks) {
-    if (t.account < n && !fetched[t.account]) tasks.push_back(t);
+    if (t.account < n && !fresh[t.account]) tasks.push_back(t);
+  }
+  for (const Task &t : snapshot.done) {
+    if (t.account < n && !fresh[t.account]) extras.done.push_back(t);
   }
   for (const TaskList &l : snapshot.lists) {
-    if (l.account < n && !fetched[l.account]) extras.lists.push_back(l);
+    if (l.account < n && !fresh[l.account]) extras.lists.push_back(l);
   }
   for (const DateItem &d : snapshot.dates) {
-    if (d.account < n && !fetched[d.account]) extras.dates.push_back(d);
+    if (d.account < n && !fresh[d.account]) extras.dates.push_back(d);
   }
   if (extras.frequent.empty()) extras.frequent = snapshot.frequent;
   // Actions that have been sent are reflected in this fetch; forget them.
@@ -395,29 +657,46 @@ void fetchAll(const Settings &s) {
 
   snapshot.events = std::move(events);
   snapshot.tasks = std::move(tasks);
+  sortDone(extras.done);
+  snapshot.done = std::move(extras.done);
   snapshot.lists = std::move(extras.lists);
   snapshot.dates = std::move(extras.dates);
   snapshot.frequent = std::move(extras.frequent);
   snapshot.accounts = std::move(accounts);
+  if (extras.hasIcs) snapshot.ics = std::move(extras.ics);
+  snapshot.ics.resize(s.ics.size());
   snapshot.error = errors;
   if (!errors.length()) {
     snapshot.syncedAt = time(nullptr);
     snapshot.offline = false;
+  } else if (!anyOk && (snapshot.events.size() || snapshot.tasks.size())) {
+    snapshot.offline = true;  // every account failed: what is shown is an older copy
   }
+  const time_t week = weekRequested;
+  if (weekCovered(snapshot.accounts, week)) weekFromFeed(week);
   snapshot.version++;
 }
 
+// The feed about to run will hold this week (this week or the next one).
+bool feedWillCover(time_t week) {
+  const time_t monday = thisMonday();
+  return monday && (week == monday || week == addDays(monday, 7));
+}
+
+// A week the feed does not cover: one range request per account.
 void fetchWeek(const Settings &s, time_t weekStart) {
   const int64_t from = int64_t(weekStart) * 1000;
-  const int64_t to = from + 7LL * 86400 * 1000;
-  const String query = "action=range&from=" + String((long long)from) + "&to=" + String((long long)to);
+  const int64_t to = int64_t(addDays(weekStart, 7)) * 1000;
+  String query = String(kApiVersion) + "&action=range&from=" + String((long long)from) + "&to=" + String((long long)to);
   std::vector<Event> events;
   String errors;
   for (uint8_t i = 0; i < s.accounts.size(); i++) {
     String body, err;
     JsonDocument doc;
-    if (httpGet(accountUrl(s.accounts[i], query), body, err) && parseResponse(body, doc, err)) {
-      parseEvents(doc["events"].as<JsonArray>(), i, events);
+    String q = query;
+    if (i == 0) q += icsQuery(s);
+    if (httpGet(accountUrl(s.accounts[i], q), body, err) && parseResponse(body, doc, err)) {
+      parseEvents(doc["events"].as<JsonArray>(), calRefs(doc["calendars"].as<JsonArray>(), s), i, events);
     } else {
       if (errors.length()) errors += kErrJoin;
       errors += strf(kErrAccount, s.accounts[i].label.c_str(), err.c_str());
@@ -569,6 +848,11 @@ void workerLoop(void *) {
       for (size_t i = 0; !accountsChanged && i < next.accounts.size(); i++) {
         accountsChanged = next.accounts[i].url != s.accounts[i].url || next.accounts[i].token != s.accounts[i].token;
       }
+      bool icsChanged = next.ics.size() != s.ics.size();
+      for (size_t i = 0; !icsChanged && i < next.ics.size(); i++) {
+        icsChanged = next.ics[i].url != s.ics[i].url || next.ics[i].label != s.ics[i].label ||
+                     next.ics[i].color != s.ics[i].color;
+      }
       s = next;
       if (accountsChanged) {
         // Indexes moved; start clean rather than mislabel items.
@@ -577,11 +861,18 @@ void workerLoop(void *) {
         snapshot.tasks.clear();
         snapshot.week.clear();
         snapshot.accounts.assign(s.accounts.size(), AccountStatus());
+        snapshot.ics.assign(s.ics.size(), IcsStatus());
         hidden.clear();
         pending.clear();
         addedIds.clear();
         snapshot.version++;
         refreshRequested = true;
+      } else if (icsChanged) {
+        Guard g;
+        snapshot.ics.assign(s.ics.size(), IcsStatus());
+        snapshot.version++;
+        refreshRequested = true;
+        fullRequested = true;
       }
     }
 
@@ -595,21 +886,42 @@ void workerLoop(void *) {
           tzset();
         }
         clockSet = true;
+        // The first feed asks for this week from Monday, so give NTP a moment.
+        for (int i = 0; i < 40 && time(nullptr) < kClockValid; i++) delay(100);
       }
       const bool acted = runPendingActions(s);
       const bool due = lastFetch == 0 || millis() - lastFetch >= s.refreshMinutes * 60000UL;
-      if (s.accounts.size() && (acted || due || refreshRequested)) {
-        refreshRequested = false;
-        fetchAll(s);
-        lastFetch = millis();
-      }
+      const bool fetch = s.accounts.size() && (acted || due || refreshRequested);
       const time_t week = weekRequested;
       bool needWeek;
       {
         Guard g;
         needWeek = week && snapshot.weekLoading;
       }
-      if (needWeek) fetchWeek(s, week);
+      // A week the user is waiting for goes first, unless the feed about to
+      // run holds it anyway.
+      if (needWeek && !(fetch && feedWillCover(week))) {
+        fetchWeek(s, week);
+        needWeek = false;
+      }
+      if (fetch) {
+        // After a tap (or "Sync now") take the whole feed, so nothing local
+        // is kept that the server no longer has.
+        const bool full = acted || fullRequested;
+        refreshRequested = false;
+        fullRequested = false;
+        fetchAll(s, full);
+        lastFetch = millis();
+      }
+      if (needWeek) {
+        bool still;
+        {
+          Guard g;
+          still = weekRequested == week && snapshot.weekLoading;
+        }
+        if (still) fetchWeek(s, week);
+      }
+      closeIdleConnections();
     }
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(up ? kIdleLoopMs : kOfflineLoopMs));
   }
@@ -623,7 +935,9 @@ void wake() {
 
 void sync_start() {
   lock = xSemaphoreCreateMutex();
-  snapshot.accounts.resize(settings_get().accounts.size());
+  const Settings s = settings_get();
+  snapshot.accounts.resize(s.accounts.size());
+  snapshot.ics.resize(s.ics.size());
   // Core 0 alongside the Wi-Fi stack; LVGL runs in loop() on core 1.
   xTaskCreatePinnedToCore(workerLoop, "sync", kTaskStack, nullptr, 1, &worker, 0);
 }
@@ -637,17 +951,25 @@ bool sync_get_if_newer(uint32_t version, Snapshot &out) {
 
 void sync_refresh() {
   refreshRequested = true;
+  fullRequested = true;
   wake();
 }
 
 void sync_request_week(time_t weekStart) {
+  bool loading;
   {
     Guard g;
     weekRequested = weekStart;
-    snapshot.weekLoading = true;
+    // This week and the next are in the feed (or the SD copy of it): no wait.
+    if (weekCovered(snapshot.accounts, weekStart)) {
+      weekFromFeed(weekStart);
+    } else {
+      snapshot.weekLoading = true;
+    }
+    loading = snapshot.weekLoading;
     snapshot.version++;
   }
-  wake();
+  if (loading) wake();
 }
 
 void sync_dismiss_event(const Event &ev) {
@@ -678,6 +1000,9 @@ void sync_complete_task(const Task &task) {
       return t.account == task.account && t.id == task.id;
     }), list.end());
     hidden[hk] = false;
+    Task done = task;
+    done.completedAt = time(nullptr);
+    snapshot.done.insert(snapshot.done.begin(), done);
     pending.push_back({ActionType::Complete, task.account, hk, "action=complete", task.id, task.listId});
     snapshot.version++;
   }
@@ -698,7 +1023,11 @@ void sync_uncomplete_task(const Task &task) {
       pending.push_back({ActionType::Uncomplete, task.account, "", "action=uncomplete", task.id, task.listId});
     }
     hidden.erase(hk);
+    snapshot.done.erase(std::remove_if(snapshot.done.begin(), snapshot.done.end(), [&](const Task &t) {
+      return t.account == task.account && t.id == task.id;
+    }), snapshot.done.end());
     snapshot.tasks.push_back(task);
+    snapshot.tasks.back().completedAt = 0;
     std::vector<Event> none;
     sortAndFilter(none, snapshot.tasks);
     snapshot.version++;

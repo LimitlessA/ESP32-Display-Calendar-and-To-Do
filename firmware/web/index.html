@@ -76,15 +76,15 @@ nav button.on{border-top-color:var(--ac)}
 <li>Run <b>preview</b> once to allow access, then Deploy &rsaquo; New deployment &rsaquo; Web app (Execute as: Me, Access: Anyone).</li>
 <li>Paste the web app URL and the token here.</li></ol></details></div>
 
-<div class=c><h2>Outlook, iCloud &amp; other (ICS)</h2><p class="st wn" id=in hidden>This firmware can't show ICS calendars yet. Update it on the Device tab.</p><div id=il></div>
-<div id=ifs><form id=if><label for=ip>Provider</label><select id=ip name=provider><option value=outlook>Outlook<option value=icloud>iCloud<option value=other>Other</select>
-<label for=iname>Name shown on the display</label><input id=iname name=label maxlength=20 placeholder="Football club" required>
-<label for=iu>Calendar link (ICS)</label><input id=iu name=url placeholder="https://... or webcal://..." required>
+<div class=c><h2>Outlook, iCloud &amp; other (ICS)</h2><div id=il></div>
+<form id=if><label for=iname>Name shown on the display</label><input id=iname name=label maxlength=20 placeholder="Work (Outlook)" required>
+<label for=iu>Calendar link (ICS)</label><input id=iu name=url placeholder="https://... or webcal://..." required pattern="(https?|webcal)://.+">
 <button class=b>Add calendar</button><p class=msg id=im></p></form>
 <details><summary>Where to find the link</summary><ol>
 <li><b>Outlook</b>: Settings &rsaquo; Calendar &rsaquo; Shared calendars &rsaquo; Publish a calendar, then copy the ICS link.</li>
 <li><b>iCloud</b>: in the Calendar app, share the calendar as a Public Calendar and copy the link.</li>
-<li><b>Other</b>: any link ending in <code>.ics</code> or starting with <code>webcal://</code>.</li></ol></details></div></div>
+<li><b>Other</b>: any link ending in <code>.ics</code> or starting with <code>webcal://</code>.</li></ol>
+The first Google account's script reads these links, so add a Google account first.</details></div>
 </section>
 
 <section class=pane id=p2>
@@ -96,7 +96,7 @@ nav button.on{border-top-color:var(--ac)}
 <button class=b>Save desk</button><button class="b s" type=button id=dt>Test connection</button><p class=msg id=dm></p></form></div>
 
 <div class=c><h2>Sync interval</h2><p class=m>How often calendars and tasks refresh from the internet.</p>
-<form id=sf><label for=si>Refresh</label><select id=si name=minutes><option value=5>Every 5 minutes<option value=10>Every 10 minutes<option value=15>Every 15 minutes<option value=30>Every 30 minutes<option value=60>Every hour</select>
+<form id=sf><label for=si>Refresh</label><select id=si name=minutes><option value=2>Every 2 minutes<option value=3>Every 3 minutes<option value=5>Every 5 minutes<option value=10>Every 10 minutes<option value=15>Every 15 minutes<option value=30>Every 30 minutes</select>
 <button class=b>Save</button><p class=msg id=sm></p></form></div>
 </section>
 
@@ -143,11 +143,10 @@ function render(d,fill){
   return row(a.color,a.label,a.error||(a.synced?'Synced'+(a.email?' · '+a.email:''):'Not synced yet'),a.error?'er':a.synced?'ok':'',
    '/account/remove',i,$('gm'))});
  $('gf').querySelector('button').disabled=d.accounts.length>=d.maxAccounts;
- // TODO(ics): needs "ics" in /state, [{label, provider, events, error}], plus /ics/add and /ics/remove.
- $('in').hidden=!!d.ics;$('ifs').hidden=!d.ics;
- list('il',d.ics||[],d.ics?'No ICS calendars yet.':'',function(c,i){
-  var n={outlook:'Outlook',icloud:'iCloud'}[c.provider]||'Other';
-  return row(c.color||'#6C8CFF',c.label,c.error||(c.events!=null?c.events+' events · ':'')+n,c.error?'er':'ok','/ics/remove',i,$('im'))});
+ $('if').querySelector('button').disabled=d.ics.length>=d.maxIcs;
+ list('il',d.ics,'No published calendars yet.',function(c,i){
+  return row(c.color,c.label,c.error||(c.synced?'Synced \u00b7 '+c.events+' events'+(c.name&&c.name!=c.label?' \u00b7 '+c.name:''):'Not synced yet'),
+   c.error?'er':c.synced?'ok':'','/ics/remove',i,$('im'))});
  s=$('ds');s.textContent='';
  if(!k.on)s.appendChild(el('p','st wn','Desk control is off. Turn it on at the display: Settings › Features › Smart desk.'));
  else s.appendChild(el('p','st '+(k.online?'ok':'er'),k.online?'Connected'+(k.loggedIn?', logged in':k.user?', login refused':', as guest'):'Not reachable'+(k.error?': '+k.error:'')));
@@ -161,7 +160,6 @@ function render(d,fill){
  if(o.state=='installing')s.appendChild(el('p','st','Installing: '+o.progress+'%'));
  if(o.state=='failed'&&o.msg)s.appendChild(el('p','st er','Last update failed: '+o.msg));
  if(fill){$('dh').value=k.host;$('du').value=k.user;$('uu').value=d.updateUrl;
-  // TODO(sync): saved with POST /settings/sync, minutes=N (Settings::refreshMinutes). Route not added yet.
   s=$('si');if(d.refresh&&!s.querySelector('[value="'+d.refresh+'"]'))s.appendChild(new Option('Every '+d.refresh+' minutes',d.refresh));s.value=d.refresh}}
 function load(fill){return fetch('/state').then(function(r){return r.json()}).then(function(d){render(d,fill===true)})
  .catch(function(){$('hv').innerHTML='<span class=er>Display not reachable</span>'})}

@@ -29,6 +29,7 @@ struct Task {
   String dueKey;     // yyyy-MM-dd, empty if no due date
   String notes;
   String parent;     // parent task id for subtasks
+  time_t completedAt = 0;  // Done tab only: when it was completed
 };
 
 // A Google Tasks list, for picking where quick add puts a task.
@@ -60,15 +61,28 @@ struct AccountStatus {
   time_t syncedAt = 0;
   String error;
   std::vector<CalendarInfo> calendars;
+  String hash;       // feed fingerprint; sent back so an unchanged feed answers in a few bytes
+  int64_t from = 0;  // the feed holds every event between these (epoch ms), so the
+  int64_t to = 0;    // week view can show those weeks without asking again
+};
+
+// A published (ICS) calendar from Settings::ics, fetched by the first account's script.
+struct IcsStatus {
+  bool synced = false;
+  uint16_t events = 0;  // in the feed's window
+  String name;          // the calendar's own name (X-WR-CALNAME), if it has one
+  String error;
 };
 
 struct Snapshot {
   std::vector<Event> events;          // next 7 days, all accounts merged, by start
   std::vector<Task> tasks;            // all accounts, dated first then undated
   std::vector<AccountStatus> accounts;  // same order as Settings::accounts
+  std::vector<Task> done;             // completed in the last 7 days, newest first
   std::vector<TaskList> lists;        // every account's task lists
   std::vector<DateItem> dates;        // next 60 days, by day, duplicates across accounts removed
   std::vector<String> frequent;       // most often completed task titles, for quick add
+  std::vector<IcsStatus> ics;         // same order as Settings::ics
 
   time_t weekStart = 0;               // local midnight of the week view's Monday
   std::vector<Event> week;            // events for that week
