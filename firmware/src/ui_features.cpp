@@ -1,6 +1,5 @@
 // Settings > Features (round 7, design C): a grid of tiles, one per feature. A tap turns
 // the feature on or off; holding a tile opens its options, including its layout A, B or C.
-// Layout presets sit in a row above the grid.
 #include "presence.h"
 #include "sensors.h"
 #include "ui_internal.h"
@@ -12,7 +11,6 @@ namespace {
 constexpr const char *kTitle = "Features";
 constexpr const char *kOnCount = "%d of %d on";
 constexpr const char *kHint = "Tap to turn on/off \xC2\xB7 hold for options";
-constexpr const char *kPresetsCaption = "LAYOUTS";
 constexpr const char *kDone = "Done";
 constexpr const char *kLayoutRow = "Layout";
 constexpr const char *kOptionRow = "When";
@@ -24,10 +22,6 @@ constexpr const char *kDeskLogin = "Desk address, login and connection test";
 constexpr const char *kPair = "Pair a phone";
 constexpr const char *kForget = "Forget";
 constexpr const char *kForgotten = "Paired phones removed. Also remove \"Calendar display\" in your phone's Bluetooth settings.";
-constexpr const char *kPresetPicks = "Your picks";
-constexpr const char *kPresetA = "All A";
-constexpr const char *kPresetB = "All B";
-constexpr const char *kPresetC = "All C";
 constexpr const char *kVariant = "%s \xC2\xB7 %s";  // letter, layout name
 constexpr const char *kLetters[] = {"A", "B", "C"};
 
@@ -79,7 +73,6 @@ const Feature kFeatures[] = {
     {"Offline copy", "Keep the last sync on the TF card", &Settings::offlineCopy, Opt::None, -1},
 };
 constexpr int kFeatureCount = sizeof(kFeatures) / sizeof(kFeatures[0]);
-constexpr const char *kNoSensor = "No sensor";
 constexpr const char *kNeedsLightSensor = "Needs a BH1750 light sensor on I2C";
 
 constexpr const char *kMinutes = "%d min";
@@ -87,12 +80,12 @@ constexpr const char *kMoney = "\u20AC%d";
 
 constexpr int BODY_Y = HEADER_H + GAP;
 constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
-constexpr int PRESETS_H = 36;
+constexpr int HINT_H = 16;
 constexpr int COLS = 5;
 constexpr int TILE_GAP = 8;
 constexpr int TILE_W = (SCREEN_W - 2 * PAD - (COLS - 1) * TILE_GAP) / COLS;
 constexpr int ROWS = (kFeatureCount + COLS - 1) / COLS;
-constexpr int GRID_H = BODY_H - PRESETS_H - TILE_GAP;
+constexpr int GRID_H = BODY_H - HINT_H - TILE_GAP;
 constexpr int TILE_H = (GRID_H - (ROWS - 1) * TILE_GAP) / ROWS;  // every tile on one screen, no scrolling
 constexpr int DIALOG_W = 640;
 constexpr int INNER_W = DIALOG_W - 56;
@@ -269,38 +262,11 @@ lv_obj_t *textColumn(lv_obj_t *parent, int i, int w) {
   return col;
 }
 
-// The grid: a tap toggles, holding opens the options.
+// The grid: a tap toggles, holding opens the options (and the layout).
 void buildGrid() {
   const Theme &t = theme();
-  lv_obj_t *presets = mk_box(body, 0, 0);
-  lv_obj_set_style_bg_opa(presets, LV_OPA_TRANSP, 0);
-  lv_obj_set_size(presets, SCREEN_W - 2 * PAD, PRESETS_H);
-  set_flex(presets, LV_FLEX_FLOW_ROW, 8);
-  lv_obj_t *cap = mk_label(presets, &font_12, t.muted, kPresetsCaption);
-  lv_obj_set_style_text_letter_space(cap, 1, 0);
-  // Presets, like a set of themes for the layouts.
-  static uint8_t kAllA[kLayoutCount], kAllB[kLayoutCount], kAllC[kLayoutCount];
-  memset(kAllA, 0, kLayoutCount);
-  memset(kAllB, 1, kLayoutCount);
-  memset(kAllC, 2, kLayoutCount);
-  static const struct {
-    const char *name;
-    const uint8_t *values;
-  } kPresets[] = {{kPresetPicks, kDefaultLayouts}, {kPresetA, kAllA}, {kPresetB, kAllB}, {kPresetC, kAllC}};
-  for (const auto &p : kPresets) {
-    const bool on = memcmp(g_settings.layouts, p.values, kLayoutCount) == 0;
-    on_click(mk_chip(presets, p.name, on, PRESETS_H), [](lv_event_t *e) {
-      lv_async_call([](void *p) {
-        flushPending();
-        Settings s = g_settings;
-        memcpy(s.layouts, p, sizeof(s.layouts));
-        ui_save_settings(s);  // rebuilds the screens, this one too
-      }, lv_event_get_user_data(e));
-    }, (void *)p.values);
-  }
-  lv_obj_t *hint = mk_label(presets, &font_12, t.muted, kHint);
-  lv_obj_set_flex_grow(hint, 1);
-  lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_obj_t *hint = mk_label(body, &font_12, t.muted, kHint);
+  lv_obj_set_height(hint, HINT_H);
 
   lv_obj_t *grid = mk_box(body, 0, 0);
   lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
@@ -308,30 +274,14 @@ void buildGrid() {
   set_flex(grid, LV_FLEX_FLOW_ROW_WRAP, TILE_GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_set_style_pad_row(grid, TILE_GAP, 0);
   for (int i = 0; i < kFeatureCount; i++) {
-    const Feature &f = kFeatures[i];
     const bool on = isOn(i);
     lv_obj_t *tile = mk_button(grid, t.card, 14);
     lv_obj_set_size(tile, TILE_W, TILE_H);
     lv_obj_set_style_pad_hor(tile, 12, 0);
-    lv_obj_set_style_pad_ver(tile, 10, 0);
-    set_flex(tile, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START);
-    lv_obj_t *name = mk_label(tile, &font_14b, on ? t.text : t.muted, f.name);
+    lv_obj_t *name = mk_label(tile, &font_14b, on ? t.text : t.muted, kFeatures[i].name);
     lv_obj_set_width(name, TILE_W - 24);  // two lines at most
-    // Below: the current layout letter (or why it cannot be on), and the on/off dot.
-    lv_obj_t *foot = mk_box(tile, 0, 0);
-    lv_obj_set_style_bg_opa(foot, LV_OPA_TRANSP, 0);
-    lv_obj_set_size(foot, lv_pct(100), 20);
-    set_flex(foot, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
-    if (!available(i)) {
-      mk_label(foot, &font_12, t.warnFg, kNoSensor);
-    } else if (f.layout >= 0) {
-      lv_obj_t *pill = mk_box(foot, on ? t.accent : t.raised, 10);
-      lv_obj_set_size(pill, 26, 20);
-      lv_obj_center(mk_label(pill, &font_12, on ? t.onAccent : t.muted, kLetters[g_settings.layouts[f.layout]]));
-    } else {
-      mk_box(foot, 0, 0);  // keeps the dot on the right
-    }
-    mk_dot(foot, on ? t.good : t.line, 10);
+    lv_obj_align(name, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_align(mk_dot(tile, on ? t.good : t.line, 10), LV_ALIGN_TOP_RIGHT, 2, 0);
     // LVGL sends SHORT_CLICKED only when the press was not a long press.
     lv_obj_add_event_cb(tile, [](lv_event_t *e) {
       const int i = (intptr_t)lv_event_get_user_data(e);
