@@ -1,12 +1,19 @@
+#include <ArduinoJson.h>
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp_ota_ops.h>
 
 #include "config.h"
+#include "desk.h"
 #include "ota.h"
+#include "psram.h"
 #include "settings.h"
 #include "sync.h"
 #include "web.h"
+#include "web_page.h"
+#include "wifi_mgr.h"
+#include "harness.h"
 
 namespace {
 
@@ -24,81 +31,20 @@ constexpr const char *kTooMany = "Too many accounts";
 constexpr const char *kAdded = "Account added. It syncs within a few seconds.";
 constexpr const char *kRemoved = "Account removed.";
 constexpr const char *kLinkSaved = "Update link saved.";
+constexpr const char *kBadIcs = "The calendar link should start with https://, http:// or webcal://";
+constexpr const char *kTooManyIcs = "Too many calendar links";
+constexpr const char *kIcsAdded = "Calendar added. It shows up with the next sync.";
+constexpr const char *kIcsRemoved = "Calendar removed.";
+constexpr const char *kSyncSaved = "Sync interval saved.";
 constexpr const char *kDeskSaved = "Desk settings saved. Turn the desk on in Settings > Features > Smart desk.";
 constexpr const char *kInstalled = "Installed. The display is restarting.";
 constexpr const char *kUpdateFailed = "Update failed: ";
 constexpr const char *kInterrupted = "upload interrupted";
 constexpr const char *kNotFound = "Not found";
 
-// The setup page, top to bottom
-const char kPageStart[] PROGMEM =
-    "<!doctype html><html lang=en><head><meta charset=utf-8>"
-    "<meta name=viewport content='width=device-width,initial-scale=1'>"
-    "<title>Calendar display</title><style>";
-const char kStyle[] PROGMEM = R"(
-body{margin:0;background:#101317;color:#F1F3F6;font:16px/1.45 system-ui,sans-serif}
-main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
-h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:28px 0 10px}
-p,li{color:#C3CAD3}a{color:#F5A524}
-.card{background:#1C2229;border-radius:14px;padding:14px 16px;margin:10px 0}
-.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.dot{width:14px;height:14px;border-radius:7px;flex:none}
-.muted{color:#A9B1BC;font-size:14px}.err{color:#FFB4AB}.ok{color:#B8F0C4}
-label{display:block;font-size:14px;color:#A9B1BC;margin:10px 0 4px}
-input{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid #3A434E;background:#101317;color:#F1F3F6;font:inherit}
-button{padding:12px 18px;border-radius:22px;border:0;background:#F5A524;color:#101317;font:600 15px system-ui,sans-serif;cursor:pointer;margin-top:12px}
-button.ghost{background:#262D36;color:#F1F3F6;margin:0}
-.msg{background:#1E3A26;color:#B8F0C4;padding:10px 14px;border-radius:10px}
-)";
-const char kPageTitle[] PROGMEM =
-    "</style></head><body><main><h1>Calendar display</h1><p class=muted>Firmware " FIRMWARE_VERSION " &middot; ";
-const char kAccountsHeading[] PROGMEM = "<h2>Google accounts</h2>";
-const char kNoAccounts[] PROGMEM = "<p>No accounts yet. Add one below.</p>";
-constexpr const char *kNotSynced = "not synced yet";
-constexpr const char *kSynced = "Synced";
-constexpr const char *kRemove = "Remove";
-const char kAddSection[] PROGMEM =
-    "<h2>Add an account</h2><div class=card><ol>"
-    "<li>Sign in to the Google account at <a href='https://script.google.com/create' target=_blank>script.google.com</a> and create a project.</li>"
-    "<li>Paste <b>Code.gs</b> and <b>appsscript.json</b> from the repository's <code>apps-script</code> folder and set your own TOKEN.</li>"
-    "<li>Run <b>preview</b> once to allow access, then Deploy &rsaquo; New deployment &rsaquo; Web app (Execute as: Me, Access: Anyone).</li>"
-    "<li>Paste the web app URL and the token here.</li></ol>"
-    "<form method=post action=/account/add>"
-    "<label for=label>Name shown on the display</label><input id=label name=label placeholder='Personal' maxlength=20 required>"
-    "<label for=url>Web app URL</label><input id=url name=url placeholder='https://script.google.com/macros/s/.../exec' required>"
-    "<label for=token>Token</label><input id=token name=token required>"
-    "<label for=pin1>PIN from the display</label><input id=pin1 name=pin inputmode=numeric required>"
-    "<button>Add account</button></form></div>";
-// Smart desk: address and the desk web UI login. Values go between the parts.
-const char kDeskStart[] PROGMEM =
-    "<h2>Smart desk</h2><div class=card><p>The display talks to the desk's own web UI. "
-    "Without a login only the memory buttons and Stop work; raise, lower, the sit/stand timer and "
-    "away mode need a desk account with the <b>user</b> role.</p>"
-    "<form method=post action=/settings/desk>"
-    "<label for=dhost>Desk address</label><input id=dhost name=host placeholder='smartdesk-a43c.local' value='";
-const char kDeskUser[] PROGMEM = "'><label for=duser>Desk username (optional)</label><input id=duser name=user autocomplete=off value='";
-const char kDeskEnd[] PROGMEM =
-    "'><label for=dpass>Desk password</label><input id=dpass name=pass type=password autocomplete=new-password "
-    "placeholder='unchanged if empty'>"
-    "<label for=pin4>PIN from the display</label><input id=pin4 name=pin inputmode=numeric required>"
-    "<button>Save desk</button></form></div>";
-const char kFirmwareSection[] PROGMEM =
-    "<h2>Firmware update</h2><div class=card><p>New versions install by themselves (Settings &rsaquo; Auto-update). "
-    "To install one by hand, upload a <b>firmware.bin</b> from a GitHub release or build. "
-    "The display restarts by itself when it is done.</p>"
-    "<form method=post enctype=multipart/form-data id=up>"
-    "<label for=fw>Firmware file</label><input id=fw type=file name=fw accept='.bin' required>"
-    "<label for=pin2>PIN from the display</label><input id=pin2 name=pin inputmode=numeric required>"
-    "<button>Upload and install</button></form>"
-    "<script>up.onsubmit=function(){up.action='/update?pin='+encodeURIComponent(pin2.value)}</script></div>"
-    "<div class=card><p>Where the display looks for new versions (a <code>manifest.json</code>). "
-    "Leave it as it is unless you host the firmware somewhere else.</p>"
-    "<form method=post action=/settings/update-url>"
-    "<label for=uurl>Update link</label><input id=uurl name=url value='";
-const char kPageEnd[] PROGMEM =
-    "' placeholder='https://.../manifest.json'>"
-    "<label for=pin3>PIN from the display</label><input id=pin3 name=pin inputmode=numeric required>"
-    "<button>Save link</button></form></div></main></body></html>";
+constexpr const char *kPinOk = "PIN OK.";
+constexpr const char *kLocked = "Too many wrong PINs. Wait a minute, then try again.";
+constexpr const char *kTesting = "Testing the desk...";
 
 // ---- State -------------------------------------------------------------------
 
@@ -109,20 +55,6 @@ uint8_t wrongPins = 0;
 uint32_t lockedUntil = 0;
 
 // ---- Code --------------------------------------------------------------------
-
-String esc(const String &s) {
-  String out;
-  out.reserve(s.length() + 8);
-  for (size_t i = 0; i < s.length(); i++) {
-    const char c = s[i];
-    if (c == '&') out += "&amp;";
-    else if (c == '<') out += "&lt;";
-    else if (c == '>') out += "&gt;";
-    else if (c == '"') out += "&quot;";
-    else out += c;
-  }
-  return out;
-}
 
 String hex(uint32_t c) {
   char buf[8];
@@ -146,54 +78,110 @@ bool checkPin(const String &given) {
 
 bool pinOk() {
   if (checkPin(server.arg("pin"))) return true;
-  server.send(403, "text/plain", kWrongPin);
+  if (millis() < lockedUntil) server.send(429, "text/plain", kLocked);
+  else server.send(403, "text/plain", kWrongPin);
   return false;
 }
 
-void redirectHome(const String &msg = "") {
-  server.sendHeader("Location", msg.length() ? "/?msg=" + msg : "/");
-  server.send(303);
+// The page posts with fetch() and shows the reply text next to the form.
+void reply(const char *msg) {
+  server.send(200, "text/plain", msg);
 }
 
+void sendJson(const JsonDocument &doc) {
+  String out;
+  serializeJson(doc, out);
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", out);
+}
 
+// The page itself never changes at run time (web/index.html, gzipped into web_page.h):
+// everything it shows comes from /state.
 void handleRoot() {
+  server.sendHeader("Content-Encoding", "gzip");
+  server.sendHeader("Cache-Control", "no-cache");
+  server.send_P(200, "text/html", reinterpret_cast<PGM_P>(kWebPage), kWebPageSize);
+}
+
+const char *otaStateName(OtaState s) {
+  switch (s) {
+    case OtaState::Checking: return "checking";
+    case OtaState::UpToDate: return "uptodate";
+    case OtaState::Available: return "available";
+    case OtaState::Installing: return "installing";
+    case OtaState::Done: return "done";
+    case OtaState::Failed: return "failed";
+    default: return "idle";
+  }
+}
+
+// What the page shows. No PIN needed, like the old page; tokens and passwords are left out.
+void handleState() {
   const Settings s = settings_get();
   Snapshot snap;
   sync_get_if_newer(UINT32_MAX, snap);
+  const DeskStatus desk = desk_status();
+  const OtaStatus ota = ota_status();
+  const esp_partition_t *slot = esp_ota_get_next_update_partition(nullptr);
 
-  String h;
-  h.reserve(8000);
-  h += FPSTR(kPageStart);
-  h += FPSTR(kStyle);
-  h += FPSTR(kPageTitle);
-  h += esc(WiFi.localIP().toString());
-  h += F("</p>");
-  if (server.hasArg("msg")) h += "<p class=msg>" + esc(server.arg("msg")) + "</p>";
+  JsonDocument doc(psram_json());
+  doc["v"] = FIRMWARE_VERSION;
+  doc["host"] = HOSTNAME ".local";
+  doc["maxAccounts"] = MAX_ACCOUNTS;
+  doc["maxImage"] = slot ? slot->size : 0;
 
-  h += FPSTR(kAccountsHeading);
-  if (s.accounts.empty()) h += FPSTR(kNoAccounts);
+  JsonObject wifi = doc["wifi"].to<JsonObject>();
+  wifi["ok"] = WiFi.status() == WL_CONNECTED;
+  wifi["ssid"] = wifi_ssid();
+  wifi["rssi"] = wifi_rssi();
+  wifi["ip"] = wifi_ip();
+
+  JsonArray accounts = doc["accounts"].to<JsonArray>();
   for (size_t i = 0; i < s.accounts.size(); i++) {
-    const Account &a = s.accounts[i];
     const AccountStatus st = i < snap.accounts.size() ? snap.accounts[i] : AccountStatus();
-    h += "<div class='card row'><span class=dot style='background:" + hex(a.color) + "'></span><div style='flex:1;min-width:200px'><b>" +
-         esc(a.label) + "</b><div class=muted>" + esc(st.email.length() ? st.email : String(kNotSynced)) + "</div>";
-    if (st.error.length()) h += "<div class=err>" + esc(st.error) + "</div>";
-    else if (st.syncedAt) h += "<div class=ok>" + String(kSynced) + "</div>";
-    h += "</div><form method=post action=/account/remove class=row><input type=hidden name=i value=" + String(i) +
-         "><input name=pin placeholder=PIN inputmode=numeric style='width:110px' aria-label=PIN required>"
-         "<button class=ghost>" + String(kRemove) + "</button></form></div>";
+    JsonObject a = accounts.add<JsonObject>();
+    a["label"] = s.accounts[i].label;
+    a["color"] = hex(s.accounts[i].color);
+    a["email"] = st.email;
+    a["synced"] = st.syncedAt != 0;
+    a["error"] = st.error;
   }
+  // Published calendars; the page has no provider field to store, it is only a hint there.
+  JsonArray ics = doc["ics"].to<JsonArray>();
+  for (size_t i = 0; i < s.ics.size(); i++) {
+    const IcsStatus st = i < snap.ics.size() ? snap.ics[i] : IcsStatus();
+    JsonObject c = ics.add<JsonObject>();
+    c["label"] = s.ics[i].label;
+    c["color"] = hex(s.ics[i].color);
+    c["name"] = st.name;
+    c["synced"] = st.synced;
+    c["events"] = st.events;
+    c["error"] = st.error;
+  }
+  doc["maxIcs"] = kMaxIcs;
 
-  h += FPSTR(kAddSection);
-  h += FPSTR(kDeskStart);
-  h += esc(s.deskHost);
-  h += FPSTR(kDeskUser);
-  h += esc(s.deskUser);
-  h += FPSTR(kDeskEnd);
-  h += FPSTR(kFirmwareSection);
-  h += esc(s.updateUrl);
-  h += FPSTR(kPageEnd);
-  server.send(200, "text/html", h);
+  JsonObject d = doc["desk"].to<JsonObject>();
+  d["on"] = s.desk;
+  d["host"] = s.deskHost;
+  d["user"] = s.deskUser;
+  d["online"] = desk.online;
+  d["loggedIn"] = desk.loggedIn;
+  d["error"] = desk.error;
+
+  doc["refresh"] = s.refreshMinutes;
+  doc["updateUrl"] = s.updateUrl;
+  doc["autoUpdate"] = s.autoUpdate;
+  JsonObject o = doc["ota"].to<JsonObject>();
+  o["state"] = otaStateName(ota.state);
+  o["latest"] = ota.latest;
+  o["progress"] = ota.progress;
+  o["msg"] = ota.message;
+  sendJson(doc);
+}
+
+// The page checks the PIN once when it unlocks; every change below checks it again.
+void handlePin() {
+  if (pinOk()) reply(kPinOk);
 }
 
 void handleAddAccount() {
@@ -214,7 +202,7 @@ void handleAddAccount() {
                         kAccountColors[s.accounts.size() % (sizeof(kAccountColors) / sizeof(kAccountColors[0]))]});
   settings_save(s);
   sync_refresh();
-  redirectHome(kAdded);
+  reply(kAdded);
 }
 
 void handleRemoveAccount() {
@@ -225,7 +213,49 @@ void handleRemoveAccount() {
     s.accounts.erase(s.accounts.begin() + i);
     settings_save(s);
   }
-  redirectHome(kRemoved);
+  reply(kRemoved);
+}
+
+void handleAddIcs() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  String url = server.arg("url");
+  url.trim();
+  if (!url.startsWith("https://") && !url.startsWith("webcal://") && !url.startsWith("http://")) {
+    server.send(400, "text/plain", kBadIcs);
+    return;
+  }
+  if (s.ics.size() >= kMaxIcs) {
+    server.send(400, "text/plain", kTooManyIcs);
+    return;
+  }
+  String label = server.arg("label");
+  label.trim();
+  const size_t n = sizeof(kAccountColors) / sizeof(kAccountColors[0]);
+  s.ics.push_back({label.substring(0, kMaxLabel), url, kAccountColors[(s.accounts.size() + s.ics.size()) % n]});
+  settings_save(s);
+  sync_refresh();
+  reply(kIcsAdded);
+}
+
+void handleRemoveIcs() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  const size_t i = server.arg("i").toInt();
+  if (i < s.ics.size()) {
+    s.ics.erase(s.ics.begin() + i);
+    settings_save(s);
+  }
+  reply(kIcsRemoved);
+}
+
+// Sync interval in minutes (Settings > Sync on the display): minutes=2..60.
+void handleSyncInterval() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  s.refreshMinutes = constrain((int)server.arg("minutes").toInt(), 1, 60);
+  settings_save(s);
+  reply(kSyncSaved);
 }
 
 void handleUpdateUrl() {
@@ -234,7 +264,7 @@ void handleUpdateUrl() {
   s.updateUrl = server.arg("url");
   s.updateUrl.trim();
   settings_save(s);
-  redirectHome(kLinkSaved);
+  reply(kLinkSaved);
 }
 
 void handleDesk() {
@@ -247,7 +277,34 @@ void handleDesk() {
   if (!s.deskUser.length()) s.deskPassword = "";
   else if (server.arg("pass").length()) s.deskPassword = server.arg("pass");
   settings_save(s);
-  redirectHome(kDeskSaved);
+  reply(kDeskSaved);
+}
+
+// "Test connection": tries the address and login as typed, before they are saved. An empty
+// password means the saved one, as on the form. The page then polls the GET for the result.
+void handleDeskTest() {
+  if (!pinOk()) return;
+  const Settings s = settings_get();
+  String host = server.arg("host");
+  host.trim();
+  if (!host.length()) host = s.deskHost;
+  String user = server.arg("user");
+  user.trim();
+  String pass = server.arg("pass");
+  if (!pass.length() && user == s.deskUser) pass = s.deskPassword;
+  desk_test(host, user, pass);
+  reply(kTesting);
+}
+
+void handleDeskTestResult() {
+  if (!pinOk()) return;
+  const DeskTestResult r = desk_test_result();
+  JsonDocument doc(psram_json());
+  doc["running"] = r.running;
+  doc["done"] = r.done;
+  doc["ok"] = r.ok;
+  doc["message"] = r.message;
+  sendJson(doc);
 }
 
 void handleUploadDone() {
@@ -299,14 +356,29 @@ void webTask(void *) {
 void web_begin() {
   pin = String(100000 + esp_random() % 900000);
   server.on("/", HTTP_GET, handleRoot);
+  server.on("/state", HTTP_GET, handleState);
+  server.on("/pin", HTTP_POST, handlePin);
   server.on("/account/add", HTTP_POST, handleAddAccount);
   server.on("/account/remove", HTTP_POST, handleRemoveAccount);
+  server.on("/ics/add", HTTP_POST, handleAddIcs);
+  server.on("/ics/remove", HTTP_POST, handleRemoveIcs);
+  server.on("/settings/sync", HTTP_POST, handleSyncInterval);
   server.on("/settings/update-url", HTTP_POST, handleUpdateUrl);
   server.on("/settings/desk", HTTP_POST, handleDesk);
+  server.on("/settings/desk/test", HTTP_POST, handleDeskTest);
+  server.on("/settings/desk/test", HTTP_GET, handleDeskTestResult);
   server.on("/update", HTTP_POST, handleUploadDone, handleUpload);
+  // Test harness (tools/harness.py): one command, or a screenshot.
+  server.on("/harness", HTTP_GET, [] {
+    if (pinOk()) server.send(200, "text/plain", harness_run(server.arg("cmd")));
+  });
+  server.on("/shot.bmp", HTTP_GET, [] {
+    if (pinOk()) harness_send_bmp(server);
+  });
   server.onNotFound([] { server.send(404, "text/plain", kNotFound); });
   server.begin();
-  xTaskCreatePinnedToCore(webTask, "web", 8192, nullptr, 1, nullptr, 0);
+  // Stack in PSRAM (8 KB of internal RAM saved); see ota_begin() about uploads.
+  psram_task(webTask, "web", 8192, nullptr, 1, nullptr, 0);
 }
 
 String web_pin() {

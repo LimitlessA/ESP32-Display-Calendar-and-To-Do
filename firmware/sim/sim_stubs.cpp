@@ -5,6 +5,7 @@
 
 #include "audio.h"
 #include "battery.h"
+#include "crashlog.h"
 #include "ota.h"
 #include "desk.h"
 #include "presence.h"
@@ -52,9 +53,12 @@ void sync_dismiss_event(const Event &ev) {
 void sync_complete_task(const Task &task) {
   auto &l = g_sim.tasks;
   l.erase(std::remove_if(l.begin(), l.end(), [&](const Task &t) { return t.id == task.id; }), l.end());
+  g_sim.done.insert(g_sim.done.begin(), task);
   g_sim.version++;
 }
 void sync_uncomplete_task(const Task &task) {
+  auto &d = g_sim.done;
+  d.erase(std::remove_if(d.begin(), d.end(), [&](const Task &t) { return t.id == task.id; }), d.end());
   g_sim.tasks.push_back(task);
   g_sim.version++;
 }
@@ -127,12 +131,18 @@ bool motion_seen() { return false; }
 PhoneState g_sim_phone = PhoneState::Near;
 long g_sim_seen_ago = 20;
 void presence_apply(bool) {}
+const char *presence_error() { return nullptr; }
+bool presence_ready() { return true; }
 PhoneState presence_state(uint8_t) { return g_sim_phone; }
 long presence_seen_ago() { return g_sim_seen_ago; }
 void presence_pair(bool) {}
 bool presence_pairing() { return true; }
 int presence_paired_count() { return 1; }
 void presence_forget() {}
+size_t presence_ram_used() { return 0; }
+
+// Why the display last restarted: SIM_CRASH="Crash in sync (LoadProhibited)" shows it in Settings.
+String crashlog_summary() { return getenv("SIM_CRASH") ? getenv("SIM_CRASH") : ""; }
 
 // Smart desk: sitting at M1 with the timer running; sim_main can change it.
 DeskStatus g_sim_desk = [] {
@@ -156,7 +166,20 @@ void desk_recall(uint8_t slot) { g_sim_desk.heightMm = g_sim_desk.memoryMm[slot 
 void desk_hold(int) {}
 void desk_stop() {}
 void desk_timer(bool on) { g_sim_desk.timerRunning = on; }
+void desk_timer_cmd(int what) {
+  g_sim_desk.timerRunning = what != 0;
+  g_sim_desk.timerPaused = what == 2;
+}
 void desk_away(bool) {}
+void desk_timer_apply() {}
+void desk_test(const String &, const String &, const String &) {}
+DeskTestResult desk_test_result() {
+  DeskTestResult r;
+  r.done = true;
+  r.ok = true;
+  r.message = "Desk found (80.2 cm). Login accepted.";
+  return r;
+}
 
 
 void battery_begin() {}

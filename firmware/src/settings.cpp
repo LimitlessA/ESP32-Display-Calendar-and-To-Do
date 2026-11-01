@@ -1,6 +1,7 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
+#include "psram.h"
 #include "settings.h"
 #include "storage.h"
 
@@ -20,7 +21,7 @@ bool dirty = false;
 uint32_t changedAt = 0;
 
 String toJson(const Settings &s) {
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   doc["wifiSsid"] = s.wifiSsid;
   doc["wifiPassword"] = s.wifiPassword;
   JsonArray accounts = doc["accounts"].to<JsonArray>();
@@ -30,6 +31,13 @@ String toJson(const Settings &s) {
     o["url"] = a.url;
     o["token"] = a.token;
     o["color"] = a.color;
+  }
+  JsonArray ics = doc["ics"].to<JsonArray>();
+  for (const IcsCalendar &c : s.ics) {
+    JsonObject o = ics.add<JsonObject>();
+    o["label"] = c.label;
+    o["url"] = c.url;
+    o["color"] = c.color;
   }
   doc["brightness"] = s.brightness;
   doc["volume"] = s.volume;
@@ -41,7 +49,7 @@ String toJson(const Settings &s) {
   doc["dimIdle"] = s.dimIdle;
   doc["dimAfterMinutes"] = s.dimAfterMinutes;
   doc["use24h"] = s.use24h;
-  doc["refreshMinutes"] = s.refreshMinutes;
+  doc["syncMinutes"] = s.refreshMinutes;
   doc["theme"] = s.theme;
   doc["updateUrl"] = s.updateUrl;
   doc["autoUpdate"] = s.autoUpdate;
@@ -73,6 +81,8 @@ String toJson(const Settings &s) {
   doc["deskHost"] = s.deskHost;
   doc["deskUser"] = s.deskUser;
   doc["deskPassword"] = s.deskPassword;
+  doc["deskSitMin"] = s.deskSitMin;
+  doc["deskStandMin"] = s.deskStandMin;
   doc["deskSitSlot"] = s.deskSitSlot;
   doc["deskStandSlot"] = s.deskStandSlot;
   doc["deskMeetings"] = s.deskMeetings;
@@ -86,7 +96,7 @@ String toJson(const Settings &s) {
 }
 
 bool fromJson(const String &json, Settings &s) {
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   if (deserializeJson(doc, json)) return false;
   Settings d;  // defaults for anything missing
   s.wifiSsid = doc["wifiSsid"] | "";
@@ -94,6 +104,10 @@ bool fromJson(const String &json, Settings &s) {
   s.accounts.clear();
   for (JsonObject o : doc["accounts"].as<JsonArray>()) {
     s.accounts.push_back({o["label"] | "", o["url"] | "", o["token"] | "", o["color"] | 0x6C8CFFu});
+  }
+  s.ics.clear();
+  for (JsonObject o : doc["ics"].as<JsonArray>()) {
+    if (s.ics.size() < kMaxIcs) s.ics.push_back({o["label"] | "", o["url"] | "", o["color"] | 0x4FD1C5u});
   }
   s.brightness = doc["brightness"] | d.brightness;
   s.volume = doc["volume"] | d.volume;
@@ -105,7 +119,9 @@ bool fromJson(const String &json, Settings &s) {
   s.dimIdle = doc["dimIdle"] | d.dimIdle;
   s.dimAfterMinutes = doc["dimAfterMinutes"] | d.dimAfterMinutes;
   s.use24h = doc["use24h"] | d.use24h;
-  s.refreshMinutes = max<uint8_t>(1, doc["refreshMinutes"] | d.refreshMinutes);
+  // "syncMinutes" replaces "refreshMinutes", which had no control and stayed at
+  // the old 5-minute default; dropping it moves those displays to the new one.
+  s.refreshMinutes = max<uint8_t>(1, doc["syncMinutes"] | d.refreshMinutes);
   s.theme = doc["theme"] | d.theme;
   s.updateUrl = doc["updateUrl"] | d.updateUrl;
   s.autoUpdate = doc["autoUpdate"] | d.autoUpdate;
@@ -137,6 +153,8 @@ bool fromJson(const String &json, Settings &s) {
   s.deskHost = doc["deskHost"] | d.deskHost;
   s.deskUser = doc["deskUser"] | d.deskUser;
   s.deskPassword = doc["deskPassword"] | d.deskPassword;
+  s.deskSitMin = doc["deskSitMin"] | d.deskSitMin;
+  s.deskStandMin = doc["deskStandMin"] | d.deskStandMin;
   s.deskSitSlot = constrain(doc["deskSitSlot"] | d.deskSitSlot, 1, 4);
   s.deskStandSlot = constrain(doc["deskStandSlot"] | d.deskStandSlot, 1, 4);
   s.deskMeetings = doc["deskMeetings"] | d.deskMeetings;

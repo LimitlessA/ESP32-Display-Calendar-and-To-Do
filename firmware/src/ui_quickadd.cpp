@@ -98,8 +98,14 @@ void addFromInput() {
 }
 
 void refreshDue() {
+  // Layout B removes "This weekend", so match each chip by the choice stored
+  // in it, not by its position (child 0 is the "Due" label).
   if (dueRow) {
-    for (int i = 0; i < (int)Due::Count; i++) set_chip(lv_obj_get_child(dueRow, i + 1), (Due)i == due);
+    const uint32_t n = lv_obj_get_child_cnt(dueRow);
+    for (uint32_t i = 1; i < n; i++) {
+      lv_obj_t *chip = lv_obj_get_child(dueRow, i);
+      set_chip(chip, (Due)(intptr_t)lv_obj_get_user_data(chip) == due);
+    }
   }
   if (dueCycle) lv_label_set_text(lv_obj_get_child(dueCycle, 0), kDueNames[(int)due]);
 }
@@ -110,7 +116,9 @@ void mkDueChips(lv_obj_t *parent) {
   set_flex(dueRow, LV_FLEX_FLOW_ROW, 6);
   mk_label(dueRow, &font_14, theme().muted, kDueLabel);
   for (int i = 0; i < (int)Due::Count; i++) {
-    on_click(mk_chip(dueRow, kDueNames[i], (Due)i == due), [](lv_event_t *e) {
+    lv_obj_t *chip = mk_chip(dueRow, kDueNames[i], (Due)i == due);
+    lv_obj_set_user_data(chip, (void *)(intptr_t)i);
+    on_click(chip, [](lv_event_t *e) {
       due = (Due)(intptr_t)lv_event_get_user_data(e);
       refreshDue();
     }, (void *)(intptr_t)i);

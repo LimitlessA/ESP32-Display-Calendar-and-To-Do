@@ -5,7 +5,7 @@
 // The GitHub build sets this to "<major>.<minor>.<build number>"; raise the
 // major.minor here by hand for big changes.
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "0.1.0"
+#define FIRMWARE_VERSION "0.2.0"
 #endif
 // Which CrowPanel this build is for: platformio.ini sets one of these per build.
 // The 7.0" is the default because it is the board in use.

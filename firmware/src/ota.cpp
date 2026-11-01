@@ -5,8 +5,10 @@
 #include <WiFiClientSecure.h>
 
 #include "config.h"
+#include "display.h"
 #include "ota.h"
 #include "ota_root_cas.h"
+#include "psram.h"
 #include "settings.h"
 
 namespace {
@@ -40,6 +42,9 @@ void set(OtaState st, const String &message = "", int progress = -1) {
   status.message = message;
   if (progress >= 0) status.progress = progress;
   xSemaphoreGive(lock);
+  // Dark while installing (it restarts when done); back on if it failed.
+  if (st == OtaState::Installing) display_blank(true);
+  else if (st == OtaState::Failed) display_blank(false);
 }
 
 // "1.10.0" > "1.9.3": compare numerically, part by part.
@@ -74,7 +79,7 @@ void check() {
     http.end();
     return;
   }
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   const bool ok = !deserializeJson(doc, http.getString());
   http.end();
   if (!ok || !doc["version"].is<const char *>() || !doc["url"].is<const char *>()) {
@@ -134,7 +139,12 @@ void otaTask(void *) {
 
 void ota_begin() {
   lock = xSemaphoreCreateMutex();
-  xTaskCreatePinnedToCore(otaTask, "ota", kTaskStack, nullptr, 1, &task, 0);
+  // Stack in PSRAM (12 KB of internal RAM saved). It writes the update to
+  // flash, which is fine: with the program running from PSRAM, ESP-IDF keeps
+  // the cache on during flash writes unless some flash is mapped, and only
+  // the image check at the end of an update (esp_ota_end) maps any, between
+  // writes of the same task.
+  psram_task(otaTask, "ota", kTaskStack, nullptr, 1, &task, 0);
 }
 
 OtaStatus ota_status() {
