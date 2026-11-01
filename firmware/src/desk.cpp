@@ -169,28 +169,63 @@ void poll(const String &base) {
   });
 }
 
+// A memory height from whatever shape the desk uses: 1200, {"height_mm":1200} or {"mm":1200}.
+int memoryHeight(JsonVariantConst v) {
+  if (v.is<JsonObjectConst>()) {
+    for (const char *k : {"height_mm", "mm", "height", "position"})
+      if (v[k].is<int>()) return v[k].as<int>();
+    return 0;
+  }
+  return v.is<int>() ? v.as<int>() : 0;
+}
+
 void fetchMemory(const String &base, const Settings &s) {
   if (!s.deskUser.length()) return;
   if (!token.length() && !login(base, s)) return;
   String out;
   int code = request(base + "/api/desk/memory", "GET", "", out);
   if (code == 401 && login(base, s)) code = request(base + "/api/desk/memory", "GET", "", out);
+  Serial.printf("[desk] GET /api/desk/memory -> %d %s\n", code, out.substring(0, 300).c_str());
   JsonDocument doc;
   if (code != 200 || deserializeJson(doc, out)) return;
+  // {"positions":{"M1":..}}, {"M1":..}, or a list of four.
+  JsonVariantConst pos = doc["positions"].isNull() ? doc.as<JsonVariantConst>() : doc["positions"].as<JsonVariantConst>();
   update([&](DeskStatus &st) {
-    const char *keys[] = {"M1", "M2", "M3", "M4"};
-    for (int i = 0; i < 4; i++) st.memoryMm[i] = doc["positions"][keys[i]] | 0;
+    for (int i = 0; i < 4; i++) {
+      char key[3] = {'M', (char)('1' + i), 0};
+      int mm = pos.is<JsonArrayConst>() ? memoryHeight(pos[i]) : memoryHeight(pos[key]);
+      if (!mm && !pos.is<JsonArrayConst>()) mm = memoryHeight(pos[key + 1]);  // "1".."4"
+      st.memoryMm[i] = mm;
+    }
   });
+}
+
+// Recall memory M<slot> (1-4, as the desk's web UI numbers them). Public on the desk (guest
+// mode), so no login is needed; with one, a refusal is retried signed in. Every request and
+// reply goes to the serial log so a test on the real desk shows what it expects.
+void recall(const String &base, const Settings &s, uint8_t slot) {
+  String out;
+  const String url = base + "/position";
+  const String bodies[] = {"{\"position\":" + String(slot) + "}", "{\"position\":\"M" + String(slot) + "\"}"};
+  for (const String &body : bodies) {
+    out = "";
+    int code = request(url, "POST", body, out, false);
+    Serial.printf("[desk] POST /position %s -> %d %s\n", body.c_str(), code, out.substring(0, 200).c_str());
+    if ((code == 401 || code == 403) && s.deskUser.length()) {
+      out = "";
+      code = authed(base, s, "/position", "POST", body);
+      Serial.printf("[desk] signed-in retry -> %d\n", code);
+    }
+    const bool refused = out.indexOf("\"success\":false") >= 0 || out.indexOf("\"error\"") >= 0;
+    if (code >= 200 && code < 300 && !refused) return;
+  }
+  update([](DeskStatus &st) { st.error = "The desk did not accept the memory button"; });
 }
 
 void send(const String &base, const Settings &s, const Command &c) {
   String out;
   switch (c.cmd) {
-    case Cmd::Recall: {
-      // Public on the desk, like its guest mode.
-      request(base + "/position", "POST", "{\"position\":" + String(c.slot) + "}", out, false);
-      break;
-    }
+    case Cmd::Recall: recall(base, s, c.slot); break;
     case Cmd::Stop: request(base + "/api/desk/emergency-stop", "POST", "{}", out, false); break;
     case Cmd::HoldStop: authed(base, s, "/api/desk/hold/stop", "POST", "{}"); break;
     case Cmd::TimerOn: {
