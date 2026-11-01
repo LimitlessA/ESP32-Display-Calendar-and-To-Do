@@ -110,7 +110,10 @@ void desk_settings_show() {
   stopPolling();
   const Theme &t = theme();
   mk_overlay(false, &layer);
-  lv_obj_add_event_cb(layer, [](lv_event_t *) {
+  lv_obj_add_event_cb(layer, [](lv_event_t *e) {
+    // An older form, deleted later (lv_obj_del_async) while a new one is open,
+    // must not clear the new one's fields: the keyboard then pointed nowhere.
+    if (layer && layer != lv_event_get_target(e)) return;
     stopPolling();
     result = keyboard = nullptr;
     for (lv_obj_t *&f : fields) f = nullptr;
