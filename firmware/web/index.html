@@ -1,0 +1,198 @@
+<!doctype html><html lang=en><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name=color-scheme content=dark><meta name=theme-color content="#0A0C0F">
+<title>Calendar display</title>
+<!-- Setup page at http://calendar.local. Edit this file, then run: python3 tools/web_page.py
+     (writes src/web_page.h, the gzipped copy web.cpp serves). Colours: the Midnight theme. -->
+<style>
+:root{--bg:#101317;--hd:#0A0C0F;--cd:#1C2229;--rs:#262D36;--ln:#3A434E;--tx:#F1F3F6;--mu:#A9B1BC;--ac:#F5A524;--on:#101317;--ok:#7BD88F;--wf:#FFD48A;--wb:#47360F;--bf:#FFB4AB;--bb:#4A1F1C}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--hd);border-bottom:1px solid var(--ln)}
+.w{max-width:940px;margin:0 auto;padding:0 20px}
+.top{display:flex;align-items:center;gap:12px;padding:14px 0 6px}
+h1{font-size:19px;margin:0;flex:1}
+h2{font-size:16px;margin:0 0 10px}
+a{color:var(--ac)}
+.m{color:var(--mu);font-size:13px}
+.ok{color:var(--ok)}.er{color:var(--bf)}
+nav{display:flex;gap:4px}
+nav button{all:unset;cursor:pointer;padding:11px 16px;color:var(--mu);font-weight:600;border-bottom:3px solid transparent}
+nav button.on{color:var(--ac);border-color:var(--ac)}
+nav button:focus-visible{outline:2px solid var(--ac)}
+main.w{padding-top:18px;padding-bottom:40px}
+.pin{background:var(--wb);color:var(--wf);border-radius:12px;padding:10px 14px;margin-bottom:16px}
+.pin form,.pin div{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pin input{width:130px;padding:8px 10px;letter-spacing:2px}
+.pin .b{margin:0;padding:8px 16px}
+.pin.u{background:var(--cd);color:var(--ok)}
+.pane{display:none}.pane.on{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.c{background:var(--cd);border-radius:14px;padding:16px;min-width:0}
+.full{grid-column:1/-1}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
+input,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);font:inherit;font-size:16px}
+input:focus,select:focus{outline:2px solid var(--ac);outline-offset:-1px;border-color:transparent}
+input[type=file]{padding:8px}
+input[type=file]::file-selector-button{background:var(--rs);color:var(--tx);border:0;border-radius:8px;padding:6px 12px;margin-right:10px;font:inherit;cursor:pointer}
+.b{padding:10px 18px;border-radius:10px;border:0;background:var(--ac);color:var(--on);font:600 14px system-ui,sans-serif;margin:12px 8px 0 0;cursor:pointer}
+.b.s{background:var(--rs);color:var(--tx)}
+.b.x{background:var(--bb);color:var(--bf)}
+.b:disabled{opacity:.5;cursor:default}
+.li{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rs)}
+.li .b{margin:0;padding:8px 12px}
+.sq{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--on);font-weight:700;flex:none}
+.g{flex:1;min-width:0;overflow-wrap:anywhere}
+.msg{margin:10px 0 0;font-size:14px}.msg:empty{display:none}
+.msg.ok,.msg.er{padding:8px 12px;border-radius:10px;background:#1E3A26}.msg.er{background:var(--bb)}
+.st{padding:8px 12px;border-radius:10px;background:var(--rs);font-size:14px;margin:0 0 6px}
+.st.wn{background:var(--wb);color:var(--wf)}
+details{margin:12px 0 0;font-size:14px;color:var(--mu)}summary{cursor:pointer;color:var(--tx)}
+ol{padding-left:20px;margin:8px 0}li{margin:4px 0}
+code{font-size:13px}
+progress{width:100%;margin-top:10px;accent-color:var(--ac)}
+@media(max-width:720px){
+html{scroll-padding-bottom:80px}.w{padding:0 14px}
+.pane.on{display:block}.c{margin-bottom:12px}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--hd);border-top:1px solid var(--ln);gap:0;z-index:9;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;text-align:center;padding:14px 2px;font-size:13px;border-bottom:0;border-top:3px solid transparent}
+nav button.on{border-top-color:var(--ac)}
+.top{padding:12px 0}main.w{padding-top:14px;padding-bottom:90px}}
+</style></head><body>
+<header><div class=w><div class=top><h1>Calendar display</h1><span class=m id=hv></span></div>
+<nav><button class=on data-t=p1>Accounts</button><button data-t=p2>Desk &amp; sync</button><button data-t=p3>Device</button></nav></div></header>
+<main class=w>
+<div class=pin id=pb><form id=pf><b>PIN</b><input id=pin inputmode=numeric autocomplete=off maxlength=6 placeholder="6 digits" aria-label="PIN from the display"><button class=b>Unlock</button><span class=m style="color:inherit">Shown on the display's Accounts screen. Needed for every change.</span></form><p class=msg id=pm></p></div>
+<div class="pin u" id=pu hidden><div><span>Unlocked until you leave this page.</span><button class="b s" id=lk>Lock</button></div></div>
+
+<section class="pane on" id=p1>
+<div class=c><h2>Google accounts</h2><div id=gl></div>
+<form id=gf><label for=gn>Name shown on the display</label><input id=gn name=label maxlength=20 placeholder=Personal required>
+<label for=gu>Web app URL</label><input id=gu name=url placeholder="https://script.google.com/macros/s/.../exec" required pattern="https://script\.google\.com/.+/exec">
+<label for=gt>Token</label><input id=gt name=token autocomplete=off required>
+<button class=b>Add Google account</button><p class=msg id=gm></p></form>
+<details><summary>How to get the URL and token</summary><ol>
+<li>Sign in to the Google account at <a href="https://script.google.com/create" target=_blank rel=noopener>script.google.com</a> and create a project.</li>
+<li>Paste <b>Code.gs</b> and <b>appsscript.json</b> from the repository's <code>apps-script</code> folder and set your own TOKEN.</li>
+<li>Run <b>preview</b> once to allow access, then Deploy &rsaquo; New deployment &rsaquo; Web app (Execute as: Me, Access: Anyone).</li>
+<li>Paste the web app URL and the token here.</li></ol></details></div>
+
+<div class=c><h2>Outlook, iCloud &amp; other (ICS)</h2><p class="st wn" id=in hidden>This firmware can't show ICS calendars yet. Update it on the Device tab.</p><div id=il></div>
+<div id=ifs><form id=if><label for=ip>Provider</label><select id=ip name=provider><option value=outlook>Outlook<option value=icloud>iCloud<option value=other>Other</select>
+<label for=iname>Name shown on the display</label><input id=iname name=label maxlength=20 placeholder="Football club" required>
+<label for=iu>Calendar link (ICS)</label><input id=iu name=url placeholder="https://... or webcal://..." required>
+<button class=b>Add calendar</button><p class=msg id=im></p></form>
+<details><summary>Where to find the link</summary><ol>
+<li><b>Outlook</b>: Settings &rsaquo; Calendar &rsaquo; Shared calendars &rsaquo; Publish a calendar, then copy the ICS link.</li>
+<li><b>iCloud</b>: in the Calendar app, share the calendar as a Public Calendar and copy the link.</li>
+<li><b>Other</b>: any link ending in <code>.ics</code> or starting with <code>webcal://</code>.</li></ol></details></div></div>
+</section>
+
+<section class=pane id=p2>
+<div class=c><h2>Smart desk</h2><div id=ds></div>
+<p class=m>Without a login only the memory buttons and Stop work. Raise, lower, the sit/stand timer and away mode need a desk account with the <b>user</b> role.</p>
+<form id=df><label for=dh>Desk address</label><input id=dh name=host placeholder="smartdesk-a43c.local">
+<label for=du>Desk username (optional)</label><input id=du name=user autocomplete=off>
+<label for=dp>Desk password</label><input id=dp name=pass type=password autocomplete=new-password placeholder="unchanged if empty">
+<button class=b>Save desk</button><button class="b s" type=button id=dt>Test connection</button><p class=msg id=dm></p></form></div>
+
+<div class=c><h2>Sync interval</h2><p class=m>How often calendars and tasks refresh from the internet.</p>
+<form id=sf><label for=si>Refresh</label><select id=si name=minutes><option value=5>Every 5 minutes<option value=10>Every 10 minutes<option value=15>Every 15 minutes<option value=30>Every 30 minutes<option value=60>Every hour</select>
+<button class=b>Save</button><p class=msg id=sm></p></form></div>
+</section>
+
+<section class=pane id=p3>
+<div class=c><h2>Wi-Fi</h2><div id=wi></div><p class=m>To change the network, use Settings &rsaquo; Wi-Fi on the display.</p></div>
+
+<div class=c><h2>Firmware</h2><div id=fi></div>
+<form id=uf><label for=uu>Update link (<code>manifest.json</code>)</label><input id=uu name=url placeholder="https://.../manifest.json">
+<p class=m>Where the display looks for new versions. Leave it unless you host the firmware yourself.</p>
+<button class=b>Save link</button><p class=msg id=um></p></form></div>
+
+<div class="c full"><h2>Install by hand</h2><p class=m>Upload a <b>firmware.bin</b> from a GitHub release or your own build. The display restarts by itself when it is done.</p>
+<form id=wf><label for=fw>Firmware file</label><input id=fw type=file accept=".bin" required>
+<progress id=fp max=100 value=0 hidden></progress>
+<button class=b>Upload and install</button><p class=msg id=fm></p></form></div>
+</section>
+</main>
+<script>
+var P='',D=null,$=function(i){return document.getElementById(i)};
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function say(m,t,k){m.textContent=t||'';m.className='msg '+(k||'')}
+function lock(why,k){P='';$('pu').hidden=true;$('pb').hidden=false;say($('pm'),why,k||'er')}
+// Every change goes through here: the PIN rides along and the server checks it each time.
+function post(u,f,m,done,busy){
+ if(!P){say(m,'Enter the PIN at the top first.','er');$('pin').focus();return}
+ var b=new URLSearchParams(f instanceof HTMLFormElement?new FormData(f):f);b.set('pin',P);
+ say(m,busy||'Saving...');
+ fetch(u,{method:'POST',body:b}).then(function(r){return r.text().then(function(t){
+  if(r.status==403||r.status==429)lock(t);
+  if(r.status==404)t="This firmware can't do that yet. Update it on the Device tab.";
+  say(m,t||('Error '+r.status),r.ok?'ok':'er');if(r.ok&&done)done(t)})})
+ .catch(function(){say(m,'No answer from the display. Is it on and on the same Wi-Fi?','er')})}
+function row(color,name,sub,cls,url,i,m){
+ var r=el('div','li'),q=el('span','sq',(name||'?')[0].toUpperCase()),g=el('div','g'),x=el('button','b s','Remove'),t;
+ q.style.background=color;g.appendChild(el('b',0,name));g.appendChild(el('div','m '+cls,sub));
+ x.onclick=function(){if(x.textContent=='Remove'){x.textContent='Sure?';x.className='b x';t=setTimeout(function(){x.textContent='Remove';x.className='b s'},4000);return}
+  clearTimeout(t);x.disabled=true;post(url,{i:i},m,load,'Removing...')};
+ r.appendChild(q);r.appendChild(g);r.appendChild(x);return r}
+function list(id,a,empty,f){var l=$(id);l.textContent='';if(!a.length&&empty)l.appendChild(el('p','m',empty));a.forEach(function(x,i){l.appendChild(f(x,i))})}
+function render(d,fill){
+ D=d;var w=d.wifi,k=d.desk,o=d.ota,s;
+ $('hv').textContent='v'+d.v+(w.ip?' · '+w.ip:'');
+ list('gl',d.accounts,'No Google accounts yet. Add one below.',function(a,i){
+  return row(a.color,a.label,a.error||(a.synced?'Synced'+(a.email?' · '+a.email:''):'Not synced yet'),a.error?'er':a.synced?'ok':'',
+   '/account/remove',i,$('gm'))});
+ $('gf').querySelector('button').disabled=d.accounts.length>=d.maxAccounts;
+ // TODO(ics): needs "ics" in /state, [{label, provider, events, error}], plus /ics/add and /ics/remove.
+ $('in').hidden=!!d.ics;$('ifs').hidden=!d.ics;
+ list('il',d.ics||[],d.ics?'No ICS calendars yet.':'',function(c,i){
+  var n={outlook:'Outlook',icloud:'iCloud'}[c.provider]||'Other';
+  return row(c.color||'#6C8CFF',c.label,c.error||(c.events!=null?c.events+' events · ':'')+n,c.error?'er':'ok','/ics/remove',i,$('im'))});
+ s=$('ds');s.textContent='';
+ if(!k.on)s.appendChild(el('p','st wn','Desk control is off. Turn it on at the display: Settings › Features › Smart desk.'));
+ else s.appendChild(el('p','st '+(k.online?'ok':'er'),k.online?'Connected'+(k.loggedIn?', logged in':k.user?', login refused':', as guest'):'Not reachable'+(k.error?': '+k.error:'')));
+ s=$('wi');s.textContent='';
+ var r=el('div','li'),g=el('div','g');g.appendChild(el('b',0,w.ssid||'No network'));
+ g.appendChild(el('div','m',w.ok?w.rssi+' dBm ('+(w.rssi>-60?'strong':w.rssi>-72?'good':'weak')+') · '+w.ip+' · '+d.host:'Not connected'));
+ r.appendChild(g);r.appendChild(el('span',w.ok?'ok':'er',w.ok?'Connected':'Offline'));s.appendChild(r);
+ s=$('fi');s.textContent='';
+ s.appendChild(el('p','m','Installed: v'+d.v+'. Auto-update is '+(d.autoUpdate?'on: new versions install by themselves.':'off (Settings › Auto-update on the display).')));
+ if(o.state=='available')s.appendChild(el('p','st wn','Version '+o.latest+' is available. Install it from Settings on the display.'));
+ if(o.state=='installing')s.appendChild(el('p','st','Installing: '+o.progress+'%'));
+ if(o.state=='failed'&&o.msg)s.appendChild(el('p','st er','Last update failed: '+o.msg));
+ if(fill){$('dh').value=k.host;$('du').value=k.user;$('uu').value=d.updateUrl;
+  // TODO(sync): saved with POST /settings/sync, minutes=N (Settings::refreshMinutes). Route not added yet.
+  s=$('si');if(d.refresh&&!s.querySelector('[value="'+d.refresh+'"]'))s.appendChild(new Option('Every '+d.refresh+' minutes',d.refresh));s.value=d.refresh}}
+function load(fill){return fetch('/state').then(function(r){return r.json()}).then(function(d){render(d,fill===true)})
+ .catch(function(){$('hv').innerHTML='<span class=er>Display not reachable</span>'})}
+var T=document.querySelectorAll('nav button');
+function tab(id){T.forEach(function(b){b.className=b.dataset.t==id?'on':''});document.querySelectorAll('.pane').forEach(function(p){p.className=p.id==id?'pane on':'pane'})}
+T.forEach(function(b){b.onclick=function(){tab(b.dataset.t);history.replaceState(0,'','#'+b.dataset.t);scrollTo(0,0)}});
+if(/^#p[123]$/.test(location.hash))tab(location.hash.slice(1));
+$('pf').onsubmit=function(e){e.preventDefault();var v=$('pin').value.trim(),m=$('pm');
+ if(!/^\d{6}$/.test(v)){say(m,'The PIN has 6 digits.','er');return}
+ say(m,'Checking...');fetch('/pin',{method:'POST',body:new URLSearchParams({pin:v})}).then(function(r){return r.text().then(function(t){
+  if(!r.ok){say(m,t,'er');return}P=v;say(m);$('pin').value='';$('pb').hidden=true;$('pu').hidden=false})})
+ .catch(function(){say(m,'No answer from the display.','er')})};
+$('lk').onclick=function(){lock()};
+$('gf').onsubmit=function(e){e.preventDefault();var f=this;post('/account/add',f,$('gm'),function(){f.reset();load()})};
+$('if').onsubmit=function(e){e.preventDefault();var f=this;post('/ics/add',f,$('im'),function(){f.reset();load()})};
+$('df').onsubmit=function(e){e.preventDefault();post('/settings/desk',this,$('dm'),function(){$('dp').value='';load()})};
+$('dt').onclick=function(){var m=$('dm'),n=0;post('/settings/desk/test',$('df'),m,function poll(){
+ fetch('/settings/desk/test?pin='+encodeURIComponent(P)).then(function(r){return r.json()}).then(function(t){
+  if((t.running||!t.done)&&++n<40)return setTimeout(poll,500);say(m,t.done?t.message:'The desk did not answer in time.',t.ok?'ok':'er')})
+ .catch(function(){say(m,'Could not read the test result.','er')})},'Testing the desk...')};
+$('sf').onsubmit=function(e){e.preventDefault();post('/settings/sync',this,$('sm'),load)};
+$('uf').onsubmit=function(e){e.preventDefault();post('/settings/update-url',this,$('um'),load)};
+$('wf').onsubmit=function(e){e.preventDefault();var m=$('fm'),f=$('fw').files[0],p=$('fp'),x;
+ if(!P){say(m,'Enter the PIN at the top first.','er');$('pin').focus();return}
+ if(!f||!/\.bin$/i.test(f.name)){say(m,'Choose a firmware .bin file.','er');return}
+ if(D&&f.size>D.maxImage){say(m,'That file is too big for this display ('+f.size+' bytes).','er');return}
+ x=new XMLHttpRequest();x.open('POST','/update?pin='+encodeURIComponent(P));
+ x.upload.onprogress=function(e){if(e.lengthComputable)p.value=e.loaded*100/e.total};
+ x.onload=function(){p.hidden=true;if(x.status==403)lock(x.responseText);say(m,x.responseText||'Error '+x.status,x.status==200?'ok':'er');
+  if(x.status==200)lock('The display restarts with a new PIN. Enter it to make more changes.','ok')};
+ x.onerror=function(){p.hidden=true;say(m,'Upload interrupted. Try again.','er')};
+ var fd=new FormData();fd.append('fw',f,f.name);p.value=0;p.hidden=false;say(m,'Uploading... keep this page open.');x.send(fd)};
+load(true);setInterval(function(){if(!document.hidden)load()},15000);
+</script></body></html>
