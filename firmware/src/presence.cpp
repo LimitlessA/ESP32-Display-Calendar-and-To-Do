@@ -2,6 +2,7 @@
 
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
+#include <esp_heap_caps.h>
 #include <mbedtls/aes.h>
 
 #include <array>
@@ -16,6 +17,17 @@ constexpr uint32_t kPairWindowMs = 120000;  // pairing closes by itself after th
 constexpr uint16_t kScanInterval = 160;     // 100 ms, in 0.625 ms units
 constexpr uint16_t kScanWindow = 48;        // 30 ms of every 100 ms: leaves room for Wi-Fi
 constexpr uint16_t kAppearanceHid = 0x03C0;
+// Bluetooth starts on its own task: NimBLE's start-up waits for the radio
+// and needs more stack than the UI loop can spare, and must not stall it.
+constexpr uint32_t kStartStack = 6144;
+// The Bluetooth controller and NimBLE's tasks need internal RAM, which Wi-Fi
+// and the display's buffers share. NimBLE stops the program (the display
+// restarts) if it runs out while starting, so check first. Includes the
+// start task's stack, which is freed again afterwards.
+constexpr size_t kNeedInternal = 56 * 1024;
+constexpr size_t kNeedBlock = 16 * 1024;
+constexpr const char *kErrMemory = "Bluetooth could not start: only %u KB of internal memory free";
+constexpr const char *kErrTask = "Bluetooth could not start";
 
 // Just a media remote with no keys: enough for phones to list it in their
 // Bluetooth settings and reconnect to it, without acting as a keyboard.
@@ -35,8 +47,11 @@ const uint8_t kReportMap[] = {
 
 // ---- State -------------------------------------------------------------------
 
-bool started = false;
+enum class Bt : uint8_t { Off, Starting, Ready, Failed };
+volatile Bt bt = Bt::Off;  // written by the start task, read by the UI
+bool running = false;      // advertising and scanning
 bool enabled = false;
+char errorText[96] = "";
 volatile bool pairing = false;
 bool bondingOpen = false;  // NimBLE currently accepts new bonds
 volatile uint32_t pairUntil = 0;
@@ -150,34 +165,74 @@ void begin() {
   scan->setInterval(kScanInterval);
   scan->setWindow(kScanWindow);
   loadIrks();
-  started = true;
+}
+
+void startTask(void *) {
+  begin();
+  bt = Bt::Ready;
+  vTaskDelete(nullptr);
+}
+
+void startBluetooth() {
+  const size_t freeInternal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  const size_t block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  log_i("presence: %u bytes internal free, largest block %u", (unsigned)freeInternal, (unsigned)block);
+  if (freeInternal < kNeedInternal || block < kNeedBlock) {
+    snprintf(errorText, sizeof(errorText), kErrMemory, (unsigned)(freeInternal / 1024));
+    log_w("%s", errorText);
+    bt = Bt::Failed;
+    return;
+  }
+  bt = Bt::Starting;
+  if (xTaskCreatePinnedToCore(startTask, "ble start", kStartStack, nullptr, 1, nullptr, 0) != pdPASS) {
+    snprintf(errorText, sizeof(errorText), "%s", kErrTask);
+    bt = Bt::Failed;
+  }
+}
+
+void setBonding(bool open) {
+  bondingOpen = open;
+  NimBLEDevice::setSecurityAuth(open, false, true);  // bond, no PIN (the display has no keypad), secure connections
 }
 
 }  // namespace
 
+// Called every second: Bluetooth comes up in the background, and
+// advertising and scanning start once it is ready.
 void presence_apply(bool on) {
-  if (on == enabled) return;
   enabled = on;
   if (on) {
-    if (!started) begin();
-    NimBLEDevice::startAdvertising();
-    NimBLEDevice::getScan()->start(0, nullptr, false);
-  } else if (started) {
+    if (bt == Bt::Off) startBluetooth();
+    if (bt == Bt::Ready && !running) {
+      running = true;
+      if (pairing) setBonding(true);  // the pairing window opened while starting
+      NimBLEDevice::startAdvertising();
+      NimBLEDevice::getScan()->start(0, nullptr, false);
+    }
+    return;
+  }
+  pairing = false;
+  if (bt == Bt::Failed) {
+    bt = Bt::Off;  // try again when it is turned back on
+    errorText[0] = 0;
+  }
+  if (running) {
+    running = false;
     NimBLEDevice::getScan()->stop();
     NimBLEDevice::stopAdvertising();
     NimBLEServer *server = NimBLEDevice::getServer();
     for (uint16_t h : server->getPeerDevices()) server->disconnect(h);
-    pairing = false;
   }
 }
+
+const char *presence_error() { return bt == Bt::Failed ? errorText : nullptr; }
+
+bool presence_ready() { return bt == Bt::Ready; }
 
 PhoneState presence_state(uint8_t awayMinutes) {
   if (!enabled) return PhoneState::Off;
   if (pairing && millis() - pairUntil < 0x80000000UL) pairing = false;  // window over
-  if (!pairing && bondingOpen) {
-    bondingOpen = false;
-    NimBLEDevice::setSecurityAuth(false, false, true);
-  }
+  if (!pairing && bondingOpen) setBonding(false);
   if (connected > 0) seen();
   if (!presence_paired_count()) return PhoneState::NotPaired;
   if (!everSeen) return PhoneState::Away;
@@ -195,17 +250,17 @@ void presence_pair(bool open) {
   if (!enabled) return;
   pairUntil = millis() + kPairWindowMs;
   pairing = open;
-  bondingOpen = open;
-  NimBLEDevice::setSecurityAuth(open, false, true);  // bond, no PIN (the display has no keypad), secure connections
+  if (!running) return;  // presence_apply opens it once Bluetooth is up
+  setBonding(open);
   NimBLEDevice::startAdvertising();
 }
 
 bool presence_pairing() { return pairing; }
 
-int presence_paired_count() { return started ? NimBLEDevice::getNumBonds() : 0; }
+int presence_paired_count() { return bt == Bt::Ready ? NimBLEDevice::getNumBonds() : 0; }
 
 void presence_forget() {
-  if (!started) return;
+  if (bt != Bt::Ready) return;
   NimBLEDevice::deleteAllBonds();
   loadIrks();
   everSeen = false;

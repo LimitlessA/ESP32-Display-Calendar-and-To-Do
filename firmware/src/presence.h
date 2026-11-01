@@ -8,8 +8,12 @@
 // is in range, and its private, changing address is recognised in scans too.
 enum class PhoneState : uint8_t { Off, NotPaired, Near, Away };
 
-// Starts Bluetooth when the feature is on; safe to call again after settings change.
+// Starts Bluetooth when the feature is on (in the background, on its own
+// task); call it regularly, also after settings change.
 void presence_apply(bool on);
+// Why Bluetooth could not start (e.g. too little free memory), or nullptr.
+const char *presence_error();
+bool presence_ready();  // Bluetooth is up (paired phones can be counted)
 PhoneState presence_state(uint8_t awayMinutes);
 // Seconds since the phone was last seen, or -1 if never.
 long presence_seen_ago();

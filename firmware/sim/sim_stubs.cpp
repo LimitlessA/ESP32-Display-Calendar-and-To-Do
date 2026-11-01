@@ -127,6 +127,8 @@ bool motion_seen() { return false; }
 PhoneState g_sim_phone = PhoneState::Near;
 long g_sim_seen_ago = 20;
 void presence_apply(bool) {}
+const char *presence_error() { return nullptr; }
+bool presence_ready() { return true; }
 PhoneState presence_state(uint8_t) { return g_sim_phone; }
 long presence_seen_ago() { return g_sim_seen_ago; }
 void presence_pair(bool) {}

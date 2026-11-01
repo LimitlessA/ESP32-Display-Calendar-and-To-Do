@@ -60,6 +60,7 @@ lv_obj_t *welcome = nullptr;
 lv_obj_t *pairLayer = nullptr, *pairStatus = nullptr;
 uint32_t pairStarted = 0;
 int bondsBefore = 0;
+bool errorShown = false;  // the Bluetooth error toast, once per attempt
 
 // ---- Code --------------------------------------------------------------------
 
@@ -164,7 +165,11 @@ void showWelcome(long awaySecs) {
 void updatePair() {
   if (!pairLayer || !pairStatus) return;
   const Theme &t = theme();
-  if (presence_paired_count() > bondsBefore) {
+  if (bondsBefore < 0 && presence_ready()) bondsBefore = presence_paired_count();
+  if (const char *err = presence_error()) {
+    lv_label_set_text(pairStatus, err);
+    lv_obj_set_style_text_color(pairStatus, c(t.warnFg), 0);
+  } else if (bondsBefore >= 0 && presence_paired_count() > bondsBefore) {
     lv_label_set_text(pairStatus, kPairDone);
     lv_obj_set_style_text_color(pairStatus, c(t.good), 0);
   } else if (!presence_pairing()) {
@@ -192,6 +197,7 @@ String event_title(const Event &ev) { return presence_private() ? String(kBusy) 
 
 String presence_status() {
   if (!g_settings.presence) return kStatusOff;
+  if (const char *err = presence_error()) return err;
   const int n = presence_paired_count();
   if (!n) return kStatusNone;
   const long ago = presence_seen_ago();
@@ -216,6 +222,8 @@ void presence_pair_show() {
   lv_label_set_long_mode(steps, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_line_space(steps, 6, 0);
   pairStatus = mk_label(card, &font_14b, t.accent, "");
+  lv_obj_set_width(pairStatus, 508);
+  lv_label_set_long_mode(pairStatus, LV_LABEL_LONG_WRAP);
   lv_obj_add_event_cb(pairStatus, [](lv_event_t *) { pairStatus = nullptr; }, LV_EVENT_DELETE, nullptr);
   lv_obj_t *close = mk_text_button(card, kClose, false, 508);
   lv_obj_set_height(close, 52);
@@ -230,7 +238,7 @@ void presence_pair_show() {
     lv_label_set_text(pairStatus, kPairOff);
     return;
   }
-  bondsBefore = presence_paired_count();
+  bondsBefore = presence_ready() ? presence_paired_count() : -1;  // -1: count once Bluetooth is up
   pairStarted = millis();
   presence_pair(true);
   updatePair();
@@ -240,6 +248,9 @@ void presence_tick() {
   if (millis() - lastCheck < kCheckMs) return;
   lastCheck = millis();
   presence_apply(g_settings.presence);
+  const char *err = presence_error();
+  if (err && !errorShown) toast(err);
+  errorShown = err != nullptr;
   updatePair();
   const PhoneState was = state;
   state = presence_state(g_settings.awayMinutes);
