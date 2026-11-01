@@ -30,7 +30,7 @@ constexpr const char *kTestGuest = "Desk found (%s cm). No login set: memory but
 constexpr const char *kTestLoginOk = "Desk found (%s cm). Login accepted.";
 constexpr const char *kTestLoginBad = "Desk found, but it did not accept the login.";
 
-enum class Cmd : uint8_t { Recall, HoldStop, Stop, TimerOn, TimerOff, AwayOn, AwayOff };
+enum class Cmd : uint8_t { Recall, HoldStop, Stop, TimerOn, TimerOff, TimerPause, TimerResume, AwayOn, AwayOff };
 struct Command {
   Cmd cmd;
   uint8_t slot;
@@ -242,6 +242,8 @@ void send(const String &base, const Settings &s, const Command &c) {
       break;
     }
     case Cmd::TimerOff: authed(base, s, "/interval/stop", "POST", "{}"); break;
+    case Cmd::TimerPause: authed(base, s, "/interval/pause", "POST", "{}"); break;
+    case Cmd::TimerResume: authed(base, s, "/interval/resume", "POST", "{}"); break;
     case Cmd::AwayOn: authed(base, s, "/api/away/start", "POST", "{}"); break;
     case Cmd::AwayOff: authed(base, s, "/api/away/end", "POST", "{}"); break;
   }
@@ -425,6 +427,10 @@ void desk_stop() {
 }
 
 void desk_timer(bool on) { push(on ? Cmd::TimerOn : Cmd::TimerOff); }
+
+void desk_timer_cmd(int what) {
+  push(what == 1 ? Cmd::TimerOn : what == 2 ? Cmd::TimerPause : what == 3 ? Cmd::TimerResume : Cmd::TimerOff);
+}
 
 void desk_away(bool away) { push(away ? Cmd::AwayOn : Cmd::AwayOff); }
 

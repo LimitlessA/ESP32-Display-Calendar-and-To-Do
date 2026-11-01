@@ -404,6 +404,23 @@ static void renderVariants(const char *dir) {
     render(dir, name);
     clearTop();
   }
+  // The timer card in its four states (layout B): running sitting is the default above.
+  setLayout(Layout::Desk, 1);
+  const DeskStatus base = g_sim_desk;
+  for (int k = 0; k < 5; k++) {
+    g_sim_desk = base;
+    const char *tn[] = {"sitting", "standing", "stopped", "lastmin", "paused"};
+    if (k == 1) { g_sim_desk.timerPhase = "STAND"; g_sim_desk.timerLeft = 22 * 60; g_sim_desk.heightMm = 1120; }
+    if (k == 2) g_sim_desk.timerRunning = false;
+    if (k == 3) g_sim_desk.timerLeft = 42;
+    if (k == 4) g_sim_desk.timerPaused = true;
+    ui_show(Screen::Desk);
+    desk_refresh();
+    tick();
+    snprintf(name, sizeof(name), "r15-desk-timer-%s", tn[k]);
+    render(dir, name);
+  }
+  g_sim_desk = base;
   ui_show(Screen::Features);
   render(dir, "r15-desk-features");
   desk_settings_show();

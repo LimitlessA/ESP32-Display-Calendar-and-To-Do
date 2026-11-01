@@ -31,14 +31,11 @@ constexpr const char *kRaise = "Hold to raise";
 constexpr const char *kLower = "Hold to lower";
 constexpr const char *kNeedsLogin = "Add the desk login in Desk settings to raise, lower and run the timer.";
 constexpr const char *kDeskSettings = "Desk settings";
-constexpr const char *kSitLabel = "Sit";
-constexpr const char *kStandLabel = "Stand";
 constexpr int kTimerMin = 5, kTimerMax = 90, kTimerStep = 5, kTimerDefault = 30;
-constexpr const char *kTimerTitle = "Sit/stand timer";
-constexpr const char *kTimerSub = "%d min sitting, %d min standing";
-constexpr const char *kTimerSubUnknown = "Uses the lengths saved on the desk";
-constexpr const char *kStartTimer = "Start timer";
-constexpr const char *kStopTimer = "Stop timer";
+constexpr const char *kMin = "min";
+constexpr const char *kThen = "then %s %d";
+constexpr const char *kNext = "%s %d next";
+constexpr const char *kClock = "%d:%02d";
 constexpr const char *kToday = "Today: %s standing \xC2\xB7 %d changes";
 constexpr const char *kStateFor = "%s \xC2\xB7 %s";
 constexpr const char *kTodayAtDesk = "TODAY AT THE DESK";
@@ -72,6 +69,8 @@ constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
 // Labels kept up to date every second, for whichever view is on screen.
 struct Live {
   lv_obj_t *height = nullptr, *state = nullptr, *timer = nullptr, *timerBar = nullptr, *stop = nullptr;
+  lv_obj_t *card = nullptr, *ring = nullptr, *ringNum = nullptr;  // B: the timer card
+  int sig = 0, shown = -1;
   lv_obj_t *mem[4] = {};
   lv_obj_t *deskTop = nullptr;   // B: the drawn desk top moves with the height...
   lv_obj_t *legs[2] = {};        // ...and the legs grow under it
@@ -194,6 +193,8 @@ lv_obj_t *roundButton(lv_obj_t *parent, const char *icon, int size) {
   return b;
 }
 
+void updateTimerCard(Live &live, const DeskStatus &st);
+
 void updateLive(Live &live, const DeskStatus &st) {
   const Theme &t = theme();
   if (live.height) lv_label_set_text(live.height, cm(st.heightMm, true).c_str());
@@ -203,6 +204,7 @@ void updateLive(Live &live, const DeskStatus &st) {
     lv_label_set_text(live.state, s.c_str());
     lv_obj_set_style_text_color(live.state, c(!st.online ? t.badFg : st.heightMm >= kStandingMm ? t.good : t.muted), 0);
   }
+  updateTimerCard(live, st);
   if (live.timer) lv_label_set_text(live.timer, timerText(st).c_str());
   if (live.timerBar) lv_bar_set_value(live.timerBar, timerProgress(st), LV_ANIM_OFF);
   if (live.stop) {
@@ -251,7 +253,6 @@ int timerLength(bool stand, const DeskStatus &st) {
   return std::max(kTimerMin, std::min(kTimerMax, v));
 }
 
-String minutesText(int v) { return strf(kMinutes, v); }
 
 void setTimerLength(int v, void *user) {
   Settings s = g_settings;
@@ -262,6 +263,118 @@ void setTimerLength(int v, void *user) {
   if (!s.deskStandMin) s.deskStandMin = (uint8_t)timerLength(true, desk_status());
   ui_save_settings(s);
   desk_timer_apply();
+}
+
+// ---- Timer card: a ring with the minutes left, the phase beside it ----
+
+int timerSig(const DeskStatus &st) {  // what the card looks like; it is rebuilt only when this changes
+  if (!st.timerRunning) return 0;
+  return 1 + (st.timerPaused ? 1 : 0) + (st.timerPhase == "SIT" ? 2 : 0) + (st.timerLeft <= 60 ? 4 : 0);
+}
+
+String numText(int v) { return String(v); }
+
+void timerPress(void *cmd) {
+  desk_timer_cmd((int)(intptr_t)cmd);
+  lv_async_call([](void *) { desk_refresh(); }, nullptr);
+}
+
+void timerButton(lv_obj_t *parent, uint32_t bg, uint32_t fg, const char *icon, int w, int cmd) {
+  lv_obj_t *b = mk_button(parent, bg, 14);
+  lv_obj_set_size(b, w, 44);
+  if (w == 0) lv_obj_set_flex_grow(b, 1);
+  lv_obj_center(mk_label(b, &font_16, fg, icon));
+  on_click(b, [](lv_event_t *e) { timerPress(lv_event_get_user_data(e)); }, (void *)(intptr_t)cmd);
+}
+
+void buildTimerCard(const DeskStatus &st) {
+  const Theme &t = theme();
+  Live &live = screenLive;
+  lv_obj_clean(live.card);
+  live.sig = timerSig(st);
+  live.shown = -1;
+  const bool run = st.timerRunning, sit = st.timerPhase == "SIT", last = run && st.timerLeft <= 60;
+  const uint32_t col = last ? t.warnFg : sit ? t.accent : t.good;
+  lv_obj_t *wrap = transparent(live.card);
+  lv_obj_set_size(wrap, 100, 100);
+  lv_obj_clear_flag(wrap, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *ring = lv_arc_create(wrap);
+  lv_obj_set_size(ring, 100, 100);
+  lv_obj_remove_style(ring, nullptr, LV_PART_KNOB);
+  lv_obj_clear_flag(ring, LV_OBJ_FLAG_CLICKABLE);
+  lv_arc_set_rotation(ring, 270);
+  lv_arc_set_bg_angles(ring, 0, 360);
+  lv_arc_set_range(ring, 0, 1000);
+  lv_obj_set_style_arc_width(ring, 9, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(ring, 9, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_color(ring, c(t.line), LV_PART_MAIN);
+  lv_obj_set_style_arc_color(ring, c(col), LV_PART_INDICATOR);
+  lv_obj_set_style_arc_rounded(ring, true, LV_PART_INDICATOR);
+  if (!run) lv_obj_set_style_arc_opa(ring, LV_OPA_TRANSP, LV_PART_INDICATOR);
+  live.ring = ring;
+  lv_obj_t *side = transparent(live.card);
+  lv_obj_set_height(side, 100);
+  lv_obj_set_flex_grow(side, 1);
+  if (!run) {
+    // A play triangle, drawn (the icon font is too small here).
+    lv_obj_add_event_cb(wrap, [](lv_event_t *e) {
+      lv_obj_t *o = lv_event_get_target(e);
+      lv_area_t a;
+      lv_obj_get_coords(o, &a);
+      const lv_point_t pts[3] = {{(lv_coord_t)(a.x1 + 38), (lv_coord_t)(a.y1 + 28)},
+                                 {(lv_coord_t)(a.x1 + 38), (lv_coord_t)(a.y1 + 72)},
+                                 {(lv_coord_t)(a.x1 + 76), (lv_coord_t)(a.y1 + 50)}};
+      lv_draw_rect_dsc_t d;
+      lv_draw_rect_dsc_init(&d);
+      d.bg_color = c(theme().accent);
+      lv_draw_polygon(lv_event_get_draw_ctx(e), &d, pts, 3);
+    }, LV_EVENT_DRAW_MAIN_END, nullptr);
+    on_click(wrap, [](lv_event_t *) { timerPress((void *)1); });
+    set_flex(side, LV_FLEX_FLOW_COLUMN, 4, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+    for (int stand = 0; stand < 2; stand++) {
+      lv_obj_t *r = transparent(side);
+      lv_obj_set_size(r, LV_SIZE_CONTENT, TOUCH);
+      set_flex(r, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+      lv_obj_set_width(mk_label(r, &font_14b, t.muted, stand ? kStand : kSit), 50);
+      mk_stepper(r, timerLength(stand, st), kTimerMin, kTimerMax, kTimerStep, numText, setTimerLength,
+                 (void *)(intptr_t)stand, 44);
+    }
+    return;
+  }
+  lv_obj_t *num = transparent(wrap);
+  lv_obj_set_size(num, 80, LV_SIZE_CONTENT);
+  set_flex(num, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_center(num);
+  live.ringNum = mk_label(num, last ? &font_26b : &font_34b, last ? t.warnFg : t.text, "");
+  if (!last) mk_label(num, &font_12, t.muted, kMin);
+  set_flex(side, LV_FLEX_FLOW_COLUMN, 3, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_t *head = transparent(side);
+  lv_obj_set_size(head, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  set_flex(head, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  mk_dot(head, col, 12);
+  mk_label(head, &font_20b, col, sit ? kSitting : kStanding);
+  const char *next = sit ? kStand : kSit;
+  const int nextMin = timerLength(sit, st);
+  mk_label(side, &font_14, t.muted, strf(last ? kNext : kThen, next, nextMin).c_str());
+  lv_obj_t *btns = transparent(side);
+  lv_obj_set_size(btns, lv_pct(100), 44);
+  set_flex(btns, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  timerButton(btns, t.accent, t.onAccent, st.timerPaused ? ICON_PLAY : ICON_PAUSE, 0, st.timerPaused ? 3 : 2);
+  timerButton(btns, t.badBg, t.badFg, ICON_STOP, 56, 0);
+}
+
+// Once a second: the arc and the number (m:ss in the last minute). Rebuilds the card when its look changes.
+void updateTimerCard(Live &live, const DeskStatus &st) {
+  if (!live.card) return;
+  if (timerSig(st) != live.sig) buildTimerCard(st);
+  if (!st.timerRunning || !live.ringNum) return;
+  const bool last = st.timerLeft <= 60;
+  const int shown = last ? (int)st.timerLeft : (int)((st.timerLeft + 59) / 60);
+  if (shown == live.shown) return;
+  live.shown = shown;
+  lv_label_set_text(live.ringNum, (last ? strf(kClock, shown / 60, shown % 60) : String(shown)).c_str());
+  const long len = (st.timerPhase == "SIT" ? st.sitMinutes : st.standMinutes) * 60L;
+  lv_arc_set_value(live.ring, last ? (int)(st.timerLeft * 1000 / 60) : len > 0 ? (int)(std::min(st.timerLeft, len) * 1000 / len) : 0);
 }
 
 // ---- B: Desk screen ----
@@ -332,42 +445,14 @@ void buildScreenB(const DeskStatus &st) {
   lv_obj_center(mk_label(stop, &font_14b, t.badFg, kStop));
   on_click(stop, [](lv_event_t *) { desk_stop(); });
 
-  lv_obj_t *timer = mk_box(right, t.card, 14);
-  lv_obj_set_width(timer, rw);
-  lv_obj_set_style_pad_all(timer, 12, 0);
-  set_flex(timer, LV_FLEX_FLOW_COLUMN, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *th = transparent(timer);
-  lv_obj_set_size(th, rw - 24, TOUCH);
-  set_flex(th, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-  lv_obj_t *tl = transparent(th);
-  lv_obj_set_height(tl, LV_SIZE_CONTENT);
-  lv_obj_set_flex_grow(tl, 1);
-  set_flex(tl, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-  mk_label(tl, &font_14b, t.text, kTimerTitle);
-  mk_label(tl, &font_14b, t.text, "\xC2\xB7");
-  live.timer = mk_label(tl, &font_14b, t.accent, "");
-  if (st.hasLogin) {
-    lv_obj_t *b = mk_text_button(th, st.timerRunning ? kStopTimer : kStartTimer, !st.timerRunning, 130);
-    on_click(b, [](lv_event_t *) {
-      desk_timer(!desk_status().timerRunning);
-      lv_async_call([](void *) { desk_refresh(); }, nullptr);
-    });
-    // Sit and stand lengths: -/+ (hold to repeat). A running timer restarts with the new lengths.
-    lv_obj_t *steps = transparent(timer);
-    lv_obj_set_size(steps, rw - 24, TOUCH);
-    set_flex(steps, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-    for (int stand = 0; stand < 2; stand++) {
-      lv_obj_t *l = mk_label(steps, &font_14b, t.muted, stand ? kStandLabel : kSitLabel);
-      lv_obj_set_width(l, stand ? 46 : 30);
-      mk_stepper(steps, timerLength(stand, st), kTimerMin, kTimerMax, kTimerStep, minutesText, setTimerLength,
-                 (void *)(intptr_t)stand, 62);
-    }
+  if (st.hasLogin) {  // the timer needs the desk login
+    live.card = mk_box(right, t.card, 14);
+    lv_obj_set_size(live.card, rw, 120);
+    lv_obj_set_style_pad_all(live.card, 10, 0);
+    lv_obj_clear_flag(live.card, LV_OBJ_FLAG_SCROLLABLE);
+    set_flex(live.card, LV_FLEX_FLOW_ROW, 14, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    buildTimerCard(st);
   }
-  live.timerBar = lv_bar_create(timer);
-  lv_obj_set_size(live.timerBar, rw - 24, 6);
-  lv_bar_set_range(live.timerBar, 0, 1000);
-  lv_obj_set_style_bg_color(live.timerBar, c(t.line), LV_PART_MAIN);
-  lv_obj_set_style_bg_color(live.timerBar, c(t.good), LV_PART_INDICATOR);
   live.today = mk_label(right, &font_12, t.muted, "");
   lv_obj_add_event_cb(right, [](lv_event_t *) { forget(&screenLive); }, LV_EVENT_DELETE, nullptr);
 }
