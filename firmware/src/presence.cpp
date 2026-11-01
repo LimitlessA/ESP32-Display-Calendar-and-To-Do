@@ -1,12 +1,36 @@
 #include "presence.h"
+#include "settings.h"
 
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
 #include <esp_heap_caps.h>
+#include <nvs.h>
 #include <mbedtls/aes.h>
 
 #include <array>
 #include <vector>
+
+// The Arduino core frees the Bluetooth controller's memory (about 36 KB of
+// internal RAM) at start-up unless bleInUse() says otherwise; NimBLE-Arduino
+// does not tell it, so turning presence on crashed the display in
+// esp_bt_controller_init. Keep the memory only when presence is switched on in
+// the saved settings (NVS is ready by the time the core asks).
+static bool bleMemoryKept = false;
+
+extern "C" bool bleInUse(void) {
+  nvs_handle_t h;
+  if (nvs_open("calendar", NVS_READONLY, &h) != ESP_OK) return false;
+  size_t len = 0;
+  if (nvs_get_str(h, "cfg", nullptr, &len) == ESP_OK && len > 0 && len < 16384) {
+    char *json = (char *)malloc(len);
+    if (json && nvs_get_str(h, "cfg", json, &len) == ESP_OK) {
+      bleMemoryKept = strstr(json, "\"presence\":true") != nullptr;
+    }
+    free(json);
+  }
+  nvs_close(h);
+  return bleMemoryKept;
+}
 
 namespace {
 
@@ -24,10 +48,13 @@ constexpr uint32_t kStartStack = 6144;
 // and the display's buffers share. NimBLE stops the program (the display
 // restarts) if it runs out while starting, so check first. Includes the
 // start task's stack, which is freed again afterwards.
-constexpr size_t kNeedInternal = 56 * 1024;
+constexpr size_t kNeedInternal = 28 * 1024;  // heap left with the controller memory already kept
 constexpr size_t kNeedBlock = 16 * 1024;
 constexpr const char *kErrMemory = "Bluetooth could not start: only %u KB of internal memory free";
 constexpr const char *kErrTask = "Bluetooth could not start";
+constexpr const char *kRestarting = "Restarting to start Bluetooth...";
+constexpr uint32_t kRestartDelayMs = 2500;
+uint32_t restartAt = 0;
 
 // Just a media remote with no keys: enough for phones to list it in their
 // Bluetooth settings and reconnect to it, without acting as a keyboard.
@@ -174,6 +201,14 @@ void startTask(void *) {
 }
 
 void startBluetooth() {
+  if (!bleMemoryKept) {
+    // Its memory was given away at start-up: save and restart with it kept.
+    snprintf(errorText, sizeof(errorText), "%s", kRestarting);
+    bt = Bt::Failed;
+    settings_flush(true);
+    restartAt = millis() + kRestartDelayMs;
+    return;
+  }
   const size_t freeInternal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   const size_t block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   log_i("presence: %u bytes internal free, largest block %u", (unsigned)freeInternal, (unsigned)block);
@@ -201,6 +236,10 @@ void setBonding(bool open) {
 // advertising and scanning start once it is ready.
 void presence_apply(bool on) {
   enabled = on;
+  if (restartAt && (int32_t)(millis() - restartAt) >= 0) {
+    if (on) ESP.restart();
+    restartAt = 0;  // turned off again before the restart
+  }
   if (on) {
     if (bt == Bt::Off) startBluetooth();
     if (bt == Bt::Ready && !running) {
