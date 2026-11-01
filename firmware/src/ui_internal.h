@@ -263,5 +263,6 @@ String day_heading(time_t t);              // "TOMORROW", "SATURDAY 31 OCT"
 String event_when(const Event &ev);        // "Today, 14:00 - 15:00"
 String until_text(int64_t start_ms);       // "in 1 h 15 min", "now", ""
 enum class Tone { None, Warn, Bad };
-String due_text(const String &due_key, Tone &tone);  // "Overdue", "Today", "Sat 31 Oct"
+String due_text(const String &due_key, Tone &tone);  // "Overdue · Fri 30 Oct", "Today", "Tomorrow · Mon 2 Nov", "Fri 6 Nov"
+lv_obj_t *mk_due(lv_obj_t *parent, const String &due_key);  // icon + coloured due text, "No date" if empty
 String initial_of(const String &s);

@@ -216,6 +216,7 @@ void parseTasks(JsonArray arr, uint8_t account, std::vector<Task> &out) {
     task.dueKey = t["dueKey"].as<String>();
     task.notes = t["notes"].as<String>();
     task.parent = t["parent"].as<String>();
+    task.completedAt = t["at"].as<long>();
     out.push_back(task);
   }
 }
@@ -246,6 +247,7 @@ void parseFrequent(JsonArray arr, std::vector<String> &out) {
 
 // Everything in a feed besides events and tasks.
 struct Extras {
+  std::vector<Task> done;
   std::vector<TaskList> lists;
   std::vector<DateItem> dates;
   std::vector<String> frequent;
@@ -253,6 +255,10 @@ struct Extras {
 
 void sortDates(std::vector<DateItem> &dates) {
   std::stable_sort(dates.begin(), dates.end(), [](const DateItem &a, const DateItem &b) { return a.day < b.day; });
+}
+
+void sortDone(std::vector<Task> &done) {
+  std::stable_sort(done.begin(), done.end(), [](const Task &a, const Task &b) { return a.completedAt > b.completedAt; });
 }
 
 void parseCalendars(JsonArray arr, std::vector<CalendarInfo> &out) {
@@ -301,6 +307,7 @@ bool applyFeed(const String &body, uint8_t account, std::vector<Event> &events,
   if (!parseResponse(body, doc, err)) return false;
   parseEvents(doc["events"].as<JsonArray>(), account, events);
   parseTasks(doc["tasks"].as<JsonArray>(), account, tasks);
+  parseTasks(doc["done"].as<JsonArray>(), account, extras.done);
   parseLists(doc["lists"].as<JsonArray>(), account, extras.lists);
   parseDates(doc["dates"].as<JsonArray>(), account, extras.dates);
   parseFrequent(doc["frequent"].as<JsonArray>(), extras.frequent);
@@ -331,6 +338,8 @@ void loadCache(const Settings &s) {
   sortDates(extras.dates);
   snapshot.events = std::move(events);
   snapshot.tasks = std::move(tasks);
+  sortDone(extras.done);
+  snapshot.done = std::move(extras.done);
   snapshot.lists = std::move(extras.lists);
   snapshot.dates = std::move(extras.dates);
   snapshot.frequent = std::move(extras.frequent);
@@ -379,6 +388,9 @@ void fetchAll(const Settings &s) {
   for (const Task &t : snapshot.tasks) {
     if (t.account < n && !fetched[t.account]) tasks.push_back(t);
   }
+  for (const Task &t : snapshot.done) {
+    if (t.account < n && !fetched[t.account]) extras.done.push_back(t);
+  }
   for (const TaskList &l : snapshot.lists) {
     if (l.account < n && !fetched[l.account]) extras.lists.push_back(l);
   }
@@ -395,6 +407,8 @@ void fetchAll(const Settings &s) {
 
   snapshot.events = std::move(events);
   snapshot.tasks = std::move(tasks);
+  sortDone(extras.done);
+  snapshot.done = std::move(extras.done);
   snapshot.lists = std::move(extras.lists);
   snapshot.dates = std::move(extras.dates);
   snapshot.frequent = std::move(extras.frequent);
@@ -678,6 +692,9 @@ void sync_complete_task(const Task &task) {
       return t.account == task.account && t.id == task.id;
     }), list.end());
     hidden[hk] = false;
+    Task done = task;
+    done.completedAt = time(nullptr);
+    snapshot.done.insert(snapshot.done.begin(), done);
     pending.push_back({ActionType::Complete, task.account, hk, "action=complete", task.id, task.listId});
     snapshot.version++;
   }
@@ -698,7 +715,11 @@ void sync_uncomplete_task(const Task &task) {
       pending.push_back({ActionType::Uncomplete, task.account, "", "action=uncomplete", task.id, task.listId});
     }
     hidden.erase(hk);
+    snapshot.done.erase(std::remove_if(snapshot.done.begin(), snapshot.done.end(), [&](const Task &t) {
+      return t.account == task.account && t.id == task.id;
+    }), snapshot.done.end());
     snapshot.tasks.push_back(task);
+    snapshot.tasks.back().completedAt = 0;
     std::vector<Event> none;
     sortAndFilter(none, snapshot.tasks);
     snapshot.version++;

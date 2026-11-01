@@ -52,9 +52,12 @@ void sync_dismiss_event(const Event &ev) {
 void sync_complete_task(const Task &task) {
   auto &l = g_sim.tasks;
   l.erase(std::remove_if(l.begin(), l.end(), [&](const Task &t) { return t.id == task.id; }), l.end());
+  g_sim.done.insert(g_sim.done.begin(), task);
   g_sim.version++;
 }
 void sync_uncomplete_task(const Task &task) {
+  auto &d = g_sim.done;
+  d.erase(std::remove_if(d.begin(), d.end(), [&](const Task &t) { return t.id == task.id; }), d.end());
   g_sim.tasks.push_back(task);
   g_sim.version++;
 }

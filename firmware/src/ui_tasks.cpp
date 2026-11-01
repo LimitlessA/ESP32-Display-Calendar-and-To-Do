@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "sync.h"
 #include "ui_internal.h"
 
 namespace {
@@ -11,6 +12,12 @@ namespace {
 constexpr const char *kAll = "All";
 constexpr const char *kOverdue = "Overdue";
 constexpr const char *kDueToday = "Due today";
+constexpr const char *kDone = "Done";
+constexpr const char *kNoneDone = "Nothing completed in the last 7 days";
+constexpr const char *kCompleted = "Completed ";
+constexpr const char *kTodaySuffix = " today";
+constexpr const char *kYesterday = "yesterday";
+constexpr const char *kRestore = "Restore";
 constexpr const char *kAllDone = "All done!";
 constexpr const char *kNothingHere = "Nothing here";
 constexpr const char *kSeparator = " \xC2\xB7 ";  // between list, account and notes
@@ -24,7 +31,7 @@ constexpr int BODY_Y = HEADER_H + GAP;
 constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
 constexpr int PANEL_W = SCREEN_W - 2 * PAD - NAV_W - GAP;
 
-enum class Filter { All, Overdue, Today, List };
+enum class Filter { All, Overdue, Today, Done, List };
 
 struct Selection {
   Filter filter = Filter::All;
@@ -49,6 +56,7 @@ bool matches(const Task &t, const Selection &s) {
     case Filter::All: return true;
     case Filter::Overdue: due_text(t.dueKey, tone); return tone == Tone::Bad;
     case Filter::Today: due_text(t.dueKey, tone); return tone == Tone::Warn;
+    case Filter::Done: return false;  // done tasks are listed apart
     case Filter::List: return t.account == s.account && t.list == s.list;
   }
   return true;
@@ -106,18 +114,53 @@ void taskRow(const Task &task, bool sub) {
   String meta = moved.length() ? moved + kSeparator + task.list : task.list;
   if (task.account < g_settings.accounts.size()) meta += kSeparator + g_settings.accounts[task.account].label;
   if (task.notes.length()) meta += kSeparator + task.notes;
-  lv_obj_t *m = mk_label(text, &font_12, t.muted, meta.c_str());
+  lv_obj_t *line = mk_box(text, 0, 0);
+  lv_obj_set_style_bg_opa(line, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(line, PANEL_W - 24 - 56 - (sub ? 28 : 0), LV_SIZE_CONTENT);
+  set_flex(line, LV_FLEX_FLOW_ROW, 12);
+  mk_due(line, task.dueKey);
+  lv_obj_t *m = mk_label(line, &font_12, t.muted, meta.c_str());
   lv_label_set_long_mode(m, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(m, PANEL_W - 24 - 56 - 110 - (sub ? 28 : 0));
+  lv_obj_set_flex_grow(m, 1);
+}
 
-  Tone tone;
-  const String due = due_text(task.dueKey, tone);
-  if (due.length()) {
-    lv_obj_t *chip = mk_box(row, tone == Tone::Bad ? t.badBg : tone == Tone::Warn ? t.warnBg : t.raised, 12);
-    lv_obj_set_style_pad_hor(chip, 10, 0);
-    lv_obj_set_style_pad_ver(chip, 4, 0);
-    mk_label(chip, &font_12, tone == Tone::Bad ? t.badFg : tone == Tone::Warn ? t.warnFg : t.text, due.c_str());
-  }
+// Completed task: ticked box, struck-through title, when, and a Restore button.
+void doneRow(const Task &task) {
+  const Theme &t = theme();
+  const long days = day_number(ui_now()) - day_number(task.completedAt);
+  const String when = days <= 0 ? fmt_time(task.completedAt) + kTodaySuffix
+                      : days == 1 ? String(kYesterday) : fmt_date_short(task.completedAt);
+  lv_obj_t *row = mk_box(panel, 0, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_width(row, PANEL_W - 24);
+  lv_obj_set_style_min_height(row, 54, 0);
+  lv_obj_set_style_pad_left(row, 4, 0);
+  set_flex(row, LV_FLEX_FLOW_ROW, 8);
+  lv_obj_t *box = mk_box(row, t.good, 13);
+  lv_obj_set_size(box, 26, 26);
+  lv_obj_center(mk_label(box, &font_14b, t.bg, ICON_CHECK));
+
+  lv_obj_t *text = mk_box(row, 0, 0);
+  lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0);
+  lv_obj_set_flex_grow(text, 1);
+  set_flex(text, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_t *title = mk_label(text, &font_16, t.muted, task.title.c_str());
+  lv_obj_set_style_text_decor(title, LV_TEXT_DECOR_STRIKETHROUGH, 0);
+  lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(title, PANEL_W - 24 - 40 - 130);
+  mk_label(text, &font_14, t.muted, (String(kCompleted) + when).c_str());
+
+  lv_obj_t *b = mk_button(row, t.raised, 20);
+  lv_obj_set_size(b, LV_SIZE_CONTENT, 40);
+  lv_obj_set_style_pad_hor(b, 14, 0);
+  lv_obj_set_style_border_width(b, 2, 0);
+  lv_obj_set_style_border_color(b, c(t.accent), 0);
+  set_flex(b, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_CENTER);
+  mk_label(b, &font_14b, t.accent, ICON_REFRESH);
+  mk_label(b, &font_14b, t.accent, kRestore);
+  on_click(b, [](lv_event_t *e) {
+    sync_uncomplete_task(*static_cast<Task *>(lv_event_get_user_data(e)));
+  }, attach(b, task));
 }
 
 }  // namespace
@@ -184,6 +227,7 @@ void tasks_refresh() {
   navButton(kAll, g_snap.tasks.size(), t.text, Selection{Filter::All, 0, ""});
   navButton(kOverdue, overdue, t.badFg, Selection{Filter::Overdue, 0, ""});
   navButton(kDueToday, today, t.warnFg, Selection{Filter::Today, 0, ""});
+  navButton(kDone, g_snap.done.size(), t.good, Selection{Filter::Done, 0, ""});
   for (uint8_t a = 0; a < g_settings.accounts.size(); a++) {
     std::vector<String> lists;
     for (const Task &task : g_snap.tasks) {
@@ -200,6 +244,11 @@ void tasks_refresh() {
     }
   }
 
+  if (sel.filter == Filter::Done) {
+    for (const Task &task : g_snap.done) doneRow(task);
+    if (g_snap.done.empty()) lv_obj_set_style_pad_all(mk_label(panel, &font_16, t.muted, kNoneDone), 16, 0);
+    return;
+  }
   // Parents in due order, each followed by its subtasks.
   int shown = 0;
   std::vector<bool> used(g_snap.tasks.size(), false);

@@ -115,6 +115,12 @@ static void sampleData() {
       task(0, "t7", "Buy printer ink", "Shopping", ""),
       task(0, "t8", "Pay electricity bill", "My Tasks", "2026-10-29"),
   };
+  g_sim.done = {task(0, "d1", "Order printer ink", "Shopping", "2026-10-30"),
+                task(0, "d2", "Water the plants", "My Tasks", ""),
+                task(1, "d3", "Reply to Sam", "Work", "2026-11-01"),
+                task(0, "d4", "Call the landlord", "My Tasks", "2026-10-29")};
+  const time_t doneAt[] = {at(2026, 10, 29, 10, 5), at(2026, 10, 29, 9, 12), at(2026, 10, 29, 8, 40), at(2026, 10, 28, 17, 0)};
+  for (int i = 0; i < 4; i++) g_sim.done[i].completedAt = doneAt[i];
   g_sim.lists = {{0, "l1", "My Tasks"}, {1, "l2", "Work"}, {0, "l3", "Shopping"}, {0, "l4", "Projects"}};
   g_sim.dates = {
       {DateKind::Birthday, "Mihai's birthday", "2026-10-30", "", 0},
@@ -422,6 +428,18 @@ static void renderVariants(const char *dir) {
   }
 }
 
+// Clicks the button holding a label with this text.
+static bool clickLabel(lv_obj_t *o, const char *text) {
+  if (lv_obj_check_type(o, &lv_label_class) && !strcmp(lv_label_get_text(o), text)) {
+    lv_event_send(lv_obj_get_parent(o), LV_EVENT_CLICKED, nullptr);
+    return true;
+  }
+  for (uint32_t i = 0; i < lv_obj_get_child_cnt(o); i++) {
+    if (clickLabel(lv_obj_get_child(o, i), text)) return true;
+  }
+  return false;
+}
+
 int main(int argc, char **argv) {
   const char *dir = argc > 1 ? argv[1] : ".";
   setenv("TZ", "UTC-2", 1);
@@ -462,6 +480,9 @@ int main(int argc, char **argv) {
   render(dir, "03-week");
   ui_show(Screen::Tasks);
   render(dir, "04-tasks");
+  clickLabel(lv_scr_act(), "Done");
+  lv_timer_handler();
+  render(dir, "04b-tasks-done");
 
   ui_show(Screen::Home);
   reminder_show(g_sim.events[1]);

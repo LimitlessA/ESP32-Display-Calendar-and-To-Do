@@ -29,6 +29,7 @@ struct Task {
   String dueKey;     // yyyy-MM-dd, empty if no due date
   String notes;
   String parent;     // parent task id for subtasks
+  time_t completedAt = 0;  // Done tab only: when it was completed
 };
 
 // A Google Tasks list, for picking where quick add puts a task.
@@ -66,6 +67,7 @@ struct Snapshot {
   std::vector<Event> events;          // next 7 days, all accounts merged, by start
   std::vector<Task> tasks;            // all accounts, dated first then undated
   std::vector<AccountStatus> accounts;  // same order as Settings::accounts
+  std::vector<Task> done;             // completed in the last 7 days, newest first
   std::vector<TaskList> lists;        // every account's task lists
   std::vector<DateItem> dates;        // next 60 days, by day, duplicates across accounts removed
   std::vector<String> frequent;       // most often completed task titles, for quick add

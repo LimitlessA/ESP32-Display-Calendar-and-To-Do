@@ -9,7 +9,7 @@
  *   (no action)                        feed: upcoming events, open tasks, calendars
  *   action=range&from=MS&to=MS         events in a time range (week view)
  *   action=complete&list=L&task=ID     mark a task done (a task deleted elsewhere counts as done)
- *   action=uncomplete&list=L&task=ID   undo that
+ *   action=uncomplete&list=L&task=ID   undo that (the Done tab's Restore; the due date is kept)
  *   action=dismiss&event=KEY&until=MS  hide one event occurrence on the display
  *   action=showcal&id=CAL&shown=0|1    choose which calendars the display shows
  *   action=add&title=T[&list=L][&due=D]  add a task (D = yyyy-MM-dd; no list = default list)
@@ -28,6 +28,8 @@ const CONFIG = {
   MAX_EVENTS: 60,
   MAX_RANGE_EVENTS: 120,
   MAX_TASKS: 50,
+  DONE_DAYS: 7,        // completed tasks stay on the display's Done tab this long
+  MAX_DONE: 20,
   TASKLIST_IDS: [],    // empty = every task list
 
   // Leave-by alerts: travel time from this address to each meeting's location.
@@ -89,6 +91,7 @@ function feed_() {
     })),
     events: addTravel_(getEvents_(now, new Date(now.getTime() + CONFIG.DAYS_AHEAD * 86400000), CONFIG.MAX_EVENTS)),
     tasks: getTasks_(),
+    done: getDone_(),
     lists: taskLists_().map(l => ({ id: l.id, title: l.title })),
     dates: getDates_(tz),
     frequent: frequentTasks_(),
@@ -214,6 +217,27 @@ function getTasks_() {
     notes: plainText_(t.notes, 200),
     parent: t.parent || '',
   }));
+}
+
+// Tasks completed in the last DONE_DAYS days, newest first, for the Done tab.
+// "at" is the completion time in seconds; the display restores by id + list.
+function getDone_() {
+  const since = new Date(Date.now() - CONFIG.DONE_DAYS * 86400000).toISOString();
+  const done = [];
+  taskLists_().forEach(list => {
+    const res = Tasks.Tasks.list(list.id, {
+      showCompleted: true, showHidden: true, completedMin: since, maxResults: 100,
+    });
+    (res.items || []).forEach(t => {
+      if (t.status === 'completed' && t.title && !t.parent) {
+        done.push({
+          id: t.id, listId: list.id, title: t.title, list: list.title,
+          dueKey: t.due ? t.due.substring(0, 10) : '', at: Math.floor(Date.parse(t.completed) / 1000),
+        });
+      }
+    });
+  });
+  return done.sort((a, b) => b.at - a.at).slice(0, CONFIG.MAX_DONE);
 }
 
 // The list that holds the task: the one the display sent if it is right,
