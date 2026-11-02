@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
+#include <driver/gpio.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
 #include <lvgl.h>
@@ -54,6 +55,8 @@ static constexpr int BUF_LINES = 12;
 // The LCD reads two bounce buffers of 10 lines in internal RAM (2 x 16 KB),
 // refilled from the frame in PSRAM, as Espressif recommends against drift.
 static constexpr int BOUNCE_LINES = 10;
+static constexpr gpio_num_t kBacklightPin = GPIO_NUM_2;
+static constexpr gpio_num_t kTouchHoldPin = GPIO_NUM_38;  // held low, see display_init()
 
 // ---- Code ----
 // The picture: ESP-IDF's RGB panel driver (frame in PSRAM, bounce buffers).
@@ -75,6 +78,7 @@ constexpr uint32_t kTouchPollMs = 10;
 static struct {
   bool down = false;     // finger on the glass at the last sample
   bool latched = false;  // a press LVGL has not seen yet
+  bool swallow = false;  // the tap that woke the display: ignored until the finger lifts
   int16_t x = 0, y = 0;
   uint32_t at = 0;
 } tch;
@@ -98,7 +102,7 @@ static void touch_poll() {
 
 static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *px) {
   // Copies into the frame (and writes the cache back) before it returns.
-  esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px);
+  if (panel) esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px);
   touch_poll();
   lv_disp_flush_ready(drv);
 }
@@ -113,7 +117,11 @@ static void touch_cb(lv_indev_drv_t *, lv_indev_data_t *data) {
   }
   tch.at = 0;  // always sample fresh here
   touch_poll();
-  if (tch.down || tch.latched) {
+  if (tch.swallow) {
+    tch.swallow = tch.down;
+    tch.latched = false;
+  }
+  if (!tch.swallow && (tch.down || tch.latched)) {
     // Still down, or a tap that already ended: report it pressed once, so the
     // next read (released) completes the click.
     data->state = LV_INDEV_STATE_PR;
@@ -157,7 +165,7 @@ static void reset_touch_via_expander() {
 }
 #endif
 
-static void start_panel() {
+static esp_err_t start_panel() {
   esp_lcd_rgb_panel_config_t cfg = {};
   cfg.clk_src = LCD_CLK_SRC_DEFAULT;
   cfg.timings.pclk_hz = kTiming.pclk_hz;
@@ -185,21 +193,25 @@ static void start_panel() {
   for (int8_t p : kPins.g) cfg.data_gpio_nums[i++] = p;
   for (int8_t p : kPins.r) cfg.data_gpio_nums[i++] = p;
   cfg.flags.fb_in_psram = 1;
-  ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&cfg, &panel));
-  ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
-  ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+  esp_err_t err = esp_lcd_new_rgb_panel(&cfg, &panel);
+  if (err == ESP_OK) err = esp_lcd_panel_reset(panel);
+  if (err == ESP_OK) err = esp_lcd_panel_init(panel);
+  return err;
 }
 
-static void start_touch_and_light() {
-  {
-    auto cfg = light.config();
-    cfg.pin_bl = GPIO_NUM_2;
-    cfg.invert = false;
-    cfg.freq = 44100;
-    cfg.pwm_channel = 7;
-    light.config(cfg);
-    light.init(0);
-  }
+static void start_light() {
+  auto cfg = light.config();
+  cfg.pin_bl = kBacklightPin;
+  cfg.invert = false;
+  cfg.freq = 44100;
+  cfg.pwm_channel = 7;
+  light.config(cfg);
+  light.init(0);
+}
+
+static bool touchStarted = false;
+
+static void start_touch() {
   {
     auto cfg = touch.config();
     cfg.x_min = 0;
@@ -216,20 +228,28 @@ static void start_touch_and_light() {
     cfg.i2c_addr = 0x14;  // the driver retries 0x5D if this one does not answer
     touch.config(cfg);
     touch.init();
+    touchStarted = true;
   }
 }
 
 void display_init() {
+  // Held low through a deep sleep (display_park()); let go before use.
+  gpio_hold_dis(kBacklightPin);
+  gpio_hold_dis(kTouchHoldPin);
+#if !SOC_GPIO_SUPPORT_HOLD_SINGLE_IO_IN_DSLP
+  gpio_deep_sleep_hold_dis();
+#endif
   // Elecrow's examples hold GPIO38 low on the 5" and 7" boards before starting touch.
-  pinMode(38, OUTPUT);
-  digitalWrite(38, LOW);
+  pinMode(kTouchHoldPin, OUTPUT);
+  digitalWrite(kTouchHoldPin, LOW);
 #ifdef BOARD_CROWPANEL_7
   reset_touch_via_expander();
 #endif
 
   // Set up on this core (the one running LVGL), as Espressif recommends.
-  start_panel();
-  start_touch_and_light();
+  ESP_ERROR_CHECK(start_panel());
+  start_light();
+  start_touch();
 
   lv_init();
   const size_t px = SCREEN_W * BUF_LINES;
@@ -269,4 +289,51 @@ void display_set_brightness(uint8_t level) {
 void display_blank(bool blank) {
   blanked = blank;
   light.setBrightness(blank ? 0 : brightness);
+}
+
+// ---- Low power (power.cpp) ----
+
+bool display_touched() {
+  if (!touchStarted) start_touch();
+  lgfx::touch_point_t tp;
+  return touch.getTouchRaw(&tp, 1) > 0;  // reading also clears the GT911's status register
+}
+
+bool display_sleep(bool sleep) {
+  if (sleep) {
+    light.setBrightness(0);
+    // Stop the LCD and its DMA, which would otherwise read PSRAM while the chip
+    // sleeps and could start again mid-frame (a shifted picture); the driver
+    // even holds a no-light-sleep lock while it runs. It has no "off" without a
+    // DISP pin, so the panel is deleted, which frees the frame and the bounce
+    // buffers; waking builds them again.
+    if (panel) esp_lcd_panel_del(panel);
+    panel = nullptr;
+    return true;
+  }
+  if (!panel && start_panel() != ESP_OK) {
+    if (panel) esp_lcd_panel_del(panel);
+    panel = nullptr;
+    return false;  // no internal RAM for the bounce buffers: the caller restarts
+  }
+  // The new frame is empty: draw the whole screen before the light comes on.
+  lv_obj_invalidate(lv_scr_act());
+  lv_refr_now(nullptr);
+  light.setBrightness(blanked ? 0 : brightness);
+  tch.swallow = true;
+  return true;
+}
+
+void display_park() {
+  // Deep sleep lets go of every pin: hold the backlight off and GPIO38 low.
+  gpio_reset_pin(kBacklightPin);
+  gpio_set_direction(kBacklightPin, GPIO_MODE_OUTPUT);
+  gpio_set_level(kBacklightPin, 0);
+  gpio_hold_en(kBacklightPin);
+  gpio_set_direction(kTouchHoldPin, GPIO_MODE_OUTPUT);
+  gpio_set_level(kTouchHoldPin, 0);
+  gpio_hold_en(kTouchHoldPin);
+#if !SOC_GPIO_SUPPORT_HOLD_SINGLE_IO_IN_DSLP
+  gpio_deep_sleep_hold_en();  // digital pads such as GPIO38 need this as well
+#endif
 }

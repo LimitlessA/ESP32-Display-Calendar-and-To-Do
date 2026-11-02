@@ -92,6 +92,11 @@ struct Settings {
   bool deskMeetings = true;     // layout C: stand for meetings of 15 min or more
   bool deskFocus = false;       // layout C: stand while the focus timer runs
   bool deskAway = true;         // layout C: desk away mode while your phone is away
+  bool lowPower = false;        // sleep between sleepStart and sleepEnd, a tap wakes it
+  uint16_t sleepStart = 23 * 60;  // minutes after midnight, local time
+  uint16_t sleepEnd = 7 * 60;
+  bool sleepWeekends = false;   // ...and all day on Saturday and Sunday
+  uint8_t sleepMode = 0;        // 0 light sleep, 1 deep sleep (restarts on wake)
   uint8_t layouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0, 0};  // see kDefaultLayouts
 
   uint8_t layout(Layout l) const { return layouts[(int)l]; }

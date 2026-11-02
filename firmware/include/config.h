@@ -57,4 +57,18 @@
 // (GPIO38 on the GPIO_D header is not free: the touch controller needs it.)
 #define MOTION_PIN 44
 
+// GPIO wired to the GT911 touch INT line, used to wake from low power sleep
+// (Settings > Features > Low power), or -1 if INT reaches no usable GPIO. With
+// -1 the display wakes every ~100 ms in light sleep and asks the touch
+// controller over I2C instead (see power.cpp). Deep sleep can wake from a pin
+// only if it is an RTC GPIO (0-21 on the ESP32-S3).
+#ifdef BOARD_CROWPANEL_7
+// 7.0" V3.0: INT goes to the PCA9557 expander (IO1), not to the ESP32.
+#define TOUCH_INT_GPIO -1
+#else
+// 5.0": INT is probably GPIO38 (not an RTC GPIO, so light sleep only).
+// TODO: set to 38 once measured on a board. Note display_init() drives 38 low.
+#define TOUCH_INT_GPIO -1
+#endif
+
 #define MAX_ACCOUNTS 6

@@ -92,6 +92,10 @@ std::map<String, std::pair<String, String>> addedIds;
 volatile bool refreshRequested = true;
 volatile bool fullRequested = false;  // ask for the whole feed even if it looks unchanged
 volatile time_t weekRequested = 0;
+// Low power (power.cpp): the worker parks between two rounds, so the board
+// never sleeps in the middle of a transfer.
+volatile bool pauseRequested = false;
+volatile bool parked = false;
 
 // Kept-open HTTPS connections, one per host, used only by the worker task.
 struct Conn {
@@ -185,9 +189,9 @@ Conn &connFor(const String &host) {
   return *pick;
 }
 
-void closeIdleConnections() {
+void closeIdleConnections(bool all = false) {
   for (auto &c : conns) {
-    if (c && c->usedAt && millis() - c->usedAt > kKeepAliveMs) {
+    if (c && c->usedAt && (all || millis() - c->usedAt > kKeepAliveMs)) {
       c->client.stop();
       c->usedAt = 0;
     }
@@ -871,7 +875,14 @@ void workerLoop(void *) {
 
   uint32_t lastFetch = 0;
   bool clockSet = false;
+  if (const char *tz = getenv("TZ")) timezone = tz;  // kept over a deep sleep (power.cpp)
   for (;;) {
+    if (pauseRequested) {
+      closeIdleConnections(true);  // Wi-Fi goes down while the board sleeps
+      parked = true;
+      while (pauseRequested) ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(kIdleLoopMs));
+      parked = false;
+    }
     if (settings_version() != settingsVersion) {
       const Settings next = settings_get();
       settingsVersion = settings_version();
@@ -978,6 +989,12 @@ bool sync_get_if_newer(uint32_t version, Snapshot &out) {
   if (snapshot.version == version) return false;
   out = snapshot;
   return true;
+}
+
+bool sync_pause(bool on) {
+  pauseRequested = on;
+  wake();
+  return on && parked;
 }
 
 void sync_refresh() {

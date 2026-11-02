@@ -290,6 +290,9 @@ static void renderVariants(const char *dir) {
   lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 0), 16), LV_EVENT_LONG_PRESSED, nullptr);
   render(dir, "r9-features-desk");
   clearTop();
+  lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(lv_scr_act(), 1), 0), 18), LV_EVENT_LONG_PRESSED, nullptr);
+  render(dir, "r9-features-lowpower");
+  clearTop();
 
   // Round 4. During the design review (14:00-15:00, 6 people).
   const time_t before = g_sim_now;

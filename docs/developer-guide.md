@@ -18,6 +18,7 @@ or **Possibly broken**.
 - [Flash budget](#flash-budget)
 - [Memory: internal RAM and PSRAM](#memory-internal-ram-and-psram)
 - [Display stability](#display-stability)
+- [Low power](#low-power)
 - [The setup web page](#the-setup-web-page)
 - [The desktop simulator](#the-desktop-simulator)
 - [The test harness](#the-test-harness)
@@ -64,7 +65,8 @@ folder. Run them from the `firmware` folder.
 | File | What it does |
 |---|---|
 | `main.cpp` | `setup()` starts every module. `loop()` copies new data to the UI, ticks the UI, flushes settings, polls the harness and runs LVGL. |
-| `display.cpp/.h` | RGB panel (ESP-IDF driver), GT911 touch, backlight, LVGL flush. Pin maps and timing per board. |
+| `display.cpp/.h` | RGB panel (ESP-IDF driver), GT911 touch, backlight, LVGL flush. Pin maps and timing per board. Stopping and restarting the panel for low power. |
+| `power.cpp/.h` | Low power: sleeps in the configured window, wakes on a tap or at the window's end. See [Low power](#low-power). |
 | `settings.cpp/.h` | The `Settings` struct, JSON in NVS (`Preferences`, namespace `calendar`, key `cfg`) and an SD backup. Deferred writes. |
 | `sync.cpp/.h` | The sync worker. Fetches feeds, queues actions, keeps the `Snapshot`, reads and writes the SD cache. |
 | `model.h` | `Event`, `Task`, `DateItem`, `Snapshot` and friends. |
@@ -403,6 +405,66 @@ writes and heavy PSRAM use can starve the LCD. What the code does about it:
   LCD's power and reset lines. A 5 inch image on a 7 inch board (or the other way
   round) shows lines and flicker.
 
+## Low power
+
+`power.cpp`, the Low power feature (`Settings::lowPower`, `sleepStart`,
+`sleepEnd`, `sleepWeekends`, `sleepMode`). `power_poll()` runs from `loop()` and
+checks every 5 s. It sleeps when all of these hold:
+
+- the feature is on, the clock is set (past 2023), and local time is in the window
+  (`sleepStart`..`sleepEnd`, wrapping midnight; all of Saturday and Sunday with
+  `sleepWeekends`; start = end means no nightly window);
+- nobody touched the screen for 5 minutes (`kAwakeMs`, LVGL's inactive time), so
+  after a tap it stays awake 5 minutes;
+- no update is being checked or installed;
+- the sync worker has parked between two rounds (`sync_pause(true)`; it closes its
+  kept-open connections first). It never sleeps in the middle of a transfer.
+
+Then it writes pending settings (`settings_flush(true)`), turns the backlight
+off, **deletes the RGB panel** (`display_sleep(true)`) and stops Wi-Fi
+(`esp_wifi_stop`, the driver stays in RAM). The panel is deleted because the
+driver has no "off" without a DISP pin, holds a no-light-sleep PM lock while it
+runs, and its DMA reads the frame in PSRAM; resuming it after a sleep could start
+mid-frame (a shifted picture). On wake `display_sleep(false)` creates it again
+(new frame and bounce buffers), redraws the whole screen with `lv_refr_now()` and
+only then turns the backlight on. If the 2 x 16 KB of internal RAM for the bounce
+buffers cannot be had again, the board restarts. The tap that woke it is ignored
+until the finger lifts, so it does not press a button. Then Wi-Fi starts,
+reconnects at once and a sync runs.
+
+How a tap is noticed depends on `TOUCH_INT_GPIO` in `config.h` (the GT911 INT
+line, -1 if it reaches no usable GPIO):
+
+| Mode | `TOUCH_INT_GPIO` = -1 (both boards today) | `TOUCH_INT_GPIO` set |
+|---|---|---|
+| Light sleep | Timer wake every 100 ms, read the GT911 over I2C (0x814E), sleep again unless touched. LVGL does not run. | Also `gpio_wakeup_enable(LOW)`; the timer backs it up every 1 s. Used only if INT is high (idle) when it goes to sleep. |
+| Deep sleep | Timer wake every 1 s. `power_begin()`, first in `setup()`, reads the GT911 before the display starts and goes back to sleep if not touched. | ext1 (any low) if the pin is an RTC GPIO (0-21); otherwise as on the left. |
+
+- **Deep sleep polling is expensive.** Every check is a full boot: bootloader,
+  PSRAM init and test, copying the program to PSRAM (XIP), Arduino start-up. A
+  tap is noticed within about 1 s, then the display starts (a few seconds). The
+  boots eat much of what deep sleep saves; light sleep is the better choice on
+  these boards until INT is on an RTC GPIO.
+- RTC memory (`RTC_NOINIT_ATTR`) holds a marker, the window's end and the time
+  zone (a deep sleep forgets `TZ`). Every deep sleep also arms a timer at the
+  window's end (at most 3 days), so the board always wakes. A power-on or reset
+  clears the marker and boots normally.
+- The backlight pin (GPIO2) and GPIO38 are held low through deep sleep
+  (`display_park()`); `display_init()` lets them go.
+- 7" V3.0: INT goes to the PCA9557 expander (IO1), so it cannot wake the chip.
+  5": INT is probably GPIO38 (not an RTC GPIO), unverified, so `TOUCH_INT_GPIO`
+  stays -1 there too (TODO). Note that `display_init()` drives GPIO38 low.
+- With Bluetooth running (Phone presence), light sleep only turns the screen and
+  Wi-Fi off and naps with `delay()`: a forced light sleep does not keep the
+  Bluetooth controller.
+- The clock keeps running in both sleeps (RTC). The RTC slow clock is an RC
+  oscillator, so after a long deep sleep the time may be off by a little until
+  NTP corrects it.
+- The harness command `sleep [S]` sleeps now for S seconds (default 15), in the
+  configured mode. Serial shows `[power] ...` lines: the wake cause at every
+  full boot (the silent 1 s deep-sleep checks print nothing), and how long a
+  light sleep lasted and what ended it.
+
 ## The setup web page
 
 - Source: `firmware/web/index.html`. One file, with inline CSS and JavaScript.
@@ -424,12 +486,13 @@ Routes in `web.cpp` (the PIN is a form field named `pin`):
 | Route | Method | PIN | What |
 |---|---|---|---|
 | `/` | GET | no | The page |
-| `/state` | GET | no | JSON status: version, Wi-Fi, accounts, ICS, desk, sync interval, update link, OTA state. No tokens or passwords. |
+| `/state` | GET | no | JSON status: version, Wi-Fi, accounts, ICS, desk, low power, sync interval, update link, OTA state. No tokens or passwords. |
 | `/pin` | POST | yes | Check the PIN |
 | `/account/add`, `/account/remove` | POST | yes | Google accounts. The URL must start with `https://script.google.com/` and end with `/exec`. |
 | `/ics/add`, `/ics/remove` | POST | yes | Calendar links |
 | `/settings/sync` | POST | yes | Sync interval (1 to 60; the page offers 2 to 30) |
 | `/settings/update-url` | POST | yes | Manifest address |
+| `/settings/lowpower` | POST | yes | Low power: `on`, `start`, `end` (minutes after midnight), `weekends`, `deep` (0 or 1) |
 | `/settings/desk` | POST | yes | Desk address, user, password |
 | `/settings/desk/test` | POST, GET | yes | Start a desk test, then poll for the result |
 | `/update` | POST | yes (form field) | Upload `firmware.bin` |
@@ -476,6 +539,7 @@ defined as 0 (`-DHARNESS=0`).
 | `heap` | Internal and PSRAM free, largest block, minimum |
 | `log` | The last 8 KB of log lines |
 | `pin` | The setup page PIN and address (serial only) |
+| `sleep [S]` | Low power sleep now for S seconds (default 15, max 3600) or until a tap, in the configured mode |
 | `help` | List |
 
 **HTTP:** the same commands at `GET /harness?pin=<PIN>&cmd=<command>`, and the

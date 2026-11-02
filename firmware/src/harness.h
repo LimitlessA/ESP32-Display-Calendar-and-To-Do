@@ -8,6 +8,7 @@
 //   shot                                               screenshot (serial: RLE+base64)
 //   heap | tasks (free stack per task) | crash (why it last restarted)
 //   log | help | pin (serial only: the setup page PIN and address)
+//   sleep [S]                                          low power sleep now for S s (15), or until a tap
 // Built in unless HARNESS=0.
 
 #include <Arduino.h>

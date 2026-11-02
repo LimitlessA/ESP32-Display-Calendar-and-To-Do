@@ -89,6 +89,11 @@ String toJson(const Settings &s) {
   doc["deskMeetings"] = s.deskMeetings;
   doc["deskFocus"] = s.deskFocus;
   doc["deskAway"] = s.deskAway;
+  doc["lowPower"] = s.lowPower;
+  doc["sleepStart"] = s.sleepStart;
+  doc["sleepEnd"] = s.sleepEnd;
+  doc["sleepWeekends"] = s.sleepWeekends;
+  doc["sleepMode"] = s.sleepMode;
   JsonArray layouts = doc["layouts"].to<JsonArray>();
   for (uint8_t v : s.layouts) layouts.add(v);
   String out;
@@ -162,6 +167,11 @@ bool fromJson(const String &json, Settings &s) {
   s.deskMeetings = doc["deskMeetings"] | d.deskMeetings;
   s.deskFocus = doc["deskFocus"] | d.deskFocus;
   s.deskAway = doc["deskAway"] | d.deskAway;
+  s.lowPower = doc["lowPower"] | d.lowPower;
+  s.sleepStart = (doc["sleepStart"] | d.sleepStart) % 1440;
+  s.sleepEnd = (doc["sleepEnd"] | d.sleepEnd) % 1440;
+  s.sleepWeekends = doc["sleepWeekends"] | d.sleepWeekends;
+  s.sleepMode = (doc["sleepMode"] | d.sleepMode) ? 1 : 0;
   JsonArray layouts = doc["layouts"].as<JsonArray>();
   for (uint8_t i = 0; i < kLayoutCount; i++) {
     const uint8_t v = i < layouts.size() ? layouts[i].as<uint8_t>() : kDefaultLayouts[i];

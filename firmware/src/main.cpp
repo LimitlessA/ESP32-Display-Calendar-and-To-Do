@@ -13,6 +13,7 @@
 #include "display.h"
 #include "harness.h"
 #include "ota.h"
+#include "power.h"
 #include "sensors.h"
 #include "settings.h"
 #include "storage.h"
@@ -44,6 +45,7 @@ void ui_set_backlight(uint8_t percent) {
 void setup() {
   heap_caps_malloc_extmem_enable(kInternalMallocMax);
   Serial.begin(115200);
+  power_begin();  // logs the wake cause; in a deep sleep it may go straight back to sleep
   crashlog_begin();  // prints why the display restarted
   storage_begin();  // first, so settings can fall back to the SD backup
   settings_begin();
@@ -75,6 +77,7 @@ void loop() {
   }
   settings_flush();
   harness_poll();
+  power_poll();
   crashlog_poll();
   const uint32_t idle = lv_timer_handler();
   delay(idle < 5 ? idle : 5);  // yield, but never longer than LVGL asks for

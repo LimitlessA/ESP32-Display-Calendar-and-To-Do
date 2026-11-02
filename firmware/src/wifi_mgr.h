@@ -17,6 +17,10 @@ void wifi_begin();
 // requests from the Wi-Fi screen. Returns true while connected.
 bool wifi_service();
 
+// Low power: stops the radio before a light sleep (the connection drops) and
+// starts it again after; the sync worker then reconnects at once.
+void wifi_sleep(bool sleep);
+
 WifiState wifi_state();
 String wifi_ssid();
 int wifi_rssi();

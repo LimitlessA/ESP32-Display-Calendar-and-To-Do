@@ -310,6 +310,25 @@ Nothing is sent to the phone.
 - The display does not check that a sensor is there. The tile can be switched on
   without one.
 
+## Low power
+
+- Off by default. Hold the **Low power** tile on the Features screen to set it,
+  or use the Device tab of the setup page.
+- Between **From** and **Until** (30-minute steps, default 23:00 to 07:00) the
+  display sleeps: the screen is dark and Wi-Fi is off. **All day on weekends**
+  adds Saturday and Sunday.
+- **Tap anywhere** to wake it. The tap that wakes it does not press a button.
+  It sleeps again 5 minutes after the last touch, and wakes by itself at the end
+  of the window, then syncs.
+- **Light sleep** (default) carries on where it was. A tap shows the screen at
+  once (about a tenth of a second).
+- **Deep sleep** saves more but the display restarts on wake: a tap takes about a
+  second to be noticed, then the start-up (a few seconds).
+- It only sleeps once the clock is set (after the first sync), never during an
+  update, and not while a sync is in the middle of a transfer.
+- With Phone presence on, light sleep only turns the screen and Wi-Fi off; the
+  processor keeps running for Bluetooth.
+
 ## The offline copy on the SD card
 
 See [The SD card](#the-sd-card).
@@ -407,9 +426,10 @@ The cards:
 | Phone presence | away after 5-60 min | Welcome back / Privacy mode / Away screen |
 | Smart desk | sit and stand memory, desk login | Dock on Home / Desk screen / Follows calendar |
 | Offline copy | none | none |
+| Low power | from, until, light or deep sleep, all day on weekends | none |
 
-Defaults: Ambient light, Motion wake, Phone presence, Meeting cost and Smart
-desk are **off**. The others are on.
+Defaults: Ambient light, Motion wake, Phone presence, Meeting cost, Smart
+desk and Low power are **off**. The others are on.
 
 The default layouts are Quick add B, Focus A, Summary A, Conflicts A, Leave-by B,
 Dates B, Review C, and A for everything else.
