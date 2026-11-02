@@ -9,12 +9,12 @@
 //   heap | tasks (free stack per task) | crash (why it last restarted)
 //   log | help | pin (serial only: the setup page PIN and address)
 //   sleep [S]                                          low power sleep now for S s (15), or until a tap
-// Built in unless HARNESS=0.
+// Off in release builds. The *_test environments (platformio.ini) turn it on with -DHARNESS=1.
 
 #include <Arduino.h>
 
 #ifndef HARNESS
-#define HARNESS 1
+#define HARNESS 0
 #endif
 
 #include <WebServer.h>

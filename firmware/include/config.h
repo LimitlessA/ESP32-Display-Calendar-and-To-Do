@@ -14,9 +14,11 @@
 #endif
 #ifdef BOARD_CROWPANEL_7
 #define BOARD_NAME "CrowPanel 7.0\""
+#define BOARD_ID "7in"
 #define MANIFEST_FILE "manifest.json"
 #else
 #define BOARD_NAME "CrowPanel 5.0\""
+#define BOARD_ID "5in"
 #define MANIFEST_FILE "manifest-5inch.json"
 #endif
 
