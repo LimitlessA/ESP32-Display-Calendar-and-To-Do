@@ -700,10 +700,11 @@ Notes from reading the desk code:
   `PAUSED`. `ui_desk.cpp` compares the phase with `"SIT"` (and `desk.h` says
   "SIT, STAND, IDLE"). The comparison never matches, so the display always takes
   the sit phase for the stand phase.
-- **Possibly a concern:** the display's comment says the desk stops a hold about
-  500 ms after the last beat. The desk's `hold_timeout_ms` default is 10000, so if
-  the display stops sending (for example it crashes) while a button is held, the
-  desk may keep moving for up to 10 seconds.
+- **Hold timeout:** the desk ends a hold `hold_timeout_ms` (default 10000) after
+  the last beat. When a beat or the release gets an error, the display sends
+  `POST /stop` at once. If the display crashes or loses Wi-Fi mid-hold, only the
+  desk's timeout stops it; lowering `hold_timeout_ms` to about 1000 in the desk's
+  config would close that gap.
 
 ## Things that look unclear or possibly broken
 

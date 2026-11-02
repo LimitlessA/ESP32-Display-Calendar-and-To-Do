@@ -495,9 +495,9 @@ The three layouts:
 - Press and hold. The desk moves while your finger is down and stops when you
   let go.
 - Only with a desk login.
-- **Not sure** how fast the desk stops on its own if the display loses contact
-  while you hold. The display comment says about half a second. The desk's own
-  setting (`hold_timeout_ms`) is 10 seconds by default. Let go to stop it.
+- If a hold or release message does not reach the desk, the display sends Stop.
+  If the display loses power or Wi-Fi while you hold, the desk only stops by
+  itself after its `hold_timeout_ms` setting, 10 seconds by default.
 
 **Stop** stops the desk at once. It needs no login. It is the desk's normal
 stop, not its emergency stop.

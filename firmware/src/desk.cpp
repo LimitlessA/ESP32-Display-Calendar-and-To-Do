@@ -18,7 +18,7 @@ namespace {
 
 constexpr uint32_t kPollMs = 2000;         // status while the desk stands still
 constexpr uint32_t kPollMovingMs = 500;    // ...and while it moves
-constexpr uint32_t kHoldBeatMs = 350;      // the desk stops a hold after ~500 ms without a beat
+constexpr uint32_t kHoldBeatMs = 350;      // the desk stops a hold 10 s (hold_timeout_ms) without a beat
 constexpr uint32_t kMemoryEveryMs = 300000;  // memory heights change rarely
 constexpr uint32_t kResolveEveryMs = 60000;  // look the .local name up again after failures
 constexpr uint16_t kTimeoutMs = 1500;
@@ -231,7 +231,12 @@ void send(const String &base, const Settings &s, const Command &c) {
     // The desk's plain stop (public). Its emergency stop latches: every command after it
     // is refused until an admin clears it on the desk's web page.
     case Cmd::Stop: request(base + "/stop", "POST", "", out, false); break;
-    case Cmd::HoldStop: authed(base, s, "/api/desk/hold/stop", "POST", "{}"); break;
+    case Cmd::HoldStop: {
+      // A missed release would leave the desk moving until its 10 s hold timeout.
+      const int code = authed(base, s, "/api/desk/hold/stop", "POST", "{}");
+      if (code < 200 || code >= 300) request(base + "/stop", "POST", "", out, false);
+      break;
+    }
     case Cmd::TimerOn: {
       // The lengths set on the display, else the ones saved on the desk, between the sit and stand memories.
       const DeskStatus st = desk_status();
@@ -304,7 +309,14 @@ void task(void *) {
     const int dir = holding;
     if (dir && millis() - lastBeat >= kHoldBeatMs) {
       lastBeat = millis();
-      authed(base, s, "/api/desk/hold", "POST", dir > 0 ? "{\"direction\":\"up\"}" : "{\"direction\":\"down\"}");
+      const int code = authed(base, s, "/api/desk/hold", "POST", dir > 0 ? "{\"direction\":\"up\"}" : "{\"direction\":\"down\"}");
+      // The desk only ends a hold 10 s (hold_timeout_ms) after the last beat: if a beat
+      // fails, stop now rather than leave the desk moving with the finger still down.
+      if (code < 200 || code >= 300) {
+        holding = 0;
+        String out;
+        request(base + "/stop", "POST", "", out, false);
+      }
     }
 
     if (timerApplyAt && millis() - timerApplyAt > 1200) {
