@@ -12,10 +12,10 @@
 #include <ArduinoJson.h>
 
 // Starts a task with its stack in PSRAM (falls back to internal RAM if the
-// build does not allow that). Only for tasks that do not write to flash
-// themselves while some flash is mapped: with the program running from
-// PSRAM (CONFIG_SPIRAM_XIP_FROM_PSRAM) that is any task here except the UI
-// loop. Stack size in bytes.
+// build does not allow that). Only for tasks that never write to flash or
+// install firmware: finishing an update (esp_ota_end / set_boot_partition)
+// freezes the caches, which asserts on a PSRAM stack. So not for the UI loop,
+// the OTA task or the web task (uploads). Stack size in bytes.
 bool psram_task(TaskFunction_t fn, const char *name, uint32_t stackBytes, void *arg, UBaseType_t priority,
                 TaskHandle_t *handle = nullptr, BaseType_t core = 0);
 

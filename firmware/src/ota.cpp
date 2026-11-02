@@ -139,12 +139,11 @@ void otaTask(void *) {
 
 void ota_begin() {
   lock = xSemaphoreCreateMutex();
-  // Stack in PSRAM (12 KB of internal RAM saved). It writes the update to
-  // flash, which is fine: with the program running from PSRAM, ESP-IDF keeps
-  // the cache on during flash writes unless some flash is mapped, and only
-  // the image check at the end of an update (esp_ota_end) maps any, between
-  // writes of the same task.
-  psram_task(otaTask, "ota", kTaskStack, nullptr, 1, &task, 0);
+  // Stack in internal RAM, not PSRAM: at the end of an update ESP-IDF checks
+  // the image (esp_ota_set_boot_partition maps flash and freezes the caches),
+  // and that asserts when the calling task's stack is in PSRAM - every update
+  // crashed the display there.
+  xTaskCreatePinnedToCore(otaTask, "ota", kTaskStack, nullptr, 1, &task, 0);
 }
 
 OtaStatus ota_status() {

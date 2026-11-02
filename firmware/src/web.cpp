@@ -377,8 +377,9 @@ void web_begin() {
   });
   server.onNotFound([] { server.send(404, "text/plain", kNotFound); });
   server.begin();
-  // Stack in PSRAM (8 KB of internal RAM saved); see ota_begin() about uploads.
-  psram_task(webTask, "web", 8192, nullptr, 1, nullptr, 0);
+  // Stack in internal RAM: firmware uploads finish in this task, and the
+  // image check at the end cannot run on a PSRAM stack (see ota_begin()).
+  xTaskCreatePinnedToCore(webTask, "web", 8192, nullptr, 1, nullptr, 0);
 }
 
 String web_pin() {
