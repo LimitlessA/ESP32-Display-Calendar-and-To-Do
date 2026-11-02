@@ -486,10 +486,10 @@ Routes in `web.cpp` (the PIN is a form field named `pin`):
 | Route | Method | PIN | What |
 |---|---|---|---|
 | `/` | GET | no | The page |
-| `/state` | GET | no | JSON status: version, Wi-Fi, accounts, ICS, desk, low power, sync interval, update link, OTA state. No tokens or passwords. |
+| `/state` | GET | no | JSON status (account and ICS URLs only with a valid `?pin=`): version, Wi-Fi, accounts, ICS, desk, low power, sync interval, update link, OTA state. No tokens or passwords. |
 | `/pin` | POST | yes | Check the PIN |
-| `/account/add`, `/account/remove` | POST | yes | Google accounts. The URL must start with `https://script.google.com/` and end with `/exec`. |
-| `/ics/add`, `/ics/remove` | POST | yes | Calendar links |
+| `/account/add`, `/account/edit`, `/account/remove` | POST | yes | Google accounts. Edit takes `i`, `label`, `url` and an optional `token` (empty = keep). The URL must start with `https://script.google.com/` and end with `/exec`. |
+| `/ics/add`, `/ics/edit`, `/ics/remove` | POST | yes | Calendar links |
 | `/settings/sync` | POST | yes | Sync interval (1 to 60; the page offers 2 to 30) |
 | `/settings/update-url` | POST | yes | Manifest address |
 | `/settings/lowpower` | POST | yes | Low power: `on`, `start`, `end` (minutes after midnight), `weekends`, `deep` (0 or 1) |

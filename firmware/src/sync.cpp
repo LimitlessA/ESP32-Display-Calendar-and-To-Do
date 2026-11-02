@@ -868,6 +868,28 @@ void setWifiError(bool up, WifiState st) {
   }
 }
 
+template <typename T>
+void dropAccount(std::vector<T> &v, uint8_t a) {
+  v.erase(std::remove_if(v.begin(), v.end(), [a](const T &x) { return x.account == a; }), v.end());
+}
+
+// An account got a new URL or token: forget what it fetched before (it may be
+// another Google account now) and its error. Call with the lock held.
+void forgetAccount(uint8_t a) {
+  dropAccount(snapshot.events, a);
+  dropAccount(snapshot.tasks, a);
+  dropAccount(snapshot.done, a);
+  dropAccount(snapshot.lists, a);
+  dropAccount(snapshot.dates, a);
+  dropAccount(snapshot.week, a);
+  if (a < snapshot.accounts.size()) snapshot.accounts[a] = AccountStatus();
+  const String ek = eventHiddenKey(a, ""), tk = taskHiddenKey(a, "");
+  for (auto it = hidden.begin(); it != hidden.end();) {
+    it = (it->first.startsWith(ek) || it->first.startsWith(tk)) ? hidden.erase(it) : std::next(it);
+  }
+  pending.erase(std::remove_if(pending.begin(), pending.end(), [a](const Action &x) { return x.account == a; }), pending.end());
+}
+
 void workerLoop(void *) {
   Settings s = settings_get();
   uint32_t settingsVersion = settings_version();
@@ -886,9 +908,10 @@ void workerLoop(void *) {
     if (settings_version() != settingsVersion) {
       const Settings next = settings_get();
       settingsVersion = settings_version();
-      bool accountsChanged = next.accounts.size() != s.accounts.size();
+      const bool accountsChanged = next.accounts.size() != s.accounts.size();
+      std::vector<uint8_t> edited;  // same list, but this one got a new URL or token
       for (size_t i = 0; !accountsChanged && i < next.accounts.size(); i++) {
-        accountsChanged = next.accounts[i].url != s.accounts[i].url || next.accounts[i].token != s.accounts[i].token;
+        if (next.accounts[i].url != s.accounts[i].url || next.accounts[i].token != s.accounts[i].token) edited.push_back(i);
       }
       bool icsChanged = next.ics.size() != s.ics.size();
       for (size_t i = 0; !icsChanged && i < next.ics.size(); i++) {
@@ -909,7 +932,15 @@ void workerLoop(void *) {
         addedIds.clear();
         snapshot.version++;
         refreshRequested = true;
-      } else if (icsChanged) {
+      } else if (edited.size()) {
+        // Only these accounts start over; the others keep their data and queued actions.
+        Guard g;
+        for (uint8_t a : edited) forgetAccount(a);
+        snapshot.version++;
+        refreshRequested = true;
+        fullRequested = true;
+      }
+      if (!accountsChanged && icsChanged) {
         Guard g;
         snapshot.ics.assign(s.ics.size(), IcsStatus());
         snapshot.version++;

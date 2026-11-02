@@ -30,11 +30,15 @@ constexpr const char *kBadUrl = "The URL should look like https://script.google.
 constexpr const char *kTooMany = "Too many accounts";
 constexpr const char *kAdded = "Account added. It syncs within a few seconds.";
 constexpr const char *kRemoved = "Account removed.";
+constexpr const char *kEdited = "Account saved.";
+constexpr const char *kEditedSync = "Account saved. It syncs within a few seconds.";
+constexpr const char *kNoItem = "That entry no longer exists. Reload the page.";
 constexpr const char *kLinkSaved = "Update link saved.";
 constexpr const char *kBadIcs = "The calendar link should start with https://, http:// or webcal://";
 constexpr const char *kTooManyIcs = "Too many calendar links";
 constexpr const char *kIcsAdded = "Calendar added. It shows up with the next sync.";
 constexpr const char *kIcsRemoved = "Calendar removed.";
+constexpr const char *kIcsEdited = "Calendar saved. It shows up with the next sync.";
 constexpr const char *kSyncSaved = "Sync interval saved.";
 constexpr const char *kLowPowerSaved = "Low power saved.";
 constexpr const char *kDeskSaved = "Desk settings saved. Turn the desk on in Settings > Features > Smart desk.";
@@ -125,6 +129,8 @@ void handleState() {
   const OtaStatus ota = ota_status();
   const esp_partition_t *slot = esp_ota_get_next_update_partition(nullptr);
 
+  // The edit forms need the URLs, but ICS links are secrets of their own, so only with the PIN.
+  const bool priv = server.hasArg("pin") && checkPin(server.arg("pin"));
   JsonDocument doc(psram_json());
   doc["v"] = FIRMWARE_VERSION;
   doc["host"] = HOSTNAME ".local";
@@ -142,6 +148,7 @@ void handleState() {
     const AccountStatus st = i < snap.accounts.size() ? snap.accounts[i] : AccountStatus();
     JsonObject a = accounts.add<JsonObject>();
     a["label"] = s.accounts[i].label;
+    if (priv) a["url"] = s.accounts[i].url;
     a["color"] = hex(s.accounts[i].color);
     a["email"] = st.email;
     a["synced"] = st.syncedAt != 0;
@@ -153,6 +160,7 @@ void handleState() {
     const IcsStatus st = i < snap.ics.size() ? snap.ics[i] : IcsStatus();
     JsonObject c = ics.add<JsonObject>();
     c["label"] = s.ics[i].label;
+    if (priv) c["url"] = s.ics[i].url;
     c["color"] = hex(s.ics[i].color);
     c["name"] = st.name;
     c["synced"] = st.synced;
@@ -213,6 +221,33 @@ void handleAddAccount() {
   reply(kAdded);
 }
 
+// Edits label and URL; a token is only replaced when one is sent (the page never gets the stored one).
+void handleEditAccount() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  const size_t i = server.arg("i").toInt();
+  const String url = server.arg("url");
+  if (!url.startsWith("https://script.google.com/") || !url.endsWith("/exec")) {
+    server.send(400, "text/plain", kBadUrl);
+    return;
+  }
+  if (i >= s.accounts.size() || !server.hasArg("i")) {
+    server.send(400, "text/plain", kNoItem);
+    return;
+  }
+  String label = server.arg("label");
+  label.trim();
+  Account &a = s.accounts[i];
+  const String token = server.arg("token");
+  const bool changed = url != a.url || (token.length() && token != a.token);
+  a.label = label.substring(0, kMaxLabel);
+  a.url = url;
+  if (token.length()) a.token = token;
+  settings_save(s);  // the sync worker sees the new version and restarts only this account
+  if (changed) sync_refresh();
+  reply(changed ? kEditedSync : kEdited);
+}
+
 void handleRemoveAccount() {
   if (!pinOk()) return;
   Settings s = settings_get();
@@ -244,6 +279,31 @@ void handleAddIcs() {
   settings_save(s);
   sync_refresh();
   reply(kIcsAdded);
+}
+
+void handleEditIcs() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  const size_t i = server.arg("i").toInt();
+  String url = server.arg("url");
+  url.trim();
+  if (!url.startsWith("https://") && !url.startsWith("webcal://") && !url.startsWith("http://")) {
+    server.send(400, "text/plain", kBadIcs);
+    return;
+  }
+  if (i >= s.ics.size() || !server.hasArg("i")) {
+    server.send(400, "text/plain", kNoItem);
+    return;
+  }
+  String label = server.arg("label");
+  label.trim();
+  label = label.substring(0, kMaxLabel);
+  const bool changed = url != s.ics[i].url || label != s.ics[i].label;
+  s.ics[i].label = label;
+  s.ics[i].url = url;
+  settings_save(s);
+  if (changed) sync_refresh();
+  reply(kIcsEdited);
 }
 
 void handleRemoveIcs() {
@@ -380,8 +440,10 @@ void web_begin() {
   server.on("/state", HTTP_GET, handleState);
   server.on("/pin", HTTP_POST, handlePin);
   server.on("/account/add", HTTP_POST, handleAddAccount);
+  server.on("/account/edit", HTTP_POST, handleEditAccount);
   server.on("/account/remove", HTTP_POST, handleRemoveAccount);
   server.on("/ics/add", HTTP_POST, handleAddIcs);
+  server.on("/ics/edit", HTTP_POST, handleEditIcs);
   server.on("/ics/remove", HTTP_POST, handleRemoveIcs);
   server.on("/settings/sync", HTTP_POST, handleSyncInterval);
   server.on("/settings/update-url", HTTP_POST, handleUpdateUrl);

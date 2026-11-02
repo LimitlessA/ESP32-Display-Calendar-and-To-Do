@@ -40,6 +40,7 @@ input[type=file]::file-selector-button{background:var(--rs);color:var(--tx);bord
 .b:disabled{opacity:.5;cursor:default}
 .li{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rs)}
 .li .b{margin:0;padding:8px 12px}
+.li.ed{flex-direction:column;align-items:stretch;gap:0}.li.ed .b{margin:12px 8px 0 0;padding:10px 18px}
 .sq{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--on);font-weight:700;flex:none}
 .g{flex:1;min-width:0;overflow-wrap:anywhere}
 .msg{margin:10px 0 0;font-size:14px}.msg:empty{display:none}
@@ -136,24 +137,39 @@ function post(u,f,m,done,busy){
   if(r.status==404)t="This firmware can't do that yet. Update it on the Device tab.";
   say(m,t||('Error '+r.status),r.ok?'ok':'er');if(r.ok&&done)done(t)})})
  .catch(function(){say(m,'No answer from the display. Is it on and on the same Wi-Fi?','er')})}
-function row(color,name,sub,cls,url,i,m){
- var r=el('div','li'),q=el('span','sq',(name||'?')[0].toUpperCase()),g=el('div','g'),x=el('button','b s','Remove'),t;
+function row(color,name,sub,cls,url,i,m,ed){
+ var r=el('div','li'),q=el('span','sq',(name||'?')[0].toUpperCase()),g=el('div','g'),x=el('button','b s','Remove'),t,e=el('button','b s','Edit');
  q.style.background=color;g.appendChild(el('b',0,name));g.appendChild(el('div','m '+cls,sub));
  x.onclick=function(){if(x.textContent=='Remove'){x.textContent='Sure?';x.className='b x';t=setTimeout(function(){x.textContent='Remove';x.className='b s'},4000);return}
   clearTimeout(t);x.disabled=true;post(url,{i:i},m,load,'Removing...')};
- r.appendChild(q);r.appendChild(g);r.appendChild(x);return r}
+ e.onclick=function(){edit(r,ed,i,m)};
+ r.appendChild(q);r.appendChild(g);r.appendChild(e);r.appendChild(x);return r}
+// Inline edit form. The URLs come from /state?pin=..., the token is never sent to the page.
+function edit(r,ed,i,m){
+ if(!P){say(m,'Enter the PIN at the top first.','er');$('pin').focus();return}
+ fetch('/state?pin='+encodeURIComponent(P)).then(function(q){return q.json()}).then(function(d){
+  var a=d[ed.k][i],f=el('form'),n=ed.k+i,s=el('p','msg'),b=el('button','b','Save'),c=el('button','b s','Cancel');
+  function fld(l,k,v,ph){var u=el('input');u.id=n+k;u.value=v;u.placeholder=ph||'';u.autocomplete='off';u.maxLength=k=='l'?20:400;
+   var h=el('label',0,l);h.htmlFor=u.id;f.appendChild(h);f.appendChild(u);return u}
+  if(!a||a.url==null){say(m,'Enter the PIN at the top first.','er');return}
+  fld('Name shown on the display','l',a.label);fld(ed.n,'u',a.url);
+  if(ed.t)fld('Token','t','','unchanged if empty').type='password';
+  c.type='button';c.onclick=function(){load()};f.appendChild(b);f.appendChild(c);f.appendChild(s);
+  f.onsubmit=function(e){e.preventDefault();post(ed.u,{i:i,label:$(n+'l').value,url:$(n+'u').value,token:ed.t?$(n+'t').value:''},s,function(t){say(m,t,'ok');load()})};
+  r.textContent='';r.className='li ed';r.appendChild(f);$(n+'l').focus()})
+ .catch(function(){say(m,'No answer from the display.','er')})}
 function list(id,a,empty,f){var l=$(id);l.textContent='';if(!a.length&&empty)l.appendChild(el('p','m',empty));a.forEach(function(x,i){l.appendChild(f(x,i))})}
 function render(d,fill){
  D=d;var w=d.wifi,k=d.desk,o=d.ota,s;
  $('hv').textContent='v'+d.v+(w.ip?' · '+w.ip:'');
  list('gl',d.accounts,'No Google accounts yet. Add one below.',function(a,i){
   return row(a.color,a.label,a.error||(a.synced?'Synced'+(a.email?' · '+a.email:''):'Not synced yet'),a.error?'er':a.synced?'ok':'',
-   '/account/remove',i,$('gm'))});
+   '/account/remove',i,$('gm'),{k:'accounts',u:'/account/edit',n:'Web app URL',t:1})});
  $('gf').querySelector('button').disabled=d.accounts.length>=d.maxAccounts;
  $('if').querySelector('button').disabled=d.ics.length>=d.maxIcs;
  list('il',d.ics,'No published calendars yet.',function(c,i){
   return row(c.color,c.label,c.error||(c.synced?'Synced \u00b7 '+c.events+' events'+(c.name&&c.name!=c.label?' \u00b7 '+c.name:''):'Not synced yet'),
-   c.error?'er':c.synced?'ok':'','/ics/remove',i,$('im'))});
+   c.error?'er':c.synced?'ok':'','/ics/remove',i,$('im'),{k:'ics',u:'/ics/edit',n:'Calendar link (ICS)'})});
  s=$('ds');s.textContent='';
  if(!k.on)s.appendChild(el('p','st wn','Desk control is off. Turn it on at the display: Settings › Features › Smart desk.'));
  else s.appendChild(el('p','st '+(k.online?'ok':'er'),k.online?'Connected'+(k.loggedIn?', logged in':k.user?', login refused':', as guest'):'Not reachable'+(k.error?': '+k.error:'')));
@@ -203,5 +219,5 @@ $('wf').onsubmit=function(e){e.preventDefault();var m=$('fm'),f=$('fw').files[0]
   if(x.status==200)lock('The display restarts with a new PIN. Enter it to make more changes.','ok')};
  x.onerror=function(){p.hidden=true;say(m,'Upload interrupted. Try again.','er')};
  var fd=new FormData();fd.append('fw',f,f.name);p.value=0;p.hidden=false;say(m,'Uploading... keep this page open.');x.send(fd)};
-load(true);setInterval(function(){if(!document.hidden)load()},15000);
+load(true);setInterval(function(){if(!document.hidden&&!document.querySelector('.ed'))load()},15000);
 </script></body></html>
