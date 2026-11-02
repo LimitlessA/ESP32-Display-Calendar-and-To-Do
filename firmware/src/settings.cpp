@@ -52,6 +52,7 @@ String toJson(const Settings &s) {
   doc["syncMinutes"] = s.refreshMinutes;
   doc["theme"] = s.theme;
   doc["updateUrl"] = s.updateUrl;
+  doc["timezone"] = s.timezone;
   doc["autoUpdate"] = s.autoUpdate;
   doc["sound"] = s.sound;
   doc["summary"] = s.summary;
@@ -124,6 +125,7 @@ bool fromJson(const String &json, Settings &s) {
   s.refreshMinutes = max<uint8_t>(1, doc["syncMinutes"] | d.refreshMinutes);
   s.theme = doc["theme"] | d.theme;
   s.updateUrl = doc["updateUrl"] | d.updateUrl;
+  s.timezone = doc["timezone"] | d.timezone;
   s.autoUpdate = doc["autoUpdate"] | d.autoUpdate;
   s.sound = doc["sound"] | d.sound;
   s.summary = doc["summary"] | d.summary;

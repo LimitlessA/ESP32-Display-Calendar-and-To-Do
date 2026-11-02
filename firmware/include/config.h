@@ -25,6 +25,10 @@
 #define DEFAULT_UPDATE_URL \
   "https://github.com/LimitlessA/ESP32-Display-Calendar-and-To-Do/releases/latest/download/" MANIFEST_FILE
 #define HOSTNAME         "calendar"   // setup page at http://calendar.local
+// Time zone until the first sync says otherwise (POSIX TZ, Romania with
+// daylight saving). Without it a display with no account ran on UTC: wrong
+// clock, and night mode at the wrong hours.
+#define DEFAULT_TZ "EET-2EEST,M3.5.0/3,M10.5.0/4"
 
 // TF card on SPI (same pins on the 5.0" and 7.0")
 #define SD_SCK   12

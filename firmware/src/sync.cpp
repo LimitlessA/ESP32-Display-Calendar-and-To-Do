@@ -443,9 +443,31 @@ void parseCalendars(JsonArray arr, std::vector<CalendarInfo> &out, std::vector<I
   }
 }
 
-// Fixed-offset POSIX TZ, refreshed on every sync so DST changes are picked up
-// within one refresh interval. POSIX offsets are positive west of UTC.
+// Minutes east of UTC that the current TZ gives right now.
+int currentOffsetMinutes() {
+  const time_t now = time(nullptr);
+  struct tm lt, gt;
+  localtime_r(&now, &lt);
+  gmtime_r(&now, &gt);
+  int days = lt.tm_yday - gt.tm_yday;
+  if (days > 1) days = -1;  // across New Year
+  if (days < -1) days = 1;
+  return days * 1440 + (lt.tm_hour - gt.tm_hour) * 60 + (lt.tm_min - gt.tm_min);
+}
+
+void setTimezone(const String &tz) {
+  timezone = tz;
+  setenv("TZ", tz.c_str(), 1);
+  tzset();
+}
+
+// The feed sends the account's UTC offset. If the TZ in use (with its DST
+// rules, e.g. the default) already gives that offset, keep it; otherwise use
+// a fixed-offset TZ, refreshed on every sync so DST changes are picked up
+// within one refresh interval. Either way it is saved, so the clock is right
+// from the next start-up, before any sync. POSIX offsets are positive west.
 void applyUtcOffset(int minutes) {
+  if (timezone.length() && currentOffsetMinutes() == minutes) return;
   const int west = -minutes;
   char buf[24];
   if (west % 60) {
@@ -454,9 +476,10 @@ void applyUtcOffset(int minutes) {
     snprintf(buf, sizeof(buf), "UTC%+d", west / 60);
   }
   if (timezone == buf) return;
-  timezone = buf;
-  setenv("TZ", buf, 1);
-  tzset();
+  setTimezone(buf);
+  Settings s = settings_get();
+  s.timezone = buf;
+  settings_save(s);
 }
 
 void sortAndFilter(std::vector<Event> &events, std::vector<Task> &tasks) {
@@ -889,10 +912,7 @@ void workerLoop(void *) {
     if (up) {
       if (!clockSet) {
         configTime(0, 0, kNtpServer1, kNtpServer2);
-        if (timezone.length()) {
-          setenv("TZ", timezone.c_str(), 1);
-          tzset();
-        }
+        if (timezone.length()) setTimezone(timezone);  // configTime resets TZ
         clockSet = true;
         // The first feed asks for this week from Monday, so give NTP a moment.
         for (int i = 0; i < 40 && time(nullptr) < kClockValid; i++) delay(100);
@@ -944,6 +964,7 @@ void wake() {
 void sync_start() {
   lock = xSemaphoreCreateMutex();
   const Settings s = settings_get();
+  setTimezone(s.timezone.length() ? s.timezone : String(DEFAULT_TZ));
   snapshot.accounts.resize(s.accounts.size());
   snapshot.ics.resize(s.ics.size());
   // Core 0 alongside the Wi-Fi stack; LVGL runs in loop() on core 1. The
