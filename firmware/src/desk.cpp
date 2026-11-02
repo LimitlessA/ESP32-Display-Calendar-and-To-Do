@@ -22,8 +22,12 @@ constexpr uint32_t kHoldBeatMs = 350;      // the desk stops a hold 10 s (hold_t
 constexpr uint32_t kMemoryEveryMs = 300000;  // memory heights change rarely
 constexpr uint32_t kResolveEveryMs = 60000;  // look the .local name up again after failures
 constexpr uint16_t kTimeoutMs = 1500;
+// A login checks the password hash, writes the session to flash and wakes the desk:
+// 0.6-1.6 s for a wrong password, longer for a right one, so 1.5 s often timed out.
+constexpr uint16_t kLoginTimeoutMs = 8000;
 constexpr const char *kNotFound = "Desk not found at %s";
 constexpr const char *kLoginFailed = "The desk did not accept the login";
+constexpr const char *kLoginNoAnswer = "The desk did not answer the login";
 constexpr const char *kNeedsLogin = "Needs a desk login (Features > Smart desk > Desk address and login)";
 constexpr const char *kTestNoWifi = "The display is not on Wi-Fi";
 constexpr const char *kTestNoHost = "Enter the desk address first";
@@ -88,9 +92,10 @@ bool baseUrl(const Settings &s, String &url) {
 }
 
 // One request; returns the HTTP status (or a negative error) and the body.
-int request(const String &url, const char *method, const String &body, String &out, bool auth = true) {
+int request(const String &url, const char *method, const String &body, String &out, bool auth = true,
+            uint16_t timeoutMs = kTimeoutMs) {
   HTTPClient http;
-  http.setTimeout(kTimeoutMs);
+  http.setTimeout(timeoutMs);
   http.setConnectTimeout(kTimeoutMs);
   if (!http.begin(url)) return -1;
   if (auth && token.length()) http.addHeader("Authorization", "Bearer " + token);
@@ -114,13 +119,14 @@ bool login(const String &base, const Settings &s) {
   doc["password"] = s.deskPassword;
   String body, out;
   serializeJson(doc, body);
-  const int code = request(base + "/api/auth/login", "POST", body, out, false);
+  const int code = request(base + "/api/auth/login", "POST", body, out, false, kLoginTimeoutMs);
+  Serial.printf("[desk] login -> %d\n", code);
   JsonDocument reply(psram_json());
   if (code == 200 && !deserializeJson(reply, out)) token = reply["token"] | "";
   const bool ok = token.length() > 0;
   update([&](DeskStatus &st) {
     st.loggedIn = ok;
-    if (!ok) st.error = kLoginFailed;
+    if (!ok) st.error = code == 401 || code == 400 ? kLoginFailed : kLoginNoAnswer;
   });
   return ok;
 }

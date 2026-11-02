@@ -668,7 +668,8 @@ older firmware):
 The desk runs the MicroPython firmware of SmartStandingDeskDualCore
 (`web_server.py`, `api_handlers.py`). `desk.cpp` uses these routes. The base URL is
 `http://<deskHost>`; a `.local` name is resolved with mDNS and the IP is cached.
-Calls time out after 1.5 s.
+Calls time out after 1.5 s, the login after 8 s: the desk takes 0.6 to 1.6 s to
+refuse a wrong password and longer to accept a right one.
 
 | Route | Method | Login | Sent by the display |
 |---|---|---|---|
