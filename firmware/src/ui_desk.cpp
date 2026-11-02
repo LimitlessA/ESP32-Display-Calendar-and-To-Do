@@ -76,8 +76,7 @@ struct Live {
   lv_obj_t *card = nullptr, *ring = nullptr, *ringNum = nullptr;  // B: the timer card
   int sig = 0, shown = -1;
   lv_obj_t *mem[4] = {};
-  lv_obj_t *deskTop = nullptr;   // B: the drawn desk top moves with the height...
-  lv_obj_t *legs[2] = {};        // ...and the legs grow under it
+  lv_obj_t *deskTop = nullptr;   // B: the drawn desk, redrawn at each height
   lv_obj_t *today = nullptr;
   int curMm = 0;                 // height the drawing is at right now
   int shownMm = 0;               // height the drawing is at (or gliding to)
@@ -144,17 +143,71 @@ int timerProgress(const DeskStatus &st) {  // 0-1000
   return (int)(1000 - std::min(st.timerLeft, len) * 1000 / len);
 }
 
-// The drawn desk: 650-1300 mm maps onto 150 px of travel. Only the top and the two thin legs move.
-void placeDesk(Live &live, int mm) {
-  live.curMm = mm;
-  if (!live.deskTop) return;
-  const int y = 190 - (std::max(650, std::min(1300, mm)) - 650) * 150 / 650;
-  if (lv_obj_get_style_y(live.deskTop, LV_PART_MAIN) == y) return;  // moving redraws it
-  lv_obj_set_y(live.deskTop, y);
-  for (lv_obj_t *leg : live.legs) {
-    lv_obj_set_y(leg, y + 14);
-    lv_obj_set_height(leg, 256 - y - 14);
+// The drawn desk, traced from the desk frame's CAD model (Desk_Frame_1800x600) in a three-quarter
+// view: graphite frame, gray top. Points are in that view's pixels at 740 mm (0.47 px per mm). The
+// feet and outer columns stay, the middle columns rise half as far as the top, the inner columns
+// and the top all the way. Each shape is a quad: x, y and lift (0 none, 1 half, 2 full) per corner.
+struct ArtQuad {
+  uint8_t color;
+  int16_t p[4][3];
+};
+constexpr uint32_t kArtColors[] = {
+    0x30343A, 0x4A4F56,            // feet, their top face
+    0x3A3E45, 0x292C31,            // outer column, its side
+    0x484D55, 0x33363C,            // middle column, its side
+    0x5A6069, 0x3F4349,            // inner column, its side
+    0x6E737A, 0x5A5E65, 0xA3A8AF,  // top: front edge, side edge, surface
+};
+// Columns: front face and side face of one stage, from x0 to x1 (front) and x2 (side).
+#define ART_COL(c, x0, x1, x2, yt, lt, yb, lb)                                   \
+  {c, {{x0, yt, lt}, {x1, yt, lt}, {x1, yb, lb}, {x0, yb, lb}}},                 \
+  { c + 1, {{x1, yt, lt}, {x2, yt + 3, lt}, {x2, yb + 3, lb}, {x1, yb, lb}} }
+constexpr ArtQuad kArt[] = {
+    {0, {{80, 440, 0}, {230, 410, 0}, {237, 423, 0}, {86, 453, 0}}},
+    {1, {{80, 440, 0}, {230, 410, 0}, {233, 415, 0}, {82, 445, 0}}},
+    {0, {{719, 494, 0}, {869, 467, 0}, {876, 481, 0}, {724, 508, 0}}},
+    {1, {{719, 494, 0}, {869, 467, 0}, {872, 472, 0}, {721, 499, 0}}},
+    ART_COL(2, 128, 171, 183, 205, 0, 432, 0),
+    ART_COL(4, 131, 167, 176, 140, 1, 207, 0),
+    ART_COL(6, 135, 164, 172, 112, 2, 142, 1),
+    ART_COL(2, 769, 807, 820, 258, 0, 490, 0),
+    ART_COL(4, 772, 802, 813, 195, 1, 260, 0),
+    ART_COL(6, 776, 799, 808, 140, 2, 197, 1),
+    {0, {{745, 151, 2}, {822, 132, 2}, {824, 141, 2}, {747, 160, 2}}},
+    {0, {{128, 104, 2}, {176, 104, 2}, {178, 114, 2}, {130, 114, 2}}},
+    {0, {{768, 133, 2}, {812, 133, 2}, {814, 142, 2}, {770, 142, 2}}},
+    {8, {{36, 92, 2}, {708, 150, 2}, {708, 159, 2}, {36, 101, 2}}},
+    {9, {{708, 150, 2}, {905, 100, 2}, {905, 109, 2}, {708, 159, 2}}},
+    {10, {{36, 92, 2}, {237, 41, 2}, {905, 100, 2}, {708, 150, 2}}},
+};
+#undef ART_COL
+// The part of the view in use: the top at 1300 mm down to the right foot.
+constexpr int kArtX0 = 36, kArtY0 = -230, kArtW = 870, kArtH = 740;
+
+void drawDesk(lv_event_t *e) {
+  const Live *live = static_cast<const Live *>(lv_event_get_user_data(e));
+  lv_area_t a;
+  lv_obj_get_coords(lv_event_get_target(e), &a);
+  const float k = std::min((float)lv_area_get_width(&a) / kArtW, (float)lv_area_get_height(&a) / kArtH);
+  const float ox = a.x1 + (lv_area_get_width(&a) - kArtW * k) / 2, oy = a.y1 + (lv_area_get_height(&a) - kArtH * k) / 2;
+  const float lift = (std::max(650, std::min(1300, live->curMm ? live->curMm : 750)) - 740) * (348.0f / 740);
+  lv_draw_rect_dsc_t d;
+  lv_draw_rect_dsc_init(&d);
+  for (const ArtQuad &q : kArt) {
+    lv_point_t pts[4];
+    for (int i = 0; i < 4; i++) {
+      pts[i].x = (lv_coord_t)(ox + (q.p[i][0] - kArtX0) * k);
+      pts[i].y = (lv_coord_t)(oy + (q.p[i][1] - kArtY0 - lift * q.p[i][2] / 2) * k);
+    }
+    d.bg_color = c(kArtColors[q.color]);
+    lv_draw_polygon(lv_event_get_draw_ctx(e), &d, pts, 4);
   }
+}
+
+void placeDesk(Live &live, int mm) {
+  if (live.curMm == mm) return;
+  live.curMm = mm;
+  if (live.deskTop) lv_obj_invalidate(live.deskTop);
 }
 
 // The glide animates `live` itself (not an object), so it must be stopped
@@ -435,20 +488,11 @@ void buildScreenB(const DeskStatus &st) {
   lv_obj_t *cfg = mk_chip(left, kDeskSettings, false, 32);
   lv_obj_set_pos(cfg, 10, 8);
   on_click(cfg, [](lv_event_t *) { lv_async_call([](void *) { desk_settings_show(); }, nullptr); });
-  // A drawn desk: the top moves up and down with the real one.
-  for (int i = 0; i < 2; i++) {
-    live.legs[i] = mk_box(left, t.line, 2);
-    lv_obj_set_size(live.legs[i], 12, 100);
-    lv_obj_set_x(live.legs[i], i ? 196 : 80);
-  }
-  for (int x : {64, 180}) {
-    lv_obj_t *foot = mk_box(left, t.line, 4);
-    lv_obj_set_size(foot, 44, 8);
-    lv_obj_set_pos(foot, x, 256);
-  }
-  live.deskTop = mk_box(left, t.accent, 6);
-  lv_obj_set_size(live.deskTop, 200, 14);
-  lv_obj_set_x(live.deskTop, 50);
+  // A drawn desk that moves up and down with the real one.
+  live.deskTop = transparent(left);
+  lv_obj_set_pos(live.deskTop, 10, 46);
+  lv_obj_set_size(live.deskTop, 280, BODY_H - 46 - 104);
+  lv_obj_add_event_cb(live.deskTop, drawDesk, LV_EVENT_DRAW_MAIN_END, &live);
   lv_obj_t *col = transparent(left);
   lv_obj_set_width(col, 300);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
