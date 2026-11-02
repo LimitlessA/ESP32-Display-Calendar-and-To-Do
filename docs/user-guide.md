@@ -470,8 +470,8 @@ This needs a standing desk running SmartStandingDeskDualCore. Turn on
 **Smart desk** in Features. Set the address and login (see
 [Desk settings](#desk-settings-and-login)).
 
-Without a desk login, only the **memory buttons** and **Stop** work. With a
-login you also get **hold to raise or lower**, the **sit/stand timer** and away
+Without a desk login, only **Stop** works. With a login you also get the
+**memory buttons**, **hold to raise or lower**, the **sit/stand timer** and away
 mode. The login needs the desk's **user** role.
 
 The three layouts:
@@ -495,11 +495,16 @@ The three layouts:
 - Press and hold. The desk moves while your finger is down and stops when you
   let go.
 - Only with a desk login.
-- **Not sure** how fast the desk stops on its own if the display loses contact
-  while you hold. The display comment says about half a second. The desk's own
-  setting (`hold_timeout_ms`) is 10 seconds by default. Let go to stop it.
+- If a hold or release message does not reach the desk, the display sends Stop.
+  If the display loses power or Wi-Fi while you hold, the desk only stops by
+  itself after its `hold_timeout_ms` setting, 10 seconds by default.
 
-**Stop** stops the desk at once. It needs no login.
+**Stop** stops the desk at once. It needs no login. It is the desk's normal
+stop, not its emergency stop.
+
+If the desk state says **Emergency stop**, the emergency stop was pressed on the
+desk's web page. The desk then refuses every button on the display until an
+admin clears it on that web page.
 
 **The ring timer (sit/stand)**
 - Only with a desk login. It is the desk's own timer. Tap the play triangle in

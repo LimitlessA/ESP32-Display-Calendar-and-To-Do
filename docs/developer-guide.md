@@ -676,8 +676,8 @@ Calls time out after 1.5 s.
 | `/interval/status` | GET | no | With each poll: `running`, `paused`, `phase`, `remaining_seconds`, `sit_minutes`, `stand_minutes` |
 | `/api/auth/login` | POST | no | `{"username","password"}`, returns `token`. Used as `Authorization: Bearer <token>`. Re-done on a 401. |
 | `/api/desk/memory` | GET | yes | Every 5 minutes: memory heights (accepts several JSON shapes) |
-| `/position` | POST | no | `{"position":N}` for N from 1 to 4. Falls back to `{"position":"MN"}`. Retried signed in on 401 or 403. |
-| `/api/desk/emergency-stop` | POST | no | Stop |
+| `/position` | POST | user | `{"position":N}` for N from 1 to 4. Falls back to `{"position":"MN"}`. Sent as a guest first, retried signed in on 401 or 403. |
+| `/stop` | POST | no | Stop. The desk's normal stop, which does not latch. |
 | `/api/desk/hold` | POST | user | `{"direction":"up"\|"down"}` every 350 ms while held |
 | `/api/desk/hold/stop` | POST | user | On release |
 | `/interval/start` | POST | user | `sit_min`, `stand_min`, `sit_target_mm`, `stand_target_mm` |
@@ -685,6 +685,10 @@ Calls time out after 1.5 s.
 | `/api/away/start`, `/api/away/end` | POST | yes | Away mode |
 
 Notes from reading the desk code:
+- Do not use `POST /api/desk/emergency-stop` for Stop. It latches: the desk then
+  refuses every command (`"Emergency stop active"`) until an admin sends
+  `DELETE /api/desk/emergency-stop`. The display shows that state as
+  "Emergency stop" and does not clear it by itself.
 - The display logs every memory call to the serial port (`[desk] ...`).
 - The desk checks the **user** role for hold, hold/stop and interval routes. Away
   start and end only check that you are logged in.
@@ -696,10 +700,11 @@ Notes from reading the desk code:
   `PAUSED`. `ui_desk.cpp` compares the phase with `"SIT"` (and `desk.h` says
   "SIT, STAND, IDLE"). The comparison never matches, so the display always takes
   the sit phase for the stand phase.
-- **Possibly a concern:** the display's comment says the desk stops a hold about
-  500 ms after the last beat. The desk's `hold_timeout_ms` default is 10000, so if
-  the display stops sending (for example it crashes) while a button is held, the
-  desk may keep moving for up to 10 seconds.
+- **Hold timeout:** the desk ends a hold `hold_timeout_ms` (default 10000) after
+  the last beat. When a beat or the release gets an error, the display sends
+  `POST /stop` at once. If the display crashes or loses Wi-Fi mid-hold, only the
+  desk's timeout stops it; lowering `hold_timeout_ms` to about 1000 in the desk's
+  config would close that gap.
 
 ## Things that look unclear or possibly broken
 
