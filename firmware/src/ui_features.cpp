@@ -53,7 +53,7 @@ const char *const kVariants[kLayoutCount][3] = {
     {"Dock on Home", "Desk screen", "Follows calendar"},      // smart desk
 };
 
-enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves, SleepStart, SleepEnd, RemindMinutes, NightStart, NightEnd, DimAfter, DimLevel };
+enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves, SleepStart, SleepEnd, RemindMinutes, SleepIdle, NightStart, NightEnd, DimAfter, DimLevel };
 
 struct Feature {
   const char *name;
@@ -122,6 +122,7 @@ const char *optionLabel(Opt o) {
     case Opt::SleepStart:
     case Opt::NightStart: return "From";
     case Opt::RemindMinutes: return "Before";
+    case Opt::SleepIdle: return "Idle before sleep";
     case Opt::DimAfter: return "Idle dim after";
     case Opt::DimLevel: return "Dim to";
     default: return kOptionRow;
@@ -154,6 +155,7 @@ OptRange optRange(Opt o) {
     case Opt::NightStart:
     case Opt::NightEnd: return {0, 23 * 60 + 30, 30, fmtClock};
     case Opt::RemindMinutes: return {1, 30, 1, fmtMin};
+    case Opt::SleepIdle: return {1, 30, 1, fmtMin};
     case Opt::DimAfter: return {1, 30, 1, fmtMin};
     case Opt::DimLevel: return {5, 60, 5, fmtPct};
     default: return {0, 0, 1, fmtCount};
@@ -172,6 +174,7 @@ int optionNumber(Opt o, const Settings &s) {
     case Opt::SleepStart: return s.sleepStart;
     case Opt::SleepEnd: return s.sleepEnd;
     case Opt::RemindMinutes: return s.remindMinutes;
+    case Opt::SleepIdle: return s.sleepIdleMinutes;
     case Opt::NightStart: return s.nightStart;
     case Opt::NightEnd: return s.nightEnd;
     case Opt::DimAfter: return s.dimAfterMinutes;
@@ -192,6 +195,7 @@ void applyOption(Settings &s, Opt o, int v) {
     case Opt::SleepStart: s.sleepStart = v; break;
     case Opt::SleepEnd: s.sleepEnd = v; break;
     case Opt::RemindMinutes: s.remindMinutes = v; break;
+    case Opt::SleepIdle: s.sleepIdleMinutes = v; break;
     case Opt::NightStart: s.nightStart = v; break;
     case Opt::NightEnd: s.nightEnd = v; break;
     case Opt::DimAfter: s.dimAfterMinutes = v; break;
@@ -417,6 +421,10 @@ void showDialog(int i) {
     const OptRange r = optRange(Opt::SleepEnd);
     mk_stepper(row, cur().sleepEnd, r.min, r.max, r.step, r.fmt, stepped,
                (void *)(intptr_t)(i | (int)Opt::SleepEnd << 8), 96);
+    lv_obj_t *idleRow = optionRow(card, optionLabel(Opt::SleepIdle));
+    const OptRange ir = optRange(Opt::SleepIdle);
+    mk_stepper(idleRow, optionNumber(Opt::SleepIdle, cur()), ir.min, ir.max, ir.step, ir.fmt, stepped,
+               (void *)(intptr_t)(i | (int)Opt::SleepIdle << 8), 96);
     mk_segmented(optionRow(card, kModeRow), kSleepModes, 2, cur().sleepMode, 150, [](int idx, void *) {
       lv_async_call([](void *p) {
         flushPending();

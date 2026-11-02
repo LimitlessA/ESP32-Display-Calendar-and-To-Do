@@ -318,7 +318,7 @@ Nothing is sent to the phone.
   display sleeps: the screen is dark and Wi-Fi is off. **All day on weekends**
   adds Saturday and Sunday.
 - **Tap anywhere** to wake it. The tap that wakes it does not press a button.
-  It sleeps again 5 minutes after the last touch, and wakes by itself at the end
+  It sleeps again after the idle time you set (1 to 30 minutes, 5 by default) since the last touch, and wakes by itself at the end
   of the window, then syncs.
 - **Light sleep** (default) carries on where it was. A tap shows the screen at
   once (about a tenth of a second).
@@ -426,7 +426,7 @@ The cards:
 | Phone presence | away after 1-60 min | Welcome back / Privacy mode / Away screen |
 | Smart desk | sit and stand memory, desk login | Dock on Home / Desk screen / Follows calendar |
 | Offline copy | none | none |
-| Low power | from, until, light or deep sleep, all day on weekends | none |
+| Low power | from, until, idle before sleep (1-30 min), light or deep sleep, all day on weekends | none |
 
 Defaults: Ambient light, Motion wake, Phone presence, Meeting cost, Smart
 desk and Low power are **off**. The others are on.

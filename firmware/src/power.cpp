@@ -31,7 +31,6 @@ namespace {
 
 // ---- Texts and settings ------------------------------------------------------
 
-constexpr uint32_t kAwakeMs = 5 * 60000UL;  // in the window, stay awake this long after the last touch
 constexpr uint32_t kCheckMs = 5000;         // how often loop() looks at the window
 constexpr uint32_t kLightPollMs = 100;      // light sleep: ask the touch controller this often
 constexpr uint32_t kPinPollMs = 1000;       // ...when the INT pin can wake it too
@@ -198,7 +197,7 @@ void power_poll() {
   const OtaState ota = ota_status().state;
   const bool want = forcedUntil ||
                     (s.lowPower && now > kClockValid && inWindow(s, now) &&
-                     lv_disp_get_inactive_time(nullptr) >= kAwakeMs && ota != OtaState::Checking &&
+                     lv_disp_get_inactive_time(nullptr) >= s.sleepIdleMinutes * 60000UL && ota != OtaState::Checking &&
                      ota != OtaState::Installing && ota != OtaState::Done);
   if (!want) {
     if (parking) sync_pause(false);
