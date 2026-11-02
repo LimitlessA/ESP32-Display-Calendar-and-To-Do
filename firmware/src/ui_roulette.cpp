@@ -255,7 +255,7 @@ void buildWheel() {
     mk_dot(row, kSliceColors[i % 6], 10);
     lv_obj_t *l = mk_label(row, &font_12, t.muted, pool[i].title.c_str());
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(l, 340);
+    lv_obj_set_width(l, 320);  // clear of the close button in the corner
   }
   resultBox = transparent(layer);
   lv_obj_set_pos(resultBox, 40 + WHEEL + 40, 190);
@@ -447,4 +447,14 @@ void roulette_show() {
     case 2: buildSlots(); break;
     default: buildWheel(); break;
   }
+  // Always a way back, even while the wheel turns and its buttons are gone:
+  // the close button in the corner, or a swipe down or to the right.
+  lv_obj_t *x = mk_icon_button(layer, ICON_CLOSE, theme().muted, &font_20b);
+  lv_obj_align(x, LV_ALIGN_TOP_RIGHT, -8, 8);
+  on_click(x, [](lv_event_t *) { lv_async_call([](void *) { close(); }, nullptr); });
+  lv_obj_clear_flag(layer, LV_OBJ_FLAG_GESTURE_BUBBLE);  // swipes on the buttons end up here
+  lv_obj_add_event_cb(layer, [](lv_event_t *) {
+    const lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
+    if (dir == LV_DIR_BOTTOM || dir == LV_DIR_RIGHT) lv_async_call([](void *) { close(); }, nullptr);
+  }, LV_EVENT_GESTURE, nullptr);
 }

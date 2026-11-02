@@ -5,7 +5,7 @@
 // The GitHub build sets this to "<major>.<minor>.<build number>"; raise the
 // major.minor here by hand for big changes.
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "0.1.0"
+#define FIRMWARE_VERSION "0.2.0"
 #endif
 // Which CrowPanel this build is for: platformio.ini sets one of these per build.
 // The 7.0" is the default because it is the board in use.
@@ -25,6 +25,10 @@
 #define DEFAULT_UPDATE_URL \
   "https://github.com/LimitlessA/ESP32-Display-Calendar-and-To-Do/releases/latest/download/" MANIFEST_FILE
 #define HOSTNAME         "calendar"   // setup page at http://calendar.local
+// Time zone until the first sync says otherwise (POSIX TZ, Romania with
+// daylight saving). Without it a display with no account ran on UTC: wrong
+// clock, and night mode at the wrong hours.
+#define DEFAULT_TZ "EET-2EEST,M3.5.0/3,M10.5.0/4"
 
 // TF card on SPI (same pins on the 5.0" and 7.0")
 #define SD_SCK   12
@@ -52,5 +56,19 @@
 // Optional PIR motion sensor: its output on the RX pin of the UART header.
 // (GPIO38 on the GPIO_D header is not free: the touch controller needs it.)
 #define MOTION_PIN 44
+
+// GPIO wired to the GT911 touch INT line, used to wake from low power sleep
+// (Settings > Features > Low power), or -1 if INT reaches no usable GPIO. With
+// -1 the display wakes every ~100 ms in light sleep and asks the touch
+// controller over I2C instead (see power.cpp). Deep sleep can wake from a pin
+// only if it is an RTC GPIO (0-21 on the ESP32-S3).
+#ifdef BOARD_CROWPANEL_7
+// 7.0" V3.0: INT goes to the PCA9557 expander (IO1), not to the ESP32.
+#define TOUCH_INT_GPIO -1
+#else
+// 5.0": INT is probably GPIO38 (not an RTC GPIO, so light sleep only).
+// TODO: set to 38 once measured on a board. Note display_init() drives 38 low.
+#define TOUCH_INT_GPIO -1
+#endif
 
 #define MAX_ACCOUNTS 6

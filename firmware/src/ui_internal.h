@@ -107,7 +107,6 @@ void calendars_dialog_show(uint8_t account);
 lv_obj_t *mk_check(lv_obj_t *parent, const Task &task, int size);
 void complete_with_undo(lv_obj_t *box, const Task &task);
 
-void layout_picker_show();
 void quick_add_show();
 void summary_show();
 void review_show();
@@ -198,9 +197,25 @@ lv_obj_t *mk_textarea(lv_obj_t *parent, const char *placeholder);
 // Chip button: rounded, small, selected = accent.
 lv_obj_t *mk_chip(lv_obj_t *parent, const char *text, bool selected, int h = 40);
 void set_chip(lv_obj_t *chip, bool selected);
+// -/+ stepper that shows its value; tap steps once, holding repeats. fmt turns the value into text,
+// cb runs after every change (it may save settings, but should not delete the stepper itself).
+typedef String (*StepFmt)(int value);
+typedef void (*StepCb)(int value, void *user);
+lv_obj_t *mk_stepper(lv_obj_t *parent, int value, int min, int max, int step, StepFmt fmt, StepCb cb, void *user = nullptr,
+                     int valueW = 84);
+// Row of options that are each tapped directly (instead of one button that cycles). itemW is the width of each option.
+typedef void (*SegCb)(int index, void *user);
+lv_obj_t *mk_segmented(lv_obj_t *parent, const char *const *labels, int count, int selected, int itemW, SegCb cb,
+                       void *user = nullptr);
+// Slider with title, current value, and its lowest and highest value at the ends, e.g. "10%" ... "100%".
+// Add VALUE_CHANGED / RELEASED handlers on the returned slider.
+lv_obj_t *mk_slider(lv_obj_t *parent, const char *title, int value, int min, int max, const char *unit = "%");
 // Full-screen layer for an overlay. *owner is set to it, and back to nullptr when it is deleted.
 lv_obj_t *mk_overlay(bool dim = false, lv_obj_t **owner = nullptr);
 void close_overlay(lv_obj_t **layer);
+
+// Desk address, login and connection test (ui_desk_settings.cpp). The Accounts screen can link here.
+void desk_settings_show();
 
 void toast(const String &msg, const char *action = nullptr, lv_event_cb_t cb = nullptr, void *user = nullptr);
 
@@ -247,5 +262,6 @@ String day_heading(time_t t);              // "TOMORROW", "SATURDAY 31 OCT"
 String event_when(const Event &ev);        // "Today, 14:00 - 15:00"
 String until_text(int64_t start_ms);       // "in 1 h 15 min", "now", ""
 enum class Tone { None, Warn, Bad };
-String due_text(const String &due_key, Tone &tone);  // "Overdue", "Today", "Sat 31 Oct"
+String due_text(const String &due_key, Tone &tone);  // "Overdue · Fri 30 Oct", "Today", "Tomorrow · Mon 2 Nov", "Fri 6 Nov"
+lv_obj_t *mk_due(lv_obj_t *parent, const String &due_key);  // icon + coloured due text, "No date" if empty
 String initial_of(const String &s);

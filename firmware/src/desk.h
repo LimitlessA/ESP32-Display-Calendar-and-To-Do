@@ -34,4 +34,19 @@ void desk_recall(uint8_t slot);  // memory position 1-4
 void desk_hold(int direction);   // +1 raise, -1 lower while held, 0 released
 void desk_stop();                // stops any movement (no login needed)
 void desk_timer(bool on);        // the desk's own sit/stand interval timer
+void desk_timer_cmd(int what);   // 0 stop, 1 start, 2 pause, 3 resume
 void desk_away(bool away);       // the desk's away mode
+// The timer lengths (Settings::deskSitMin / deskStandMin) are sent with "start". After they changed,
+// this restarts a running timer with them a moment later (a held + or - sends only the last value).
+void desk_timer_apply();
+
+// "Test connection" for the desk settings: runs on the desk task, with the address and login as typed
+// (not yet saved). Poll desk_test_result() for the outcome.
+struct DeskTestResult {
+  bool running = false;
+  bool done = false;
+  bool ok = false;
+  String message;
+};
+void desk_test(const String &host, const String &user, const String &password);
+DeskTestResult desk_test_result();

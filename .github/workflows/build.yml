@@ -31,7 +31,8 @@ jobs:
             ~/.platformio
             firmware/.pio
           key: pio-${{ hashFiles('firmware/platformio.ini') }}
-      - run: pip install platformio esptool==4.8.1
+      # pioarduino 55.03.x needs PlatformIO Core 6.1.19 (6.2's SCons breaks it)
+      - run: pip install platformio==6.1.19 esptool==4.8.1
       - name: Pick the version
         run: |
           BASE=$(sed -n 's/#define FIRMWARE_VERSION "\([0-9]*\.[0-9]*\).*"/\1/p' firmware/include/config.h)
@@ -41,7 +42,11 @@ jobs:
           SCONSFLAGS: -k  # report every compile error in one run, not just the first
         run: |
           export PLATFORMIO_BUILD_FLAGS="-DFIRMWARE_VERSION=\\\"$VERSION\\\""
-          pio run -d firmware -e crowpanel_7inch -e crowpanel_5inch
+          # The first run after the ESP-IDF libraries are rebuilt (custom_sdkconfig)
+          # can stop at the final link step; a second run finishes it.
+          for E in crowpanel_7inch crowpanel_5inch; do
+            pio run -d firmware -e $E || pio run -d firmware -e $E
+          done
           for E in crowpanel_7inch crowpanel_5inch; do
             grep -q "$VERSION" firmware/.pio/build/$E/firmware.bin || { echo "version $VERSION not in $E firmware"; exit 1; }
             SIZE=$(stat -c%s firmware/.pio/build/$E/firmware.bin)

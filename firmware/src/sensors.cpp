@@ -35,7 +35,6 @@ void sensors_begin() {
   const uint8_t cmd = kContinuousHighRes;
   lightFound = lgfx::i2c::transactionWrite(I2C_PORT, LIGHT_SENSOR_ADDR, &cmd, 1, kFreq).has_value();
   log_i("light sensor %s", lightFound ? "found" : "not present");
-  pinMode(MOTION_PIN, INPUT_PULLDOWN);
 }
 
 bool light_present() {
@@ -49,6 +48,13 @@ int light_lux() {
 }
 
 bool motion_seen() {
+  // The motion pin is the serial port's RX: take it only once the motion
+  // feature is in use, so the serial console keeps working otherwise.
+  static bool claimed = false;
+  if (!claimed) {
+    pinMode(MOTION_PIN, INPUT_PULLDOWN);
+    claimed = true;
+  }
   const bool high = digitalRead(MOTION_PIN) == HIGH;
   const bool rising = high && !motionWasHigh;
   motionWasHigh = high;

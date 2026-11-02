@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <algorithm>
+#include <esp_wifi.h>
 
 #include "config.h"
 #include "settings.h"
@@ -32,6 +33,9 @@ bool tryConnect(const String &ssid, const String &password) {
 
 void wifi_begin() {
   lock = xSemaphoreCreateMutex();
+  // The login is kept in Settings; Wi-Fi itself does not save it to flash,
+  // so connecting (from the sync task, whose stack is in PSRAM) never writes flash.
+  WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(HOSTNAME);
   WiFi.setAutoReconnect(true);
@@ -86,6 +90,15 @@ bool wifi_service() {
     state = WifiState::Disconnected;
   }
   return false;
+}
+
+void wifi_sleep(bool sleep) {
+  if (sleep) {
+    esp_wifi_stop();  // the driver and its settings stay in RAM
+    return;
+  }
+  esp_wifi_start();
+  lastAttempt = 0;  // reconnect at the next wifi_service(), not 30 s later
 }
 
 WifiState wifi_state() {

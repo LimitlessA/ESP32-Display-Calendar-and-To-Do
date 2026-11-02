@@ -5,8 +5,10 @@
 #include <WiFiClientSecure.h>
 
 #include "config.h"
+#include "display.h"
 #include "ota.h"
 #include "ota_root_cas.h"
+#include "psram.h"
 #include "settings.h"
 
 namespace {
@@ -40,6 +42,9 @@ void set(OtaState st, const String &message = "", int progress = -1) {
   status.message = message;
   if (progress >= 0) status.progress = progress;
   xSemaphoreGive(lock);
+  // Dark while installing (it restarts when done); back on if it failed.
+  if (st == OtaState::Installing) display_blank(true);
+  else if (st == OtaState::Failed) display_blank(false);
 }
 
 // "1.10.0" > "1.9.3": compare numerically, part by part.
@@ -74,7 +79,7 @@ void check() {
     http.end();
     return;
   }
-  JsonDocument doc;
+  JsonDocument doc(psram_json());
   const bool ok = !deserializeJson(doc, http.getString());
   http.end();
   if (!ok || !doc["version"].is<const char *>() || !doc["url"].is<const char *>()) {
@@ -134,6 +139,10 @@ void otaTask(void *) {
 
 void ota_begin() {
   lock = xSemaphoreCreateMutex();
+  // Stack in internal RAM, not PSRAM: at the end of an update ESP-IDF checks
+  // the image (esp_ota_set_boot_partition maps flash and freezes the caches),
+  // and that asserts when the calling task's stack is in PSRAM - every update
+  // crashed the display there.
   xTaskCreatePinnedToCore(otaTask, "ota", kTaskStack, nullptr, 1, &task, 0);
 }
 

@@ -21,7 +21,8 @@
 #define LV_TICK_CUSTOM_SYS_TIME_EXPR (millis())
 
 #define LV_DISP_DEF_REFR_PERIOD 16
-#define LV_INDEV_DEF_READ_PERIOD 16
+#define LV_INDEV_DEF_READ_PERIOD 10
+#define LV_INDEV_DEF_SCROLL_LIMIT 16  // a small finger wobble is still a tap, not a scroll
 #define LV_DPI_DEF 150
 
 #define LV_DRAW_COMPLEX 1

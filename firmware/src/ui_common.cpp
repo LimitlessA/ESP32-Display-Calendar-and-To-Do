@@ -20,6 +20,7 @@ constexpr const char *kTabWeek = "Week";
 constexpr const char *kTabTasks = "Tasks";
 constexpr const char *kTabDates = "Dates";  // only with the "Dates tab" layout
 constexpr const char *kTabDesk = "Desk";    // only with the desk screen layouts
+constexpr const char *kSavedCopyHint = "Showing the copy saved on the SD card until the display syncs.";
 constexpr const char *kAm = " AM";
 constexpr const char *kPm = " PM";
 constexpr const char *kNoClock = "--:--";  // before the clock is set
@@ -33,6 +34,8 @@ constexpr const char *kInHours = "in %d h";
 constexpr const char *kInHoursMinutes = "in %d h %d min";
 constexpr const char *kInDays = "in %d days";
 constexpr const char *kOverdue = "Overdue";
+constexpr const char *kDueSep = " \xC2\xB7 ";  // between "Overdue" and the date
+constexpr const char *kNoDate = "No date";
 constexpr time_t kClockValidAfter = 1700000000;  // NTP has set the clock once it is past this
 constexpr int kPillMaxW = 250;  // focus timer pill in the header
 
@@ -261,6 +264,142 @@ void set_chip(lv_obj_t *chip, bool selected) {
   if (l) lv_obj_set_style_text_color(l, c(selected ? t.onAccent : t.text), 0);
 }
 
+// ---- Controls: steppers, segmented choices, sliders with end labels ------------
+
+namespace {
+
+struct StepState {
+  lv_obj_t *label, *minus, *plus;
+  int value, min, max, step;
+  StepFmt fmt;
+  StepCb cb;
+  void *user;
+};
+
+void stepShow(StepState *st) {
+  lv_label_set_text(st->label, st->fmt(st->value).c_str());
+  lv_obj_set_style_opa(st->minus, st->value <= st->min ? LV_OPA_40 : LV_OPA_COVER, 0);
+  lv_obj_set_style_opa(st->plus, st->value >= st->max ? LV_OPA_40 : LV_OPA_COVER, 0);
+}
+
+void stepBy(lv_event_t *e, int dir) {
+  StepState *st = static_cast<StepState *>(lv_event_get_user_data(e));
+  int v = st->value + dir * st->step;
+  if (v < st->min) v = st->min;
+  if (v > st->max) v = st->max;
+  if (v == st->value) return;
+  st->value = v;
+  stepShow(st);
+  if (st->cb) st->cb(v, st->user);
+}
+
+struct SegItem {
+  SegCb cb;
+  void *user;
+  int index;
+};
+
+struct SliderState {
+  lv_obj_t *value;
+  const char *unit;
+};
+
+}  // namespace
+
+lv_obj_t *mk_stepper(lv_obj_t *parent, int value, int min, int max, int step, StepFmt fmt, StepCb cb, void *user,
+                     int valueW) {
+  const Theme &t = theme();
+  lv_obj_t *row = mk_box(parent, 0, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  set_flex(row, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_t *minus = mk_button(row, t.raised, TOUCH / 2);
+  lv_obj_set_size(minus, TOUCH, TOUCH);
+  lv_obj_center(mk_label(minus, &font_20b, t.text, "-"));
+  lv_obj_t *label = mk_label(row, &font_16, t.text, "");
+  lv_obj_set_width(label, valueW);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_t *plus = mk_button(row, t.raised, TOUCH / 2);
+  lv_obj_set_size(plus, TOUCH, TOUCH);
+  lv_obj_center(mk_label(plus, &font_20b, t.text, "+"));
+  StepState *st = attach(row, StepState{label, minus, plus, value, min, max, step, fmt, cb, user});
+  stepShow(st);
+  // A tap steps once; holding repeats (LVGL sends no click after a long press).
+  auto down = [](lv_event_t *e) { stepBy(e, -1); };
+  auto up = [](lv_event_t *e) { stepBy(e, 1); };
+  lv_obj_add_event_cb(minus, down, LV_EVENT_CLICKED, st);
+  lv_obj_add_event_cb(minus, down, LV_EVENT_LONG_PRESSED_REPEAT, st);
+  lv_obj_add_event_cb(plus, up, LV_EVENT_CLICKED, st);
+  lv_obj_add_event_cb(plus, up, LV_EVENT_LONG_PRESSED_REPEAT, st);
+  return row;
+}
+
+lv_obj_t *mk_segmented(lv_obj_t *parent, const char *const *labels, int count, int selected, int itemW, SegCb cb,
+                       void *user) {
+  const Theme &t = theme();
+  lv_obj_t *seg = mk_box(parent, t.bg, 22);
+  lv_obj_set_style_pad_all(seg, 2, 0);
+  set_flex(seg, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  for (int i = 0; i < count; i++) {
+    lv_obj_t *chip = mk_chip(seg, labels[i], i == selected, 40);
+    lv_obj_set_width(chip, itemW);
+    SegItem *item = attach(chip, SegItem{cb, user, i});
+    on_click(chip, [](lv_event_t *e) {
+      SegItem *it = static_cast<SegItem *>(lv_event_get_user_data(e));
+      lv_obj_t *me = lv_event_get_target(e);
+      lv_obj_t *box = lv_obj_get_parent(me);
+      for (uint32_t k = 0; k < lv_obj_get_child_cnt(box); k++) {
+        lv_obj_t *ch = lv_obj_get_child(box, k);
+        set_chip(ch, ch == me);
+      }
+      if (it->cb) it->cb(it->index, it->user);
+    }, item);
+  }
+  return seg;
+}
+
+lv_obj_t *mk_slider(lv_obj_t *parent, const char *title, int value, int min, int max, const char *unit) {
+  const Theme &t = theme();
+  lv_obj_t *wrap = mk_box(parent, 0, 0);
+  lv_obj_set_style_bg_opa(wrap, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(wrap, lv_pct(100), 46);
+  set_flex(wrap, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  // Title on the left, current value on the right.
+  lv_obj_t *head = mk_box(wrap, 0, 0);
+  lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(head, lv_pct(100), 18);
+  set_flex(head, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
+  mk_label(head, &font_14b, t.text, title);
+  lv_obj_t *val = mk_label(head, &font_14b, t.accent, strf("%d%s", value, unit).c_str());
+  // The track with a small bar at each end, no min/max text.
+  lv_obj_t *scale = mk_box(wrap, 0, 0);
+  lv_obj_set_style_bg_opa(scale, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(scale, lv_pct(100), 24);
+  set_flex(scale, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_hor(scale, 8, 0);
+  auto endMark = [&]() {
+    lv_obj_t *m = mk_box(scale, t.muted, 1);
+    lv_obj_set_size(m, 3, 16);
+  };
+  endMark();
+  lv_obj_t *s = lv_slider_create(scale);
+  lv_obj_set_flex_grow(s, 1);
+  lv_obj_set_height(s, 8);
+  lv_slider_set_range(s, min, max);
+  lv_slider_set_value(s, value, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(s, c(t.raised), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_KNOB);
+  lv_obj_set_style_pad_all(s, 6, LV_PART_KNOB);
+  lv_obj_set_ext_click_area(s, 16);
+  endMark();
+  SliderState *st = attach(s, SliderState{val, unit});
+  lv_obj_add_event_cb(s, [](lv_event_t *e) {
+    SliderState *ss = static_cast<SliderState *>(lv_event_get_user_data(e));
+    lv_label_set_text(ss->value, strf("%d%s", (int)lv_slider_get_value(lv_event_get_target(e)), ss->unit).c_str());
+  }, LV_EVENT_VALUE_CHANGED, st);
+  return s;
+}
+
 lv_obj_t *mk_overlay(bool dim, lv_obj_t **owner) {
   const Theme &t = theme();
   lv_obj_t *layer = mk_box(lv_layer_top(), t.dark ? 0x07090B : t.bg, 0);
@@ -326,7 +465,12 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   lv_obj_t *clock = mk_label(h, &font_26b, t.text, "");
   lv_obj_t *date = mk_label(h, &font_16, t.muted, "");
   register_clock(clock, date);
-  lv_obj_t *offline = mk_label(h, &font_16, t.warnFg, ICON_CLOUD);
+  // "Saved copy" badge while the data shown comes from the SD card (before
+  // the first sync, or when every account fails). An SD card, not a cloud,
+  // so it is not taken for the weather. Tap it for the reason.
+  lv_obj_t *offline = mk_label(h, &font_16, t.warnFg, ICON_SD);
+  lv_obj_set_ext_click_area(offline, 14);
+  on_click(offline, [](lv_event_t *) { toast(g_snap.error.length() ? g_snap.error : String(kSavedCopyHint)); });
   lv_obj_add_flag(offline, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_t *spacer = mk_box(h, 0, 0);
@@ -499,14 +643,33 @@ String due_text(const String &due_key, Tone &tone) {
   const long diff = day_number(due) - day_number(ui_now());
   if (diff < 0) {
     tone = Tone::Bad;
-    return kOverdue;
+    return String(kOverdue) + kDueSep + fmt_date_short(due);
   }
   if (diff == 0) {
     tone = Tone::Warn;
     return kToday;
   }
-  if (diff == 1) return kTomorrow;
+  if (diff == 1) return String(kTomorrow) + kDueSep + fmt_date_short(due);
   return fmt_date_short(due);
+}
+
+lv_obj_t *mk_due(lv_obj_t *parent, const String &due_key) {
+  const Theme &t = theme();
+  Tone tone;
+  const String text = due_text(due_key, tone);
+  lv_obj_t *row = mk_box(parent, 0, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  set_flex(row, LV_FLEX_FLOW_ROW, 6);
+  if (!text.length()) {
+    mk_label(row, &font_14, t.muted, kNoDate);
+    return row;
+  }
+  const uint32_t color = tone == Tone::Bad ? t.badFg : tone == Tone::Warn ? t.warnFg
+                         : text.startsWith(kTomorrow) ? t.text : t.muted;
+  mk_label(row, &font_14, color, tone == Tone::Bad ? ICON_WARNING : tone == Tone::Warn ? ICON_CLOCK : ICON_CALENDAR);
+  mk_label(row, &font_14, color, text.c_str());
+  return row;
 }
 
 String day_key(time_t t) {
