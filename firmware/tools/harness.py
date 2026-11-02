@@ -73,7 +73,10 @@ def serial_shot(port, out, timeout=120):
     if not m:
         sys.exit("no screenshot in reply:\n" + text[-500:])
     w, h, size = int(m[1]), int(m[2]), int(m[3])
-    rle = base64.b64decode("".join(m[4].split()))
+    # Log lines printed meanwhile can land between the picture's lines: keep
+    # only lines that are pure base64.
+    lines = [l.strip() for l in m[4].splitlines()]
+    rle = base64.b64decode("".join(l for l in lines if l and re.fullmatch(r"[A-Za-z0-9+/=]+", l)))
     if len(rle) != size:
         sys.exit("screenshot cut short: %d of %d bytes" % (len(rle), size))
     pixels = []
