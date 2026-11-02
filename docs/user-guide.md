@@ -489,6 +489,8 @@ The three layouts:
 - They are always labelled M1 to M4. The ones you chose for sit and stand also
   say "Sit" or "Stand". Default: M1 sit, M2 stand. Change this in the Smart desk
   options.
+- **Hold** a button (about a second) to give it your own name, up to 16 letters. The name
+  shows after "M2 ·". Empty the name to go back to the default. Holding does not move the desk.
 - The height under each button needs the desk login.
 
 **Hold to raise or lower**

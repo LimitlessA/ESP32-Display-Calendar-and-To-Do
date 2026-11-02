@@ -117,7 +117,8 @@ String duration(long secs) {
 }
 
 String slotName(uint8_t slot) {
-  // Always the desk's own name (M1-M4); sit/stand is only a hint beside it.
+  // Always the desk's own name (M1-M4); your own label, else sit/stand, is only a hint beside it.
+  if (slot >= 1 && slot <= 4 && g_settings.deskLabel[slot - 1].length()) return strf(kSlotRole, slot, g_settings.deskLabel[slot - 1].c_str());
   if (slot == g_settings.deskSitSlot) return strf(kSlotRole, slot, kSit);
   if (slot == g_settings.deskStandSlot) return strf(kSlotRole, slot, kStand);
   return strf(kSlot, slot);
@@ -208,6 +209,9 @@ lv_obj_t *memButton(lv_obj_t *parent, uint8_t slot, Live &live, int w, int h) {
   mk_label(b, &font_14b, t.text, slotName(slot).c_str());
   mk_label(b, &font_12, t.muted, "");
   on_click(b, [](lv_event_t *e) { desk_recall((uint8_t)(intptr_t)lv_event_get_user_data(e)); }, (void *)(intptr_t)slot);
+  // Hold a memory button to name it.
+  lv_obj_add_event_cb(b, [](lv_event_t *e) { desk_label_edit((uint8_t)(intptr_t)lv_event_get_user_data(e)); },
+                      LV_EVENT_LONG_PRESSED, (void *)(intptr_t)slot);
   live.mem[slot - 1] = b;
   return b;
 }

@@ -150,6 +150,7 @@ String toJson(const Settings &s, bool backup = false) {
   doc["deskSitMin"] = s.deskSitMin;
   doc["deskStandMin"] = s.deskStandMin;
   doc["deskSitSlot"] = s.deskSitSlot;
+  for (int i = 0; i < 4; i++) doc["deskLabel" + String(i + 1)] = s.deskLabel[i];
   doc["deskStandSlot"] = s.deskStandSlot;
   doc["deskMeetings"] = s.deskMeetings;
   doc["deskFocus"] = s.deskFocus;
@@ -229,6 +230,11 @@ bool fromJson(const String &json, Settings &s) {
   s.deskPassword = unseal(String(doc["deskPassword"] | d.deskPassword.c_str()));
   s.deskSitMin = doc["deskSitMin"] | d.deskSitMin;
   s.deskStandMin = doc["deskStandMin"] | d.deskStandMin;
+  for (int i = 0; i < 4; i++) {
+    s.deskLabel[i] = String((const char *)(doc["deskLabel" + String(i + 1)] | ""));
+    s.deskLabel[i].trim();
+    s.deskLabel[i] = s.deskLabel[i].substring(0, 16);
+  }
   s.deskSitSlot = constrain(doc["deskSitSlot"] | d.deskSitSlot, 1, 4);
   s.deskStandSlot = constrain(doc["deskStandSlot"] | d.deskStandSlot, 1, 4);
   s.deskMeetings = doc["deskMeetings"] | d.deskMeetings;
