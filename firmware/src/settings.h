@@ -22,7 +22,7 @@ struct IcsCalendar {
 };
 constexpr uint8_t kMaxIcs = 6;
 // How often the display asks for changes (Settings > Sync), in minutes.
-constexpr uint8_t kSyncChoices[] = {2, 3, 5, 10, 15, 30};
+constexpr uint8_t kSyncChoices[] = {1, 2, 3, 5, 10, 15, 30};
 
 // Screens that come in three layouts (A, B, C), chosen like a theme.
 enum class Layout : uint8_t {
@@ -97,6 +97,7 @@ struct Settings {
   uint16_t sleepStart = 23 * 60;  // minutes after midnight, local time
   uint16_t sleepEnd = 7 * 60;
   bool sleepWeekends = false;   // ...and all day on Saturday and Sunday
+  uint8_t sleepIdleMinutes = 5; // stay awake this long after the last touch, inside the window
   uint8_t sleepMode = 0;        // 0 light sleep, 1 deep sleep (restarts on wake)
   uint8_t layouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0, 0};  // see kDefaultLayouts
 
