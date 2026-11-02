@@ -524,8 +524,9 @@ sim/build.sh [output dir]      # default output: sim/out
 
 ## The test harness
 
-The harness lets a PC drive the display. It is built in unless `HARNESS` is
-defined as 0 (`-DHARNESS=0`).
+The harness lets a PC drive the display. Release builds leave it out. Build the
+`crowpanel_7inch_test` or `crowpanel_5inch_test` environment (the same firmware plus
+`-DHARNESS=1`) to use it.
 
 **Serial** (115200, one command per line, reply starts after `H> `):
 
@@ -563,10 +564,8 @@ python tools/harness.py decode --env crowpanel_7inch "Backtrace: 0x4200..:0x3fc9
 - `decode` finds the code addresses in a backtrace and resolves them with
   `xtensa-esp32s3-elf-addr2line` against `.pio/build/<env>/firmware.elf`.
 
-**Possibly a concern:** the HTTP harness is on in release builds and is reachable
-by anyone who knows the PIN. It can tap the screen and take screenshots, which can
-include account names and task titles. Consider building releases with
-`-DHARNESS=0`.
+The HTTP harness can tap the screen and take screenshots, which can include account
+names and task titles, so it is only in the `*_test` builds, never in releases.
 
 ## The test plan
 

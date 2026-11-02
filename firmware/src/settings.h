@@ -49,6 +49,7 @@ struct Settings {
   uint16_t nightEnd = 7 * 60;
   bool dimIdle = false;         // dim the backlight after a while without touch
   uint8_t dimAfterMinutes = 2;
+  uint8_t dimLevel = 20;        // percent backlight while dimmed
   bool use24h = true;
   uint8_t refreshMinutes = 3;   // polls are cheap: an unchanged feed is a few bytes
   uint8_t theme = 0;            // index into the theme table in theme.h

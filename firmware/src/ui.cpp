@@ -22,7 +22,6 @@ constexpr uint32_t kToastActionMs = 7000;  // ...when it has a button such as Un
 constexpr uint32_t kAutoFirstCheckMs = 60000;  // first firmware check one minute after start
 constexpr uint32_t kNightIdleMs = 30000;  // back to the night clock after a tap
 constexpr uint8_t kNightBacklight = 6;
-constexpr uint8_t kDimBacklight = 20;
 constexpr uint32_t kAutoCheckMs = 3 * 3600000UL;  // look for new firmware every 3 hours
 constexpr uint32_t kAutoIdleMs = 15 * 60000UL;    // ...and install it after 15 min without touch
 constexpr time_t kAutoMeetingGap = 15 * 60;        // but not right before a meeting
@@ -181,7 +180,7 @@ void checkNightAndDim() {
   if (current == Screen::Night) return;
 
   if (g_settings.dimIdle && !dimmed && idle > g_settings.dimAfterMinutes * 60000UL) {
-    ui_set_backlight(kDimBacklight);
+    ui_set_backlight(g_settings.dimLevel);
     dimmed = true;
   } else if (dimmed && idle < 1000) {
     applied = day_brightness();

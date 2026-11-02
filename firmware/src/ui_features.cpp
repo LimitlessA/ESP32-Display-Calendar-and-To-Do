@@ -53,7 +53,7 @@ const char *const kVariants[kLayoutCount][3] = {
     {"Dock on Home", "Desk screen", "Follows calendar"},      // smart desk
 };
 
-enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves, SleepStart, SleepEnd };
+enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves, SleepStart, SleepEnd, RemindMinutes, NightStart, NightEnd, DimAfter, DimLevel };
 
 struct Feature {
   const char *name;
@@ -69,7 +69,7 @@ const Feature kFeatures[] = {
     {"Leave-by alerts", "%s before you must leave", &Settings::leaveBy, Opt::LeaveLead, (int8_t)Layout::LeaveBy},
     {"Meeting timer", "Time left, chime 5 min before the end", &Settings::meetTimer, Opt::None, (int8_t)Layout::MeetTimer},
     {"Meeting cost", "People x %s per hour", &Settings::costMeter, Opt::CostRate, (int8_t)Layout::Cost},
-    {"Reminder sound", "Chime on the speaker", &Settings::sound, Opt::None, -1},
+    {"Reminder sound", "Chime %s before meetings", &Settings::sound, Opt::RemindMinutes, -1},
     {"Focus timer", "%s, hold a task to start", &Settings::focus, Opt::FocusMinutes, (int8_t)Layout::Focus},
     {"Quick add task", "Add tasks from the display", &Settings::quickAdd, Opt::None, (int8_t)Layout::QuickAdd},
     {"Procrastination radar", "Stuck after %s moves", &Settings::radar, Opt::RadarMoves, (int8_t)Layout::Radar},
@@ -82,6 +82,7 @@ const Feature kFeatures[] = {
     {"Smart desk", "Standing desk on Wi-Fi", &Settings::desk, Opt::None, (int8_t)Layout::Desk},
     {"Offline copy", "Keep the last sync on the TF card", &Settings::offlineCopy, Opt::None, -1},
     {"Low power", "Sleeps %s, a tap wakes it", &Settings::lowPower, Opt::SleepStart, -1},
+    {"Night clock", "Dim clock %s", &Settings::nightMode, Opt::NightStart, -1},
 };
 constexpr int kFeatureCount = sizeof(kFeatures) / sizeof(kFeatures[0]);
 constexpr const char *kNeedsLightSensor = "Needs a BH1750 light sensor on I2C";
@@ -118,13 +119,18 @@ const char *optionLabel(Opt o) {
     case Opt::CostRate: return "Rate";
     case Opt::AwayMinutes: return "Away";
     case Opt::RadarMoves: return "Stuck";
-    case Opt::SleepStart: return "From";
+    case Opt::SleepStart:
+    case Opt::NightStart: return "From";
+    case Opt::RemindMinutes: return "Before";
+    case Opt::DimAfter: return "Idle dim after";
+    case Opt::DimLevel: return "Dim to";
     default: return kOptionRow;
   }
 }
 
 String fmtMin(int v) { return strf(kMinutes, v); }
 String fmtMoney(int v) { return strf(kMoney, v); }
+String fmtPct(int v) { return strf("%d%%", v); }
 String fmtCount(int v) { return String(v); }
 String fmtClock(int v) { return fmtMinutes((uint16_t)v); }
 
@@ -144,7 +150,12 @@ OptRange optRange(Opt o) {
     case Opt::AwayMinutes: return {5, 60, 5, fmtMin};
     case Opt::RadarMoves: return {2, 10, 1, fmtCount};
     case Opt::SleepStart:
-    case Opt::SleepEnd: return {0, 23 * 60 + 30, 30, fmtClock};
+    case Opt::SleepEnd:
+    case Opt::NightStart:
+    case Opt::NightEnd: return {0, 23 * 60 + 30, 30, fmtClock};
+    case Opt::RemindMinutes: return {1, 30, 1, fmtMin};
+    case Opt::DimAfter: return {1, 30, 1, fmtMin};
+    case Opt::DimLevel: return {5, 60, 5, fmtPct};
     default: return {0, 0, 1, fmtCount};
   }
 }
@@ -160,6 +171,11 @@ int optionNumber(Opt o, const Settings &s) {
     case Opt::RadarMoves: return s.radarMoves;
     case Opt::SleepStart: return s.sleepStart;
     case Opt::SleepEnd: return s.sleepEnd;
+    case Opt::RemindMinutes: return s.remindMinutes;
+    case Opt::NightStart: return s.nightStart;
+    case Opt::NightEnd: return s.nightEnd;
+    case Opt::DimAfter: return s.dimAfterMinutes;
+    case Opt::DimLevel: return s.dimLevel;
     default: return 0;
   }
 }
@@ -175,6 +191,11 @@ void applyOption(Settings &s, Opt o, int v) {
     case Opt::RadarMoves: s.radarMoves = v; break;
     case Opt::SleepStart: s.sleepStart = v; break;
     case Opt::SleepEnd: s.sleepEnd = v; break;
+    case Opt::RemindMinutes: s.remindMinutes = v; break;
+    case Opt::NightStart: s.nightStart = v; break;
+    case Opt::NightEnd: s.nightEnd = v; break;
+    case Opt::DimAfter: s.dimAfterMinutes = v; break;
+    case Opt::DimLevel: s.dimLevel = v; break;
     default: break;
   }
 }
@@ -193,6 +214,7 @@ String optionValue(Opt o) {
     return strf(kSleepSpan, fmtMinutes(cur().sleepStart).c_str(), fmtMinutes(cur().sleepEnd).c_str(),
                 cur().sleepWeekends ? kSleepWeekends : "");
   }
+  if (o == Opt::NightStart) return strf("%s-%s", fmtMinutes(cur().nightStart).c_str(), fmtMinutes(cur().nightEnd).c_str());
   const OptRange r = optRange(o);
   return r.fmt ? r.fmt(optionNumber(o, cur())) : String("");
 }
@@ -362,6 +384,33 @@ void showDialog(int i) {
     lv_obj_set_width(l, 70);
     const OptRange r = optRange(f.opt);
     mk_stepper(row, optionNumber(f.opt, cur()), r.min, r.max, r.step, r.fmt, stepped, (void *)(intptr_t)i, 96);
+  }
+  if (f.on == &Settings::nightMode) {
+    lv_obj_t *row = optionRow(card, kUntilRow);
+    const OptRange r = optRange(Opt::NightEnd);
+    mk_stepper(row, cur().nightEnd, r.min, r.max, r.step, r.fmt, stepped,
+               (void *)(intptr_t)(i | (int)Opt::NightEnd << 8), 96);
+    // Dimming when nobody touches the screen (not only at night).
+    row = optionRow(card, "Idle dim");
+    lv_obj_t *dl = mk_label(row, &font_14, t.text, "Dim the screen when idle");
+    lv_obj_set_flex_grow(dl, 1);
+    mk_switch(row, cur().dimIdle, [](lv_event_t *e) {
+      const bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+      lv_async_call([](void *p) {
+        flushPending();
+        Settings s = g_settings;
+        s.dimIdle = (intptr_t)p;
+        ui_save_settings(s);
+      }, (void *)(intptr_t)on);
+    });
+    for (Opt o : {Opt::DimAfter, Opt::DimLevel}) {
+      const OptRange dr = optRange(o);
+      lv_obj_t *r2 = optionRow(card, optionLabel(o));
+      lv_obj_t *lab = lv_obj_get_child(r2, 0);
+      lv_obj_set_width(lab, 110);
+      mk_stepper(r2, optionNumber(o, cur()), dr.min, dr.max, dr.step, dr.fmt, stepped,
+                 (void *)(intptr_t)(i | (int)o << 8), 96);
+    }
   }
   if (f.on == &Settings::lowPower) {
     lv_obj_t *row = optionRow(card, kUntilRow);

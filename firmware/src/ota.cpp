@@ -19,6 +19,8 @@ constexpr const char *kErrNoLink = "No update link set. Upload a file at http://
 constexpr const char *kErrRead = "Could not read the update link";
 constexpr const char *kErrManifest = "Update link is not a valid manifest";
 constexpr const char *kErrCheckFirst = "Check for updates first";
+constexpr const char *kErrWrongBoard = "This file is for a different display. Upload the " BOARD_NAME " firmware (firmware.bin).";
+constexpr const char *kErrNoMarker = "This file is not a firmware for the " BOARD_NAME " display. Upload firmware.bin, not factory.bin.";
 constexpr uint32_t kTimeoutMs = 15000;
 constexpr uint32_t kRestartDelayMs = 2500;  // lets the screen show "Restarting"
 constexpr uint32_t kTaskStack = 12288;
@@ -31,6 +33,31 @@ OtaStatus status;
 String binUrl;
 size_t uploadSize = 0;
 size_t uploadDone = 0;
+
+// A hand-uploaded file must be built for this board. Every build carries kBoardMarker in its
+// image; the upload is scanned for "CPBOARD=" followed by the board id and "!".
+const char kBoardMarker[] __attribute__((used)) = "CPBOARD=" BOARD_ID "!";
+constexpr size_t kMarkerPrefix = 8;  // "CPBOARD="
+constexpr size_t kMarkerTag = sizeof(BOARD_ID) - 1;
+size_t scanPos = 0;                  // bytes of the prefix matched so far
+size_t tagLen = 0;                   // bytes of the id read after the prefix
+char tagBuf[8];
+bool markerFound = false;
+bool markerWrong = false;
+
+void scanMarker(const uint8_t *data, size_t len) {
+  for (size_t i = 0; i < len && !markerFound; i++) {
+    const char ch = (char)data[i];
+    if (scanPos < kMarkerPrefix) {
+      scanPos = ch == kBoardMarker[scanPos] ? scanPos + 1 : (ch == kBoardMarker[0] ? 1 : 0);
+    } else if (ch == '!' || tagLen >= sizeof(tagBuf) - 1) {
+      markerFound = true;
+      markerWrong = ch != '!' || tagLen != kMarkerTag || memcmp(tagBuf, BOARD_ID, kMarkerTag) != 0;
+    } else {
+      tagBuf[tagLen++] = ch;
+    }
+  }
+}
 
 // ---- Code --------------------------------------------------------------------
 
@@ -164,6 +191,8 @@ void ota_install() {
 bool ota_upload_start(size_t size) {
   uploadSize = size;
   uploadDone = 0;
+  scanPos = tagLen = 0;
+  markerFound = markerWrong = false;
   set(OtaState::Installing, "", 0);
   if (!Update.begin(size ? size : UPDATE_SIZE_UNKNOWN, U_FLASH)) {
     set(OtaState::Failed, Update.errorString());
@@ -173,6 +202,11 @@ bool ota_upload_start(size_t size) {
 }
 
 bool ota_upload_write(const uint8_t *data, size_t len) {
+  scanMarker(data, len);
+  if (markerWrong) {
+    ota_upload_abort(kErrWrongBoard);
+    return false;
+  }
   if (Update.write(const_cast<uint8_t *>(data), len) != len) {
     set(OtaState::Failed, Update.errorString());
     return false;
@@ -183,6 +217,10 @@ bool ota_upload_write(const uint8_t *data, size_t len) {
 }
 
 bool ota_upload_finish() {
+  if (!markerFound) {
+    ota_upload_abort(kErrNoMarker);
+    return false;
+  }
   if (!Update.end(true)) {
     set(OtaState::Failed, Update.errorString());
     return false;

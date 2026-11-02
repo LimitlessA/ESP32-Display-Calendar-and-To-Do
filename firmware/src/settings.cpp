@@ -1,5 +1,10 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include <esp_mac.h>
+#include <esp_random.h>
+#include <mbedtls/aes.h>
+#include <mbedtls/base64.h>
+#include <mbedtls/sha256.h>
 
 #include "psram.h"
 #include "settings.h"
@@ -20,23 +25,82 @@ constexpr uint32_t kSaveDelayMs = 5000;
 bool dirty = false;
 uint32_t changedAt = 0;
 
-String toJson(const Settings &s) {
+// The SD backup keeps secrets (Wi-Fi and desk passwords, account tokens, calendar links)
+// encrypted with AES-256-CTR. The key comes from this chip's MAC address, so a copy of the
+// card is useless on another board and passwords are not readable when the card is read in a
+// PC. It is not protection against someone who has this board and the source code.
+constexpr const char *kSealed = "enc1:";
+
+void backupKey(uint8_t key[32]) {
+  uint8_t mac[6];
+  esp_efuse_mac_get_default(mac);
+  uint8_t in[22] = "calendar-backup-v1";
+  memcpy(in + 16, mac, 6);
+  mbedtls_sha256(in, sizeof(in), key, 0);
+}
+
+String seal(const String &plain) {
+  if (!plain.length()) return plain;
+  uint8_t key[32], nonce[16], block[16], iv[16];
+  backupKey(key);
+  esp_fill_random(iv, sizeof(iv));
+  memcpy(nonce, iv, sizeof(nonce));
+  const size_t n = plain.length();
+  std::vector<uint8_t> raw(16 + n);
+  memcpy(raw.data(), iv, 16);
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, key, 256);
+  size_t off = 0;
+  mbedtls_aes_crypt_ctr(&aes, n, &off, nonce, block, (const uint8_t *)plain.c_str(), raw.data() + 16);
+  mbedtls_aes_free(&aes);
+  std::vector<uint8_t> b64(4 * (raw.size() / 3 + 1) + 4);
+  size_t olen = 0;
+  mbedtls_base64_encode(b64.data(), b64.size(), &olen, raw.data(), raw.size());
+  return String(kSealed) + String((const char *)b64.data()).substring(0, olen);
+}
+
+// Plain text (an older backup, or a value that was never sealed) comes back unchanged.
+String unseal(const String &text) {
+  if (!text.startsWith(kSealed)) return text;
+  const String b64 = text.substring(strlen(kSealed));
+  std::vector<uint8_t> raw(b64.length() + 4);
+  size_t olen = 0;
+  if (mbedtls_base64_decode(raw.data(), raw.size(), &olen, (const uint8_t *)b64.c_str(), b64.length()) != 0 ||
+      olen < 16) {
+    return "";
+  }
+  uint8_t key[32], nonce[16], block[16];
+  backupKey(key);
+  memcpy(nonce, raw.data(), 16);
+  const size_t n = olen - 16;
+  std::vector<uint8_t> out(n + 1, 0);
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, key, 256);
+  size_t off = 0;
+  mbedtls_aes_crypt_ctr(&aes, n, &off, nonce, block, raw.data() + 16, out.data());
+  mbedtls_aes_free(&aes);
+  return String((const char *)out.data());
+}
+
+String toJson(const Settings &s, bool backup = false) {
   JsonDocument doc(psram_json());
   doc["wifiSsid"] = s.wifiSsid;
-  doc["wifiPassword"] = s.wifiPassword;
+  doc["wifiPassword"] = backup ? seal(s.wifiPassword) : s.wifiPassword;
   JsonArray accounts = doc["accounts"].to<JsonArray>();
   for (const Account &a : s.accounts) {
     JsonObject o = accounts.add<JsonObject>();
     o["label"] = a.label;
     o["url"] = a.url;
-    o["token"] = a.token;
+    o["token"] = backup ? seal(a.token) : a.token;
     o["color"] = a.color;
   }
   JsonArray ics = doc["ics"].to<JsonArray>();
   for (const IcsCalendar &c : s.ics) {
     JsonObject o = ics.add<JsonObject>();
     o["label"] = c.label;
-    o["url"] = c.url;
+    o["url"] = backup ? seal(c.url) : c.url;
     o["color"] = c.color;
   }
   doc["brightness"] = s.brightness;
@@ -48,6 +112,7 @@ String toJson(const Settings &s) {
   doc["nightEnd"] = s.nightEnd;
   doc["dimIdle"] = s.dimIdle;
   doc["dimAfterMinutes"] = s.dimAfterMinutes;
+  doc["dimLevel"] = s.dimLevel;
   doc["use24h"] = s.use24h;
   doc["syncMinutes"] = s.refreshMinutes;
   doc["theme"] = s.theme;
@@ -81,7 +146,7 @@ String toJson(const Settings &s) {
   doc["desk"] = s.desk;
   doc["deskHost"] = s.deskHost;
   doc["deskUser"] = s.deskUser;
-  doc["deskPassword"] = s.deskPassword;
+  doc["deskPassword"] = backup ? seal(s.deskPassword) : s.deskPassword;
   doc["deskSitMin"] = s.deskSitMin;
   doc["deskStandMin"] = s.deskStandMin;
   doc["deskSitSlot"] = s.deskSitSlot;
@@ -106,14 +171,14 @@ bool fromJson(const String &json, Settings &s) {
   if (deserializeJson(doc, json)) return false;
   Settings d;  // defaults for anything missing
   s.wifiSsid = doc["wifiSsid"] | "";
-  s.wifiPassword = doc["wifiPassword"] | "";
+  s.wifiPassword = unseal(String(doc["wifiPassword"] | ""));
   s.accounts.clear();
   for (JsonObject o : doc["accounts"].as<JsonArray>()) {
-    s.accounts.push_back({o["label"] | "", o["url"] | "", o["token"] | "", o["color"] | 0x6C8CFFu});
+    s.accounts.push_back({o["label"] | "", o["url"] | "", unseal(String(o["token"] | "")), o["color"] | 0x6C8CFFu});
   }
   s.ics.clear();
   for (JsonObject o : doc["ics"].as<JsonArray>()) {
-    if (s.ics.size() < kMaxIcs) s.ics.push_back({o["label"] | "", o["url"] | "", o["color"] | 0x4FD1C5u});
+    if (s.ics.size() < kMaxIcs) s.ics.push_back({o["label"] | "", unseal(String(o["url"] | "")), o["color"] | 0x4FD1C5u});
   }
   s.brightness = doc["brightness"] | d.brightness;
   s.volume = doc["volume"] | d.volume;
@@ -124,6 +189,7 @@ bool fromJson(const String &json, Settings &s) {
   s.nightEnd = doc["nightEnd"] | d.nightEnd;
   s.dimIdle = doc["dimIdle"] | d.dimIdle;
   s.dimAfterMinutes = doc["dimAfterMinutes"] | d.dimAfterMinutes;
+  s.dimLevel = doc["dimLevel"] | d.dimLevel;
   s.use24h = doc["use24h"] | d.use24h;
   // "syncMinutes" replaces "refreshMinutes", which had no control and stayed at
   // the old 5-minute default; dropping it moves those displays to the new one.
@@ -159,7 +225,7 @@ bool fromJson(const String &json, Settings &s) {
   s.desk = doc["desk"] | d.desk;
   s.deskHost = doc["deskHost"] | d.deskHost;
   s.deskUser = doc["deskUser"] | d.deskUser;
-  s.deskPassword = doc["deskPassword"] | d.deskPassword;
+  s.deskPassword = unseal(String(doc["deskPassword"] | d.deskPassword.c_str()));
   s.deskSitMin = doc["deskSitMin"] | d.deskSitMin;
   s.deskStandMin = doc["deskStandMin"] | d.deskStandMin;
   s.deskSitSlot = constrain(doc["deskSitSlot"] | d.deskSitSlot, 1, 4);
@@ -220,14 +286,15 @@ void settings_flush(bool now) {
     return;
   }
   dirty = false;
-  const String json = toJson(current);
+  const Settings snapshot = current;
+  const String json = toJson(snapshot);
   xSemaphoreGive(lock);
 
   Preferences prefs;
   prefs.begin("calendar", false);
   prefs.putString("cfg", json);
   prefs.end();
-  storage_write(kBackupPath, json);
+  storage_write(kBackupPath, toJson(snapshot, true));
 }
 
 uint32_t settings_version() {
