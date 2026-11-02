@@ -36,6 +36,7 @@ constexpr const char *kTooManyIcs = "Too many calendar links";
 constexpr const char *kIcsAdded = "Calendar added. It shows up with the next sync.";
 constexpr const char *kIcsRemoved = "Calendar removed.";
 constexpr const char *kSyncSaved = "Sync interval saved.";
+constexpr const char *kLowPowerSaved = "Low power saved.";
 constexpr const char *kDeskSaved = "Desk settings saved. Turn the desk on in Settings > Features > Smart desk.";
 constexpr const char *kInstalled = "Installed. The display is restarting.";
 constexpr const char *kUpdateFailed = "Update failed: ";
@@ -168,6 +169,13 @@ void handleState() {
   d["loggedIn"] = desk.loggedIn;
   d["error"] = desk.error;
 
+  JsonObject lp = doc["lowPower"].to<JsonObject>();
+  lp["on"] = s.lowPower;
+  lp["start"] = s.sleepStart;
+  lp["end"] = s.sleepEnd;
+  lp["weekends"] = s.sleepWeekends;
+  lp["deep"] = s.sleepMode == 1;
+
   doc["refresh"] = s.refreshMinutes;
   doc["updateUrl"] = s.updateUrl;
   doc["autoUpdate"] = s.autoUpdate;
@@ -256,6 +264,19 @@ void handleSyncInterval() {
   s.refreshMinutes = constrain((int)server.arg("minutes").toInt(), 1, 60);
   settings_save(s);
   reply(kSyncSaved);
+}
+
+// Low power: on, start and end (minutes after midnight), weekends and deep as 0/1.
+void handleLowPower() {
+  if (!pinOk()) return;
+  Settings s = settings_get();
+  s.lowPower = server.arg("on") == "1";
+  s.sleepStart = constrain((int)server.arg("start").toInt(), 0, 1439);
+  s.sleepEnd = constrain((int)server.arg("end").toInt(), 0, 1439);
+  s.sleepWeekends = server.arg("weekends") == "1";
+  s.sleepMode = server.arg("deep") == "1" ? 1 : 0;
+  settings_save(s);
+  reply(kLowPowerSaved);
 }
 
 void handleUpdateUrl() {
@@ -364,6 +385,7 @@ void web_begin() {
   server.on("/ics/remove", HTTP_POST, handleRemoveIcs);
   server.on("/settings/sync", HTTP_POST, handleSyncInterval);
   server.on("/settings/update-url", HTTP_POST, handleUpdateUrl);
+  server.on("/settings/lowpower", HTTP_POST, handleLowPower);
   server.on("/settings/desk", HTTP_POST, handleDesk);
   server.on("/settings/desk/test", HTTP_POST, handleDeskTest);
   server.on("/settings/desk/test", HTTP_GET, handleDeskTestResult);

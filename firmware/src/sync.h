@@ -10,6 +10,10 @@ void sync_start();
 // Copies the latest data if it changed since `version`; returns false otherwise.
 bool sync_get_if_newer(uint32_t version, Snapshot &out);
 
+// Low power: sync_pause(true) asks the worker to stop after its current round
+// and returns true once it has (call again to poll). sync_pause(false) lets it go on.
+bool sync_pause(bool on);
+
 // Ask for a refresh now instead of waiting for the next interval.
 void sync_refresh();
 

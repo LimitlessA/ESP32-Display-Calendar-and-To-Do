@@ -9,6 +9,7 @@
 
 #include "crashlog.h"
 #include "display.h"
+#include "power.h"
 #include "presence.h"
 #include "psram.h"
 #include "web.h"
@@ -188,8 +189,13 @@ String execute(const String &line, bool overSerial) {
   // Serial only: whoever has the USB cable can already reflash the display.
   if (name == "pin") return overSerial ? web_pin() + " " + web_url() : "serial only";
   if (name == "log") return recentLog();
+  if (name == "sleep") {
+    const uint32_t s = constrain(n >= 2 ? a : 15, 1, 3600);
+    power_sleep_for(s);
+    return strf("sleeping up to %u s (%s), tap to wake", (unsigned)s, g_settings.sleepMode ? "deep" : "light");
+  }
   if (name == "help") {
-    return "tap X Y | press X Y MS | swipe X1 Y1 X2 Y2 [MS] | screen NAME | shot | heap | tasks | crash | log | pin";
+    return "tap X Y | press X Y MS | swipe X1 Y1 X2 Y2 [MS] | screen NAME | shot | heap | tasks | crash | log | pin | sleep [S]";
   }
   return "unknown command (help)";
 }

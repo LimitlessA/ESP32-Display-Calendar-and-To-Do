@@ -20,6 +20,14 @@ constexpr const char *kPhoneRow = "Phone";
 constexpr const char *kDeskRow = "Desk";
 constexpr const char *kSitRow = "Sit";
 constexpr const char *kStandRow = "Stand";
+constexpr const char *kUntilRow = "Until";
+constexpr const char *kModeRow = "Mode";
+constexpr const char *kWeekendsRow = "All day on weekends";
+constexpr const char *kSleepModes[] = {"Light sleep", "Deep sleep"};
+constexpr const char *kSleepHint = "A tap wakes it; it sleeps again 5 min after the last touch. "
+                                   "Deep sleep saves more but restarts the display, and a tap takes a few seconds.";
+constexpr const char *kSleepSpan = "%s-%s%s";
+constexpr const char *kSleepWeekends = " + weekends";
 constexpr const char *kDeskLogin = "Desk address, login and connection test";
 constexpr const char *kPair = "Pair a phone";
 constexpr const char *kForget = "Forget";
@@ -45,7 +53,7 @@ const char *const kVariants[kLayoutCount][3] = {
     {"Dock on Home", "Desk screen", "Follows calendar"},      // smart desk
 };
 
-enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves };
+enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves, SleepStart, SleepEnd };
 
 struct Feature {
   const char *name;
@@ -73,6 +81,7 @@ const Feature kFeatures[] = {
     {"Phone presence", "Away after %s without your phone", &Settings::presence, Opt::AwayMinutes, (int8_t)Layout::Presence},
     {"Smart desk", "Standing desk on Wi-Fi", &Settings::desk, Opt::None, (int8_t)Layout::Desk},
     {"Offline copy", "Keep the last sync on the TF card", &Settings::offlineCopy, Opt::None, -1},
+    {"Low power", "Sleeps %s, a tap wakes it", &Settings::lowPower, Opt::SleepStart, -1},
 };
 constexpr int kFeatureCount = sizeof(kFeatures) / sizeof(kFeatures[0]);
 constexpr const char *kNeedsLightSensor = "Needs a BH1750 light sensor on I2C";
@@ -109,6 +118,7 @@ const char *optionLabel(Opt o) {
     case Opt::CostRate: return "Rate";
     case Opt::AwayMinutes: return "Away";
     case Opt::RadarMoves: return "Stuck";
+    case Opt::SleepStart: return "From";
     default: return kOptionRow;
   }
 }
@@ -133,6 +143,8 @@ OptRange optRange(Opt o) {
     case Opt::CostRate: return {5, 500, 5, fmtMoney};
     case Opt::AwayMinutes: return {5, 60, 5, fmtMin};
     case Opt::RadarMoves: return {2, 10, 1, fmtCount};
+    case Opt::SleepStart:
+    case Opt::SleepEnd: return {0, 23 * 60 + 30, 30, fmtClock};
     default: return {0, 0, 1, fmtCount};
   }
 }
@@ -146,6 +158,8 @@ int optionNumber(Opt o, const Settings &s) {
     case Opt::CostRate: return s.costRate;
     case Opt::AwayMinutes: return s.awayMinutes;
     case Opt::RadarMoves: return s.radarMoves;
+    case Opt::SleepStart: return s.sleepStart;
+    case Opt::SleepEnd: return s.sleepEnd;
     default: return 0;
   }
 }
@@ -159,6 +173,8 @@ void applyOption(Settings &s, Opt o, int v) {
     case Opt::CostRate: s.costRate = v; break;
     case Opt::AwayMinutes: s.awayMinutes = v; break;
     case Opt::RadarMoves: s.radarMoves = v; break;
+    case Opt::SleepStart: s.sleepStart = v; break;
+    case Opt::SleepEnd: s.sleepEnd = v; break;
     default: break;
   }
 }
@@ -173,6 +189,10 @@ lv_obj_t *dialogSub = nullptr;  // the dialog's subtitle, kept up to date while 
 const Settings &cur() { return havePending ? pending : g_settings; }
 
 String optionValue(Opt o) {
+  if (o == Opt::SleepStart) {
+    return strf(kSleepSpan, fmtMinutes(cur().sleepStart).c_str(), fmtMinutes(cur().sleepEnd).c_str(),
+                cur().sleepWeekends ? kSleepWeekends : "");
+  }
   const OptRange r = optRange(o);
   return r.fmt ? r.fmt(optionNumber(o, cur())) : String("");
 }
@@ -191,13 +211,14 @@ void flushPending() {
   features_refresh();
 }
 
+// user: the feature, plus (option << 8) for a second stepper of the same feature.
 void stepped(int value, void *user) {
-  const int feature = (int)(intptr_t)user;
+  const int feature = (int)(intptr_t)user & 0xFF, opt = (int)(intptr_t)user >> 8;
   if (!havePending) {
     pending = g_settings;
     havePending = true;
   }
-  applyOption(pending, kFeatures[feature].opt, value);
+  applyOption(pending, opt ? (Opt)opt : kFeatures[feature].opt, value);
   if (dialogSub) lv_label_set_text(dialogSub, subText(feature).c_str());
   if (saveTimer) {
     lv_timer_reset(saveTimer);
@@ -240,6 +261,17 @@ void setFeature(int i, bool on) {
 }
 
 void showDialog(int i);
+
+// A row of the options dialog with its label on the left.
+lv_obj_t *optionRow(lv_obj_t *card, const char *label) {
+  lv_obj_t *row = mk_box(card, 0, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_width(row, INNER_W);
+  set_flex(row, LV_FLEX_FLOW_ROW, 10);
+  lv_obj_t *l = mk_label(row, &font_14b, theme().muted, label);
+  lv_obj_set_width(l, 70);
+  return row;
+}
 
 lv_obj_t *featureSwitch(lv_obj_t *parent, int i) {
   lv_obj_t *sw = mk_switch(parent, isOn(i), [](lv_event_t *e) {
@@ -330,6 +362,37 @@ void showDialog(int i) {
     lv_obj_set_width(l, 70);
     const OptRange r = optRange(f.opt);
     mk_stepper(row, optionNumber(f.opt, cur()), r.min, r.max, r.step, r.fmt, stepped, (void *)(intptr_t)i, 96);
+  }
+  if (f.on == &Settings::lowPower) {
+    lv_obj_t *row = optionRow(card, kUntilRow);
+    const OptRange r = optRange(Opt::SleepEnd);
+    mk_stepper(row, cur().sleepEnd, r.min, r.max, r.step, r.fmt, stepped,
+               (void *)(intptr_t)(i | (int)Opt::SleepEnd << 8), 96);
+    mk_segmented(optionRow(card, kModeRow), kSleepModes, 2, cur().sleepMode, 150, [](int idx, void *) {
+      lv_async_call([](void *p) {
+        flushPending();
+        Settings s = g_settings;
+        s.sleepMode = (uint8_t)(intptr_t)p;
+        ui_save_settings(s);
+        if (dialog) showDialog(dialogFeature);
+      }, (void *)(intptr_t)idx);
+    });
+    row = optionRow(card, "");
+    lv_obj_t *l = mk_label(row, &font_14, t.text, kWeekendsRow);
+    lv_obj_set_flex_grow(l, 1);
+    mk_switch(row, cur().sleepWeekends, [](lv_event_t *e) {
+      const bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+      lv_async_call([](void *p) {
+        flushPending();
+        Settings s = g_settings;
+        s.sleepWeekends = (intptr_t)p;
+        ui_save_settings(s);
+        if (dialog) showDialog(dialogFeature);
+      }, (void *)(intptr_t)on);
+    });
+    lv_obj_t *hint = mk_label(card, &font_12, t.muted, kSleepHint);
+    lv_obj_set_width(hint, INNER_W);
+    lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
   }
   if (f.on == &Settings::desk) {
     lv_obj_t *row = mk_box(card, 0, 0);

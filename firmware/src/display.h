@@ -13,3 +13,12 @@ void display_blank(bool blank);
 
 // The picture on screen: RGB565, w x h pixels, row by row (for screenshots).
 const uint16_t *display_frame(int *w, int *h);
+
+// Low power (power.cpp). display_sleep(true) turns the backlight off and stops
+// the panel; display_sleep(false) starts it again and redraws, or returns false
+// if it could not (then restart). display_touched() reads the touch controller
+// once over I2C; before display_init() it starts the touch driver alone (the
+// deep-sleep boot check). display_park() holds the backlight off in deep sleep.
+bool display_sleep(bool sleep);
+bool display_touched();
+void display_park();

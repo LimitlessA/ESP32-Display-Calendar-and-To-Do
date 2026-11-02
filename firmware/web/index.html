@@ -103,6 +103,13 @@ The first Google account's script reads these links, so add a Google account fir
 <section class=pane id=p3>
 <div class=c><h2>Wi-Fi</h2><div id=wi></div><p class=m>To change the network, use Settings &rsaquo; Wi-Fi on the display.</p></div>
 
+<div class=c><h2>Low power</h2><p class=m>The display sleeps with the screen off between these times (its local time); a tap wakes it. Deep sleep saves more but restarts it, so a tap takes a few seconds.</p>
+<form id=lf><label for=lo>Low power</label><select id=lo><option value=0>Off<option value=1>On</select>
+<label for=ls>From</label><input id=ls type=time step=1800><label for=le>Until</label><input id=le type=time step=1800>
+<label for=lw>Weekends</label><select id=lw><option value=0>Same times<option value=1>All day</select>
+<label for=ld>Mode</label><select id=ld><option value=0>Light sleep<option value=1>Deep sleep</select>
+<button class=b>Save</button><p class=msg id=lm></p></form></div>
+
 <div class=c><h2>Firmware</h2><div id=fi></div>
 <form id=uf><label for=uu>Update link (<code>manifest.json</code>)</label><input id=uu name=url placeholder="https://.../manifest.json">
 <p class=m>Where the display looks for new versions. Leave it unless you host the firmware yourself.</p>
@@ -160,7 +167,10 @@ function render(d,fill){
  if(o.state=='installing')s.appendChild(el('p','st','Installing: '+o.progress+'%'));
  if(o.state=='failed'&&o.msg)s.appendChild(el('p','st er','Last update failed: '+o.msg));
  if(fill){$('dh').value=k.host;$('du').value=k.user;$('uu').value=d.updateUrl;
+  s=d.lowPower;if(s){$('lo').value=+s.on;$('ls').value=hm(s.start);$('le').value=hm(s.end);$('lw').value=+s.weekends;$('ld').value=+s.deep}
   s=$('si');if(d.refresh&&!s.querySelector('[value="'+d.refresh+'"]'))s.appendChild(new Option('Every '+d.refresh+' minutes',d.refresh));s.value=d.refresh}}
+function hm(m){return('0'+(m/60|0)).slice(-2)+':'+('0'+m%60).slice(-2)}
+function mins(i){var v=$(i).value.split(':');return v[0]*60+ +v[1]||0}
 function load(fill){return fetch('/state').then(function(r){return r.json()}).then(function(d){render(d,fill===true)})
  .catch(function(){$('hv').innerHTML='<span class=er>Display not reachable</span>'})}
 var T=document.querySelectorAll('nav button');
@@ -181,6 +191,7 @@ $('dt').onclick=function(){var m=$('dm'),n=0;post('/settings/desk/test',$('df'),
   if((t.running||!t.done)&&++n<40)return setTimeout(poll,500);say(m,t.done?t.message:'The desk did not answer in time.',t.ok?'ok':'er')})
  .catch(function(){say(m,'Could not read the test result.','er')})},'Testing the desk...')};
 $('sf').onsubmit=function(e){e.preventDefault();post('/settings/sync',this,$('sm'),load)};
+$('lf').onsubmit=function(e){e.preventDefault();post('/settings/lowpower',{on:$('lo').value,start:mins('ls'),end:mins('le'),weekends:$('lw').value,deep:$('ld').value},$('lm'),load)};
 $('uf').onsubmit=function(e){e.preventDefault();post('/settings/update-url',this,$('um'),load)};
 $('wf').onsubmit=function(e){e.preventDefault();var m=$('fm'),f=$('fw').files[0],p=$('fp'),x;
  if(!P){say(m,'Enter the PIN at the top first.','er');$('pin').focus();return}
