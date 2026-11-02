@@ -2,6 +2,7 @@
 
 #if HARNESS
 
+#include <driver/gpio.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <lvgl.h>
@@ -184,6 +185,18 @@ String execute(const String &line, bool overSerial) {
   }
   if (name == "shot") return overSerial ? serialShot() : "use /shot.bmp";
   if (name == "heap") return heapReport();
+  // gpio N [MS]: turns pin N into an input (until restart) and samples it
+  // for MS ms (default 3000), e.g. to find the touch controller's INT line.
+  if (name == "gpio" && n >= 2) {
+    const uint32_t ms = n >= 3 ? b : 3000;
+    gpio_set_direction((gpio_num_t)a, GPIO_MODE_INPUT);
+    uint32_t low = 0, samples = 0;
+    for (const uint32_t t0 = millis(); millis() - t0 < ms; samples++) {
+      if (!gpio_get_level((gpio_num_t)a)) low++;
+      delay(1);
+    }
+    return strf("gpio %d: low %u of %u samples, now %d", a, (unsigned)low, (unsigned)samples, gpio_get_level((gpio_num_t)a));
+  }
   if (name == "tasks") return psram_task_report();  // free stack bytes per task
   if (name == "crash") return crashlog_details();
   // Serial only: whoever has the USB cable can already reflash the display.
@@ -195,7 +208,7 @@ String execute(const String &line, bool overSerial) {
     return strf("sleeping up to %u s (%s), tap to wake", (unsigned)s, g_settings.sleepMode ? "deep" : "light");
   }
   if (name == "help") {
-    return "tap X Y | press X Y MS | swipe X1 Y1 X2 Y2 [MS] | screen NAME | shot | heap | tasks | crash | log | pin | sleep [S]";
+    return "tap X Y | press X Y MS | swipe X1 Y1 X2 Y2 [MS] | screen NAME | shot | heap | tasks | crash | log | pin | sleep [S] | gpio N [MS]";
   }
   return "unknown command (help)";
 }
