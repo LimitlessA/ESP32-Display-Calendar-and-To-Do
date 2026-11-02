@@ -260,7 +260,8 @@ bool needsRebuild(const Settings &a, const Settings &b) {
          a.meetTimer != b.meetTimer || a.costMeter != b.costMeter || a.costRate != b.costRate ||
          a.radar != b.radar || a.radarMoves != b.radarMoves || a.roulette != b.roulette ||
          a.presence != b.presence || a.desk != b.desk || a.deskSitSlot != b.deskSitSlot ||
-         a.deskStandSlot != b.deskStandSlot;
+         a.deskStandSlot != b.deskStandSlot || a.deskLabel[0] != b.deskLabel[0] || a.deskLabel[1] != b.deskLabel[1] ||
+         a.deskLabel[2] != b.deskLabel[2] || a.deskLabel[3] != b.deskLabel[3];
 }
 
 void hideToast(lv_timer_t *) {

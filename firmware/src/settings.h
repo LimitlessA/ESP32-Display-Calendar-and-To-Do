@@ -90,6 +90,7 @@ struct Settings {
   uint8_t deskStandMin = 0;
   uint8_t deskSitSlot = 1;      // memory button for sitting (M1-M4)
   uint8_t deskStandSlot = 2;    // ...and for standing
+  String deskLabel[4];          // own names for M1-M4 (empty = the default)
   bool deskMeetings = true;     // layout C: stand for meetings of 15 min or more
   bool deskFocus = false;       // layout C: stand while the focus timer runs
   bool deskAway = true;         // layout C: desk away mode while your phone is away

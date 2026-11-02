@@ -216,6 +216,7 @@ void close_overlay(lv_obj_t **layer);
 
 // Desk address, login and connection test (ui_desk_settings.cpp). The Accounts screen can link here.
 void desk_settings_show();
+void desk_label_edit(uint8_t slot);  // names a memory button (M1-M4)
 
 void toast(const String &msg, const char *action = nullptr, lv_event_cb_t cb = nullptr, void *user = nullptr);
 

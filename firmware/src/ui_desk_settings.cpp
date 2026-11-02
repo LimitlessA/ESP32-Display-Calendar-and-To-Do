@@ -171,3 +171,65 @@ void desk_settings_show() {
   }, LV_EVENT_READY, nullptr);
   focusField(fields[0]);
 }
+
+// ---- Name a memory button ------------------------------------------------------
+
+namespace {
+
+constexpr const char *kLabelTitle = "Name for M%d";
+constexpr const char *kLabelHint = "Empty = default";
+constexpr int kLabelMax = 16;
+
+lv_obj_t *labelLayer = nullptr;
+lv_obj_t *labelField = nullptr;
+uint8_t labelSlot = 0;
+
+void saveLabel() {
+  Settings s = g_settings;
+  String v = lv_textarea_get_text(labelField);
+  v.trim();
+  s.deskLabel[labelSlot - 1] = v.substring(0, kLabelMax);
+  ui_save_settings(s);
+  close_overlay(&labelLayer);
+}
+
+}  // namespace
+
+void desk_label_edit(uint8_t slot) {
+  if (slot < 1 || slot > 4) return;
+  close_overlay(&labelLayer);
+  const Theme &t = theme();
+  labelSlot = slot;
+  mk_overlay(false, &labelLayer);
+  lv_obj_add_event_cb(labelLayer, [](lv_event_t *e) {
+    if (labelLayer && labelLayer != lv_event_get_target(e)) return;
+    labelField = nullptr;
+  }, LV_EVENT_DELETE, nullptr);
+
+  lv_obj_t *head = mk_box(labelLayer, 0, 0);
+  lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
+  lv_obj_set_size(head, FORM_W, HEADER_H);
+  lv_obj_set_pos(head, PAD, 0);
+  set_flex(head, LV_FLEX_FLOW_ROW, 10);
+  lv_obj_t *title = mk_label(head, &font_20b, t.text, strf(kLabelTitle, slot).c_str());
+  lv_obj_set_flex_grow(title, 1);
+  on_click(mk_text_button(head, kCancel, false, 110), [](lv_event_t *) {
+    lv_async_call([](void *) { close_overlay(&labelLayer); }, nullptr);
+  });
+  on_click(mk_text_button(head, kSave, true, 110), [](lv_event_t *) {
+    lv_async_call([](void *) { saveLabel(); }, nullptr);
+  });
+
+  labelField = mk_textarea(labelLayer, kLabelHint);
+  lv_obj_set_size(labelField, FORM_W, ROW_H);
+  lv_obj_set_pos(labelField, PAD, HEADER_H + 2);
+  lv_obj_set_style_pad_ver(labelField, 9, 0);
+  lv_textarea_set_max_length(labelField, kLabelMax);
+  lv_textarea_set_text(labelField, g_settings.deskLabel[slot - 1].c_str());
+
+  const int kbY = HEADER_H + 2 + ROW_H + 8;
+  lv_obj_t *kb = mk_keyboard(labelLayer, labelField);
+  lv_obj_set_pos(kb, PAD, kbY);
+  lv_obj_set_size(kb, FORM_W, SCREEN_H - kbY - 6);
+  lv_obj_add_event_cb(kb, [](lv_event_t *) { lv_async_call([](void *) { saveLabel(); }, nullptr); }, LV_EVENT_READY, nullptr);
+}
