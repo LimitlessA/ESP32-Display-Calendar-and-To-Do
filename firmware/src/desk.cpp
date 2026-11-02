@@ -228,7 +228,9 @@ void send(const String &base, const Settings &s, const Command &c) {
   String out;
   switch (c.cmd) {
     case Cmd::Recall: recall(base, s, c.slot); break;
-    case Cmd::Stop: request(base + "/api/desk/emergency-stop", "POST", "{}", out, false); break;
+    // The desk's plain stop (public). Its emergency stop latches: every command after it
+    // is refused until an admin clears it on the desk's web page.
+    case Cmd::Stop: request(base + "/stop", "POST", "", out, false); break;
     case Cmd::HoldStop: authed(base, s, "/api/desk/hold/stop", "POST", "{}"); break;
     case Cmd::TimerOn: {
       // The lengths set on the display, else the ones saved on the desk, between the sit and stand memories.
