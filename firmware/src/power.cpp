@@ -19,6 +19,7 @@
 #include <lvgl.h>
 
 #include "config.h"
+#include "desk.h"
 #include "display.h"
 #include "ota.h"
 #include "power.h"
@@ -195,8 +196,9 @@ void power_poll() {
   const Settings s = settings_get();
   const time_t now = time(nullptr);
   const OtaState ota = ota_status().state;
+  // The desk's sit/stand timer runs on the display, so it stays awake while the timer runs.
   const bool want = forcedUntil ||
-                    (s.lowPower && now > kClockValid && inWindow(s, now) &&
+                    (s.lowPower && now > kClockValid && inWindow(s, now) && !desk_status().timerRunning &&
                      lv_disp_get_inactive_time(nullptr) >= s.sleepIdleMinutes * 60000UL && ota != OtaState::Checking &&
                      ota != OtaState::Installing && ota != OtaState::Done);
   if (!want) {

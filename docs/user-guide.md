@@ -509,22 +509,20 @@ desk's web page. The desk then refuses every button on the display until an
 admin clears it on that web page.
 
 **The ring timer (sit/stand)**
-- Only with a desk login. It is the desk's own timer. Tap the play triangle in
-  the ring to start.
+- Only with a desk login. It runs on the display, like the timer on the desk's
+  web page. Tap the play triangle in the ring to start.
+- It starts in the position the desk is in now, without moving it. Standing
+  now means a stand phase first, sitting now a sit phase first.
 - Before it runs, set the **Sit** and **Stand** minutes with - and + (5 to 90).
   If you did not set them, the lengths saved on the desk are used.
+- At the end of a phase the desk goes to the other memory (Sit or Stand, as
+  chosen in the Smart desk options). If you moved the desk by hand, it goes to
+  the opposite of where it is then.
 - While it runs, the ring counts down the minutes and says "Sitting" or
-  "Standing", and "then Stand 15". In the last minute it counts seconds.
-- **Possibly broken**: the display reads the desk's phase as "SIT" or "STAND",
-  but the desk (version read for this guide) says "SITTING" or "STANDING". If
-  that is still true on your desk, the ring may always say "Standing" and
-  "Sit in N min", even in the sit phase. Check this on the real desk.
+  "Standing". In the last minute it counts seconds.
 - Buttons: pause / resume, and stop.
-- The timer starts at the desk's sit and stand heights (memory buttons you
-  chose).
-- The desk may refuse to start it outside its own working hours. The display
-  does not show a message for that. **Not sure**: this comes from the desk, not
-  the display.
+- The display does not go to low power sleep while the timer runs. The timer
+  stops if the display restarts.
 
 **Rules (layout C)**
 - **Stand for meetings of 15 min or more** (on by default). A minute before such a

@@ -48,7 +48,6 @@ SemaphoreHandle_t lock;
 DeskStatus status;
 std::deque<Command> queue;
 volatile int holding = 0;  // +1 / -1 while a button is held
-volatile int timerPending = 0;  // timer button presses the desk has not answered yet
 String token;              // desk session; desks forget sessions when they restart
 String loginKey;           // host + login the session belongs to; a change means a new session
 volatile uint32_t timerApplyAt = 0;  // millis() of the last change of the timer lengths, 0 = none
@@ -57,6 +56,16 @@ volatile bool testBusy = false;
 IPAddress ip;
 String resolvedFor;
 uint32_t lastResolve = 0, lastPoll = 0, lastMemory = 0, lastBeat = 0;
+int deskSitMin = 0, deskStandMin = 0;  // the lengths saved on the desk, for when none are set on the display
+
+// The sit/stand timer runs here, like the one on the desk's web page: it starts in the phase the
+// desk is in now (no move) and at the end of each phase sends the desk to the other memory. The
+// desk's own interval timer always starts by going to the sit memory, so it is not used.
+struct LocalTimer {
+  bool running = false, paused = false, stand = false;
+  uint32_t start = 0, length = 0, elapsed = 0;  // ms; elapsed is kept while paused
+} lt;
+uint32_t lastPublish = 0;
 
 // ---- Code --------------------------------------------------------------------
 
@@ -159,22 +168,43 @@ void poll(const String &base) {
   const int height = doc["height_mm"] | 0;
   const bool moving = doc["is_moving"] | false;
   const String state = doc["state"] | "";
-  JsonDocument timer(psram_json());
-  const bool haveTimer = request(base + "/interval/status", "GET", "", out, false) == 200 && !deserializeJson(timer, out);
   update([&](DeskStatus &st) {
     if (!st.online) st.error = "";
     st.online = true;
     st.heightMm = height;
     st.moving = moving;
     st.state = state;
-    if (haveTimer && !timerPending) {  // not while a timer button's answer is still on its way
-      st.timerRunning = timer["running"] | false;
-      st.timerPaused = timer["paused"] | false;
-      st.timerPhase = timer["phase"] | "";
-      st.timerLeft = timer["remaining_seconds"] | 0L;
-      st.sitMinutes = (int)(timer["sit_minutes"] | 0.0f);
-      st.standMinutes = (int)(timer["stand_minutes"] | 0.0f);
-    }
+  });
+}
+
+int sitMinutes(const Settings &s) { return s.deskSitMin ? s.deskSitMin : deskSitMin > 0 ? deskSitMin : 30; }
+int standMinutes(const Settings &s) { return s.deskStandMin ? s.deskStandMin : deskStandMin > 0 ? deskStandMin : 30; }
+
+// Standing or sitting now: nearer the stand or the sit memory, else 1000 mm and up is standing.
+bool standingNow(const Settings &s, const DeskStatus &st) {
+  const int sit = st.memoryMm[s.deskSitSlot - 1], stand = st.memoryMm[s.deskStandSlot - 1];
+  if (sit > 0 && stand > 0 && sit != stand) return stand > sit ? st.heightMm * 2 >= sit + stand : st.heightMm * 2 <= sit + stand;
+  return st.heightMm >= 1000;
+}
+
+void startPhase(const Settings &s, bool stand) {
+  lt.stand = stand;
+  lt.length = 60000UL * (stand ? standMinutes(s) : sitMinutes(s));
+  lt.start = millis();
+  lt.elapsed = 0;
+}
+
+uint32_t timerElapsed() { return lt.paused ? lt.elapsed : millis() - lt.start; }
+
+void publishTimer(const Settings &s) {
+  const uint32_t left = lt.running ? lt.length - std::min(lt.length, timerElapsed()) : 0;
+  update([&](DeskStatus &st) {
+    st.timerRunning = lt.running;
+    st.timerPaused = lt.paused;
+    st.timerPhase = lt.running ? (lt.stand ? "STAND" : "SIT") : "IDLE";
+    st.timerLeft = (left + 999) / 1000;
+    st.sitMinutes = sitMinutes(s);
+    st.standMinutes = standMinutes(s);
   });
 }
 
@@ -192,6 +222,11 @@ void fetchMemory(const String &base, const Settings &s) {
   if (!s.deskUser.length()) return;
   if (!token.length() && !login(base, s)) return;
   String out;
+  JsonDocument timer(psram_json());
+  if (request(base + "/interval/status", "GET", "", out, false) == 200 && !deserializeJson(timer, out)) {
+    deskSitMin = (int)(timer["sit_minutes"] | 0.0f);
+    deskStandMin = (int)(timer["stand_minutes"] | 0.0f);
+  }
   int code = request(base + "/api/desk/memory", "GET", "", out);
   if (code == 401 && login(base, s)) code = request(base + "/api/desk/memory", "GET", "", out);
   Serial.printf("[desk] GET /api/desk/memory -> %d %s\n", code, out.substring(0, 300).c_str());
@@ -244,25 +279,27 @@ void send(const String &base, const Settings &s, const Command &c) {
       if (code < 200 || code >= 300) request(base + "/stop", "POST", "", out, false);
       break;
     }
-    case Cmd::TimerOn: {
-      // The lengths set on the display, else the ones saved on the desk, between the sit and stand memories.
-      const DeskStatus st = desk_status();
-      const int sitMin = s.deskSitMin ? s.deskSitMin : st.sitMinutes;
-      const int standMin = s.deskStandMin ? s.deskStandMin : st.standMinutes;
-      String body = "{";
-      if (sitMin > 0 && standMin > 0) body += "\"sit_min\":" + String(sitMin) + ",\"stand_min\":" + String(standMin) + ",";
-      const int sit = st.memoryMm[s.deskSitSlot - 1], stand = st.memoryMm[s.deskStandSlot - 1];
-      if (sit > 0 && stand > 0) body += "\"sit_target_mm\":" + String(sit) + ",\"stand_target_mm\":" + String(stand) + ",";
-      if (body.endsWith(",")) body.remove(body.length() - 1);
-      const int code = authed(base, s, "/interval/start", "POST", body + "}");
-      // The desk refuses the timer outside its working hours (403): say so instead of doing nothing.
-      if (code == 403) update([](DeskStatus &st) { st.error = "The desk's working hours do not allow the timer now"; });
-      else if (code >= 400 && code != 401) update([](DeskStatus &st) { st.error = "The desk did not start the timer"; });
+    case Cmd::TimerOn:
+      // Starts in the position the desk is in now; no move. The desk's own timer, if it runs
+      // (started on its web page), would send the desk to sit, so it is stopped.
+      authed(base, s, "/interval/stop", "POST", "{}");
+      lt.running = true;
+      lt.paused = false;
+      startPhase(s, standingNow(s, desk_status()));
       break;
-    }
-    case Cmd::TimerOff: authed(base, s, "/interval/stop", "POST", "{}"); break;
-    case Cmd::TimerPause: authed(base, s, "/interval/pause", "POST", "{}"); break;
-    case Cmd::TimerResume: authed(base, s, "/interval/resume", "POST", "{}"); break;
+    case Cmd::TimerOff: lt.running = lt.paused = false; break;
+    case Cmd::TimerPause:
+      if (lt.running && !lt.paused) {
+        lt.elapsed = millis() - lt.start;
+        lt.paused = true;
+      }
+      break;
+    case Cmd::TimerResume:
+      if (lt.running && lt.paused) {
+        lt.start = millis() - lt.elapsed;
+        lt.paused = false;
+      }
+      break;
     case Cmd::AwayOn: authed(base, s, "/api/away/start", "POST", "{}"); break;
     case Cmd::AwayOff: authed(base, s, "/api/away/end", "POST", "{}"); break;
   }
@@ -326,9 +363,19 @@ void task(void *) {
       }
     }
 
+    // New lengths apply to the phase that runs now, counted from its start.
     if (timerApplyAt && millis() - timerApplyAt > 1200) {
       timerApplyAt = 0;
-      if (desk_status().timerRunning) send(base, s, {Cmd::TimerOn, 0});
+      if (lt.running) lt.length = 60000UL * (lt.stand ? standMinutes(s) : sitMinutes(s));
+      lastPublish = 0;
+    }
+
+    // End of a phase: to the other position from where the desk is now (it may have been moved by hand).
+    if (lt.running && !lt.paused && millis() - lt.start >= lt.length) {
+      const bool stand = !standingNow(s, desk_status());
+      recall(base, s, stand ? s.deskStandSlot : s.deskSitSlot);
+      startPhase(s, stand);
+      lastPublish = 0;
     }
 
     bool have = false;
@@ -342,9 +389,11 @@ void task(void *) {
     xSemaphoreGive(lock);
     if (have) {
       send(base, s, c);
-      if (c.cmd == Cmd::TimerOn || c.cmd == Cmd::TimerOff || c.cmd == Cmd::TimerPause || c.cmd == Cmd::TimerResume) {
-        if (timerPending > 0) timerPending--;
-      }
+      lastPublish = 0;
+    }
+    if (!lastPublish || (lt.running && millis() - lastPublish >= 1000)) {
+      lastPublish = millis();
+      publishTimer(s);
     }
 
     const DeskStatus st = desk_status();
@@ -480,15 +529,16 @@ void desk_stop() {
 void desk_timer(bool on) { desk_timer_cmd(on ? 1 : 0); }
 
 void desk_timer_cmd(int what) {
-  // Show the result at once: the desk takes 1-3 s to answer, and a button that does nothing
-  // for that long looks broken. The next poll after the command confirms or corrects it.
+  // Show the result at once: the desk task may be busy with a request to the desk for a second
+  // or two, and a button that does nothing for that long looks broken.
+  const Settings s = settings_get();
   update([&](DeskStatus &st) {
-    timerPending++;
     if (what == 1) {
+      const bool stand = standingNow(s, st);
       st.timerRunning = true;
       st.timerPaused = false;
-      st.timerPhase = "SIT";
-      st.timerLeft = 60L * (st.sitMinutes ? st.sitMinutes : 30);
+      st.timerPhase = stand ? "STAND" : "SIT";
+      st.timerLeft = 60L * (stand ? standMinutes(s) : sitMinutes(s));
     } else if (what == 2) {
       st.timerPaused = true;
     } else if (what == 3) {

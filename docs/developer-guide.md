@@ -674,15 +674,14 @@ refuse a wrong password and longer to accept a right one.
 | Route | Method | Login | Sent by the display |
 |---|---|---|---|
 | `/api/desk/status` | GET | no | Every 2 s (0.5 s while moving): `height_mm`, `is_moving`, `state` |
-| `/interval/status` | GET | no | With each poll: `running`, `paused`, `phase`, `remaining_seconds`, `sit_minutes`, `stand_minutes` |
+| `/interval/status` | GET | no | Every 5 minutes with the memory heights: `sit_minutes`, `stand_minutes` (the lengths used when none are set on the display) |
 | `/api/auth/login` | POST | no | `{"username","password"}`, returns `token`. Used as `Authorization: Bearer <token>`. Re-done on a 401. |
 | `/api/desk/memory` | GET | yes | Every 5 minutes: memory heights (accepts several JSON shapes) |
 | `/position` | POST | user | `{"position":N}` for N from 1 to 4. Falls back to `{"position":"MN"}`. Sent as a guest first, retried signed in on 401 or 403. |
 | `/stop` | POST | no | Stop. The desk's normal stop, which does not latch. |
 | `/api/desk/hold` | POST | user | `{"direction":"up"\|"down"}` every 350 ms while held |
 | `/api/desk/hold/stop` | POST | user | On release |
-| `/interval/start` | POST | user | `sit_min`, `stand_min`, `sit_target_mm`, `stand_target_mm` |
-| `/interval/stop`, `/interval/pause`, `/interval/resume` | POST | user | The ring buttons |
+| `/interval/stop` | POST | user | When the display's timer starts, so the desk's own timer does not run at the same time |
 | `/api/away/start`, `/api/away/end` | POST | yes | Away mode |
 
 Notes from reading the desk code:
@@ -693,14 +692,13 @@ Notes from reading the desk code:
 - The display logs every memory call to the serial port (`[desk] ...`).
 - The desk checks the **user** role for hold, hold/stop and interval routes. Away
   start and end only check that you are logged in.
-- `/interval/start` returns 403 "Outside working hours" if the desk user has working
-  hours set and it is outside them. The display ignores the reply code, so
-  nothing is shown. The desk also stops a running timer by itself outside
-  working hours.
-- **Possibly broken:** the desk's timer phase is `IDLE`, `SITTING`, `STANDING` or
-  `PAUSED`. `ui_desk.cpp` compares the phase with `"SIT"` (and `desk.h` says
-  "SIT, STAND, IDLE"). The comparison never matches, so the display always takes
-  the sit phase for the stand phase.
+- **Sit/stand timer:** runs on the display (`LocalTimer` in `desk.cpp`), like the
+  timer on the desk's web page. The desk's `/interval/start` always begins with
+  the sit phase and sends the desk to the sit memory, so a standing desk went
+  down first. The display's timer starts in the phase that matches the height
+  now (nearer the stand or the sit memory) without moving. At the end of a phase
+  it recalls the other memory, judged from the height then, so a desk moved by
+  hand is followed. Low power does not sleep while it runs.
 - **Hold timeout:** the desk ends a hold `hold_timeout_ms` (default 10000) after
   the last beat. When a beat or the release gets an error, the display sends
   `POST /stop` at once. If the display crashes or loses Wi-Fi mid-hold, only the
@@ -711,7 +709,6 @@ Notes from reading the desk code:
 
 Found while writing these documents. None were changed in the code.
 
-- The desk timer phase mismatch above.
 - The desk hold timeout above.
 - **No board check on firmware upload.** Neither `/update` nor `ota.cpp` checks
   that the image is for the 7 inch or the 5 inch. The test plan expects it to be

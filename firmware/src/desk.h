@@ -33,7 +33,7 @@ DeskStatus desk_status();
 void desk_recall(uint8_t slot);  // memory position 1-4
 void desk_hold(int direction);   // +1 raise, -1 lower while held, 0 released
 void desk_stop();                // stops any movement (no login needed)
-void desk_timer(bool on);        // the desk's own sit/stand interval timer
+void desk_timer(bool on);        // sit/stand timer, run on the display; starts where the desk is now
 void desk_timer_cmd(int what);   // 0 stop, 1 start, 2 pause, 3 resume
 void desk_away(bool away);       // the desk's away mode
 // The timer lengths (Settings::deskSitMin / deskStandMin) are sent with "start". After they changed,
