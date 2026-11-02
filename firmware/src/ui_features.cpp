@@ -144,10 +144,10 @@ OptRange optRange(Opt o) {
   switch (o) {
     case Opt::SummaryAt: return {5 * 60, 11 * 60, 30, fmtClock};
     case Opt::ReviewAt: return {16 * 60, 23 * 60, 30, fmtClock};
-    case Opt::LeaveLead: return {5, 60, 5, fmtMin};
-    case Opt::FocusMinutes: return {5, 90, 5, fmtMin};
+    case Opt::LeaveLead: return {1, 60, 1, fmtMin};
+    case Opt::FocusMinutes: return {1, 90, 1, fmtMin};
     case Opt::CostRate: return {5, 500, 5, fmtMoney};
-    case Opt::AwayMinutes: return {5, 60, 5, fmtMin};
+    case Opt::AwayMinutes: return {1, 60, 1, fmtMin};
     case Opt::RadarMoves: return {2, 10, 1, fmtCount};
     case Opt::SleepStart:
     case Opt::SleepEnd:

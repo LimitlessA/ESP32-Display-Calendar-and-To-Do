@@ -281,7 +281,7 @@ The display notices when your phone is near.
 The phone shows up as a media remote with no keys. It never acts as a keyboard.
 Nothing is sent to the phone.
 
-- You are away after 10 minutes without your phone (5 to 60 in the options).
+- You are away after 10 minutes without your phone (1 to 60 in the options).
 - iPhones stay connected reliably. Some Android phones drop the link to save
   battery, so allow a longer away time.
 - **Forget** removes the pairing on the display. Remove "Calendar display" on the
@@ -411,11 +411,11 @@ The cards:
 | Daily summary | time, 05:00-11:00 | Stat tiles / Timeline / Briefing |
 | End-of-day review | time, 16:00-23:00 | Checklist / One at a time / Plan by day |
 | Conflict alerts | none | Banner on Home / Compare popup / Marked in Week |
-| Leave-by alerts | warn 5-60 min | Full screen / Card on Home / Header countdown |
+| Leave-by alerts | warn 1-60 min | Full screen / Card on Home / Header countdown |
 | Meeting timer | none | Card progress / Full screen / Glowing edge |
 | Meeting cost | rate, 5-500 | On the card / Big counter / Weekly receipt |
 | Reminder sound | none | none |
-| Focus timer | length, 5-90 min | Big ring / Split / Header strip |
+| Focus timer | length, 1-90 min | Big ring / Split / Header strip |
 | Quick add task | none | Keyboard / Frequent tiles / Sheet over list |
 | Procrastination radar | stuck after 2-10 moves | Glowing tasks / Nudge popup / Radar view |
 | Task roulette | none | Wheel / Card deck / Slot machine |
@@ -423,7 +423,7 @@ The cards:
 | Birthdays and holidays | none | same layout as Countdowns |
 | Ambient light | none | none |
 | Motion wake | none | none |
-| Phone presence | away after 5-60 min | Welcome back / Privacy mode / Away screen |
+| Phone presence | away after 1-60 min | Welcome back / Privacy mode / Away screen |
 | Smart desk | sit and stand memory, desk login | Dock on Home / Desk screen / Follows calendar |
 | Offline copy | none | none |
 | Low power | from, until, light or deep sleep, all day on weekends | none |
