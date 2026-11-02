@@ -155,6 +155,10 @@ is what protects the script. Use a long one.
    from before 2 Nov 2026 did not remember it, so the first time you update from
    one of those, put your token back in once.
 2. Check **Services (+)** lists both **Tasks API** and **Google Calendar API**.
+   If Google asks for new permissions (for example "You do not have permission to
+   call UrlFetchApp.fetch"), pick **preview** in the function list next to **Run**,
+   press **Run**, then **Review permissions > your account > Advanced > Go to ...
+   > Allow**. Newer versions read Outlook/iCloud links, which needs this once.
 3. Press **Deploy > Manage deployments**.
 4. Edit the web app (pencil icon). Under **Version**, pick **New version**.
    Press **Deploy**.
