@@ -149,10 +149,14 @@ is what protects the script. Use a long one.
 
 ### When Code.gs changes later
 
-1. Paste the new version of `Code.gs` over the old one. **Keep your `CONFIG`
-   values** (especially `TOKEN`).
-2. Press **Deploy > Manage deployments**.
-3. Edit the web app (pencil icon). Under **Version**, pick **New version**.
+1. Paste the new version of `Code.gs` over the old one. Keep your other `CONFIG`
+   values (address, travel mode, and so on). `TOKEN` can stay `'change-me'`: the
+   script remembers the token from the first time the display used it. Scripts
+   from before 2 Nov 2026 did not remember it, so the first time you update from
+   one of those, put your token back in once.
+2. Check **Services (+)** lists both **Tasks API** and **Google Calendar API**.
+3. Press **Deploy > Manage deployments**.
+4. Edit the web app (pencil icon). Under **Version**, pick **New version**.
    Press **Deploy**.
 
 The URL stays the same. **Saving alone is not enough.** The display talks to the

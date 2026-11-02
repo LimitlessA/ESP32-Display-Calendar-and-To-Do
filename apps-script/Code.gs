@@ -29,7 +29,7 @@
  */
 
 const CONFIG = {
-  TOKEN: 'change-me',  // paste the same value on the display's setup page
+  TOKEN: 'change-me',  // paste the same value on the display's setup page; it is remembered, so later updates can leave this as 'change-me'
   DAYS_AHEAD: 7,
   MAX_EVENTS: 60,         // older displays (format 1)
   FEED_DAYS: 14,          // format 2: this week and the next, from Monday
@@ -65,9 +65,19 @@ const CACHE_HOURS_DATES = 6;      // birthdays, holidays and frequent tasks chan
 const CACHE_MINUTES_TRAVEL = 30;
 const CACHE_MINUTES_ICS = 10;     // published calendars are fetched at most this often
 
+// The token is also kept in the script's properties, so pasting a newer
+// Code.gs (which says 'change-me') keeps working with the token set before.
+function token_() {
+  const props = PropertiesService.getScriptProperties();
+  const placeholder = CONFIG.TOKEN === 'change-me' || !CONFIG.TOKEN;
+  if (placeholder) return props.getProperty('TOKEN') || '';
+  if (props.getProperty('TOKEN') !== CONFIG.TOKEN) props.setProperty('TOKEN', CONFIG.TOKEN);
+  return CONFIG.TOKEN;
+}
+
 function doGet(e) {
   const p = (e && e.parameter) || {};
-  if (p.token !== CONFIG.TOKEN) {
+  if (!p.token || p.token !== token_()) {
     return json_({ error: 'unauthorized' });
   }
   try {
