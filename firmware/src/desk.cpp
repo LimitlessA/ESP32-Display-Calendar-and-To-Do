@@ -48,6 +48,7 @@ SemaphoreHandle_t lock;
 DeskStatus status;
 std::deque<Command> queue;
 volatile int holding = 0;  // +1 / -1 while a button is held
+volatile int timerPending = 0;  // timer button presses the desk has not answered yet
 String token;              // desk session; desks forget sessions when they restart
 String loginKey;           // host + login the session belongs to; a change means a new session
 volatile uint32_t timerApplyAt = 0;  // millis() of the last change of the timer lengths, 0 = none
@@ -166,7 +167,7 @@ void poll(const String &base) {
     st.heightMm = height;
     st.moving = moving;
     st.state = state;
-    if (haveTimer) {
+    if (haveTimer && !timerPending) {  // not while a timer button's answer is still on its way
       st.timerRunning = timer["running"] | false;
       st.timerPaused = timer["paused"] | false;
       st.timerPhase = timer["phase"] | "";
@@ -339,7 +340,12 @@ void task(void *) {
       have = true;
     }
     xSemaphoreGive(lock);
-    if (have) send(base, s, c);
+    if (have) {
+      send(base, s, c);
+      if (c.cmd == Cmd::TimerOn || c.cmd == Cmd::TimerOff || c.cmd == Cmd::TimerPause || c.cmd == Cmd::TimerResume) {
+        if (timerPending > 0) timerPending--;
+      }
+    }
 
     const DeskStatus st = desk_status();
     const uint32_t every = st.moving || dir ? kPollMovingMs : kPollMs;
@@ -471,9 +477,27 @@ void desk_stop() {
   push(Cmd::Stop);
 }
 
-void desk_timer(bool on) { push(on ? Cmd::TimerOn : Cmd::TimerOff); }
+void desk_timer(bool on) { desk_timer_cmd(on ? 1 : 0); }
 
 void desk_timer_cmd(int what) {
+  // Show the result at once: the desk takes 1-3 s to answer, and a button that does nothing
+  // for that long looks broken. The next poll after the command confirms or corrects it.
+  update([&](DeskStatus &st) {
+    timerPending++;
+    if (what == 1) {
+      st.timerRunning = true;
+      st.timerPaused = false;
+      st.timerPhase = "SIT";
+      st.timerLeft = 60L * (st.sitMinutes ? st.sitMinutes : 30);
+    } else if (what == 2) {
+      st.timerPaused = true;
+    } else if (what == 3) {
+      st.timerPaused = false;
+    } else {
+      st.timerRunning = false;
+      st.timerPaused = false;
+    }
+  });
   push(what == 1 ? Cmd::TimerOn : what == 2 ? Cmd::TimerPause : what == 3 ? Cmd::TimerResume : Cmd::TimerOff);
 }
 

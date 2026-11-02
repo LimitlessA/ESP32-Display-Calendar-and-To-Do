@@ -208,7 +208,11 @@ lv_obj_t *memButton(lv_obj_t *parent, uint8_t slot, Live &live, int w, int h) {
   set_flex(b, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   mk_label(b, &font_14b, t.text, slotName(slot).c_str());
   mk_label(b, &font_12, t.muted, "");
-  on_click(b, [](lv_event_t *e) { desk_recall((uint8_t)(intptr_t)lv_event_get_user_data(e)); }, (void *)(intptr_t)slot);
+  // A short tap moves the desk; a long press only names the button. LV_EVENT_CLICKED also fires when
+  // a long press is released, which moved the desk as well, so use SHORT_CLICKED.
+  lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(b, [](lv_event_t *e) { desk_recall((uint8_t)(intptr_t)lv_event_get_user_data(e)); },
+                      LV_EVENT_SHORT_CLICKED, (void *)(intptr_t)slot);
   // Hold a memory button to name it.
   lv_obj_add_event_cb(b, [](lv_event_t *e) { desk_label_edit((uint8_t)(intptr_t)lv_event_get_user_data(e)); },
                       LV_EVENT_LONG_PRESSED, (void *)(intptr_t)slot);
