@@ -18,7 +18,8 @@ namespace {
 
 constexpr uint32_t kPollMs = 2000;         // status while the desk stands still
 constexpr uint32_t kPollMovingMs = 500;    // ...and while it moves
-constexpr uint32_t kHoldBeatMs = 350;      // the desk stops a hold 10 s (hold_timeout_ms) without a beat
+constexpr uint32_t kMaxMmPerS = 50;       // a little faster than the desk's 35-40 mm/s
+constexpr uint32_t kHoldBeatMs = 350;     // the desk stops a hold 10 s (hold_timeout_ms) without a beat
 constexpr uint32_t kMemoryEveryMs = 300000;  // memory heights change rarely
 constexpr uint32_t kResolveEveryMs = 10000;  // look the .local name up again after failures
 constexpr uint16_t kTimeoutMs = 1500;
@@ -168,6 +169,30 @@ int authed(const String &base, const Settings &s, const String &path, const char
   return code;
 }
 
+// When a memory recall starts, the desk briefly reports the memory's saved height before the real
+// one, and the drawing jumped there and back. The desk moves at about 35-40 mm/s, so a reading
+// further from the last good one than it can travel in the time between is skipped. Only while it
+// stands still are two readings that agree taken anyway (a move made while the display was not
+// polling), so a real change shows a poll later at worst.
+int goodMm = 0, doubtMm = 0;
+uint32_t goodAt = 0;
+
+int plausibleHeight(int mm, bool moving) {
+  if (mm <= 0) return goodMm;
+  const uint32_t now = millis();
+  const int reach = 40 + (int)((now - goodAt) * kMaxMmPerS / 1000);
+  const bool agrees = doubtMm && abs(mm - doubtMm) <= 15;
+  if (!goodMm || abs(mm - goodMm) <= reach || (!moving && agrees)) {
+    goodMm = mm;
+    goodAt = now;
+    doubtMm = 0;
+  } else {
+    Serial.printf("[desk] height %d skipped (last %d)\n", mm, goodMm);
+    doubtMm = mm;
+  }
+  return goodMm;
+}
+
 void poll(const String &base) {
   String out;
   JsonDocument doc(psram_json());
@@ -179,8 +204,8 @@ void poll(const String &base) {
     });
     return;
   }
-  const int height = doc["height_mm"] | 0;
   const bool moving = doc["is_moving"] | false;
+  const int height = plausibleHeight(doc["height_mm"] | 0, moving);
   const String state = doc["state"] | "";
   update([&](DeskStatus &st) {
     if (!st.online) st.error = "";
