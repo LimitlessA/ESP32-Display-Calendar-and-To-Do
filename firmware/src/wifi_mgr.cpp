@@ -20,13 +20,27 @@ String requestSsid, requestPassword;
 
 uint32_t lastAttempt = 0;
 
+// Network watchdog (wifi_net_result()).
+constexpr uint32_t kDeadAfterMs = 3 * 60 * 1000;      // no reply for this long, with failures...
+constexpr uint8_t kDeadFailures = 3;                  // ...at least this many: reconnect
+constexpr uint32_t kRestartAfterMs = 15 * 60 * 1000;  // still nothing: restart the display
+volatile uint32_t lastNetOk = 0;   // millis() of the last reply from any server
+volatile uint8_t netFailures = 0;  // failed requests since then
+uint32_t lastKick = 0;
+// Survives the restart: one restart per outage, not one every 15 minutes while
+// the internet itself is down. Cleared by the first reply after it.
+RTC_NOINIT_ATTR uint32_t watchdogRestarted;
+constexpr uint32_t kRestartedMagic = 0x57444F47;  // "WDOG"
+
 bool tryConnect(const String &ssid, const String &password) {
   state = WifiState::Connecting;
   WiFi.disconnect();
   WiFi.begin(ssid.c_str(), password.c_str());
   const uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < kConnectTimeoutMs) delay(200);
-  return WiFi.status() == WL_CONNECTED;
+  if (WiFi.status() != WL_CONNECTED) return false;
+  if (!lastKick) lastNetOk = 0;  // a fresh connection starts the watchdog over; after a kick it keeps counting
+  return true;
 }
 
 }  // namespace
@@ -72,7 +86,24 @@ bool wifi_service() {
 
   if (WiFi.status() == WL_CONNECTED) {
     if (state != WifiState::Failed) state = WifiState::Connected;
-    return true;
+    const uint32_t now = millis();
+    if (!lastNetOk) lastNetOk = now;
+    const uint32_t silent = now - lastNetOk;
+    if (netFailures >= kDeadFailures && silent > kDeadAfterMs && (!lastKick || now - lastKick > kDeadAfterMs)) {
+      if (silent > kRestartAfterMs && watchdogRestarted != kRestartedMagic) {
+        watchdogRestarted = kRestartedMagic;
+        Serial.printf("[wifi] nothing gets through for %lu s after reconnecting: restart\n", (unsigned long)(silent / 1000));
+        delay(100);
+        ESP.restart();
+      }
+      Serial.printf("[wifi] connected, but %u requests failed in %lu s: reconnect\n", netFailures, (unsigned long)(silent / 1000));
+      lastKick = now;
+      netFailures = 0;
+      WiFi.disconnect();
+      lastAttempt = 0;  // tryConnect() below, at once
+    } else {
+      return true;
+    }
   }
 
   const Settings s = settings_get();
@@ -92,12 +123,26 @@ bool wifi_service() {
   return false;
 }
 
+void wifi_net_result(bool ok) {
+  if (ok) {
+    lastNetOk = millis();
+    netFailures = 0;
+    lastKick = 0;
+    watchdogRestarted = 0;
+  } else if (netFailures < 255) {
+    netFailures++;
+  }
+}
+
 void wifi_sleep(bool sleep) {
   if (sleep) {
     esp_wifi_stop();  // the driver and its settings stay in RAM
     return;
   }
   esp_wifi_start();
+  lastNetOk = 0;  // asleep is not silent: start the watchdog over
+  lastKick = 0;
+  netFailures = 0;
   lastAttempt = 0;  // reconnect at the next wifi_service(), not 30 s later
 }
 
