@@ -59,7 +59,7 @@ nav button{flex:1;text-align:center;padding:14px 2px;font-size:13px;border-botto
 nav button.on{border-top-color:var(--ac)}
 .top{padding:12px 0}main.w{padding-top:14px;padding-bottom:90px}}
 </style></head><body>
-<header><div class=w><div class=top><h1>Calendar display</h1><span class=m id=hv></span></div>
+<header><div class=w><div class=top><h1>Calendar display <span id=hb></span></h1><span class=m id=hv></span></div>
 <nav><button class=on data-t=p1>Accounts</button><button data-t=p2>Desk &amp; sync</button><button data-t=p3>Device</button></nav></div></header>
 <main class=w>
 <div class=pin id=pb><form id=pf><b>PIN</b><input id=pin inputmode=numeric autocomplete=off maxlength=6 placeholder="6 digits" aria-label="PIN from the display"><button class=b>Unlock</button><span class=m style="color:inherit">Shown on the display's Accounts screen. Needed for every change.</span></form><p class=msg id=pm></p></div>
@@ -161,6 +161,8 @@ function edit(r,ed,i,m){
 function list(id,a,empty,f){var l=$(id);l.textContent='';if(!a.length&&empty)l.appendChild(el('p','m',empty));a.forEach(function(x,i){l.appendChild(f(x,i))})}
 function render(d,fill){
  D=d;var w=d.wifi,k=d.desk,o=d.ota,s;
+ // Which display this page manages: the two boards share the name calendar.local.
+ if(d.board){$('hb').textContent=d.board;document.title='Calendar display · '+d.board}
  $('hv').textContent='v'+d.v+(w.ip?' · '+w.ip:'');
  list('gl',d.accounts,'No Google accounts yet. Add one below.',function(a,i){
   return row(a.color,a.label,a.error||(a.synced?'Synced'+(a.email?' · '+a.email:''):'Not synced yet'),a.error?'er':a.synced?'ok':'',

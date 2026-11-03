@@ -143,46 +143,66 @@ int timerProgress(const DeskStatus &st) {  // 0-1000
   return (int)(1000 - std::min(st.timerLeft, len) * 1000 / len);
 }
 
-// The drawn desk, traced from the desk frame's CAD model (Desk_Frame_1800x600) in a three-quarter
-// view: graphite frame, gray top. Points are in that view's pixels at 740 mm (0.47 px per mm). The
-// feet and outer columns stay, the middle columns rise half as far as the top, the inner columns
-// and the top all the way. Each shape is a quad: x, y and lift (0 none, 1 half, 2 full) per corner.
+// The drawn desk, traced from a perspective render of the desk's CAD model (Desk_Frame_1800x600
+// with monitors and a laptop): graphite frame, gray top. Points are in that render's pixels at
+// 740 mm (about 0.54 px per mm). The feet and outer columns stay, the middle columns rise half as
+// far as the top, the inner columns, the top and everything on it all the way. Each shape is a
+// quad: x, y and lift (0 none, 1 half, 2 full) per corner, drawn back to front.
 struct ArtQuad {
   uint8_t color;
   int16_t p[4][3];
 };
 constexpr uint32_t kArtColors[] = {
-    0x30343A, 0x4A4F56,            // feet, their top face
-    0x3A3E45, 0x292C31,            // outer column, its side
-    0x484D55, 0x33363C,            // middle column, its side
-    0x5A6069, 0x3F4349,            // inner column, its side
-    0x6E737A, 0x5A5E65, 0xA3A8AF,  // top: front edge, side edge, surface
+    0x2A2D32, 0x41454B,            // feet, their top face
+    0x34373C, 0x26292D,            // outer column, its side
+    0x43474D, 0x303338,            // middle column, its side
+    0x53585F, 0x3A3E43,            // inner column, its side
+    0x9DA1A6, 0x8A8E93, 0xC4C7CB,  // top: front edge, side edge, surface
+    0x141618, 0x9A9EA4, 0x1E2023,  // monitor screens, arm, its base
+    0x4A4F55, 0x2E3236, 0x2E3135,  // laptop deck, its front edge, keyboard
+    0x3C3F44, 0x4A4E54,            // mouse, screen rims (so black screens show on a dark theme)
 };
 // Columns: front face and side face of one stage, from x0 to x1 (front) and x2 (side).
-#define ART_COL(c, x0, x1, x2, yt, lt, yb, lb)                                   \
-  {c, {{x0, yt, lt}, {x1, yt, lt}, {x1, yb, lb}, {x0, yb, lb}}},                 \
-  { c + 1, {{x1, yt, lt}, {x2, yt + 3, lt}, {x2, yb + 3, lb}, {x1, yb, lb}} }
+#define ART_COL(c, x0, x1, x2, yt, lt, yb, lb)                   \
+  {c, {{x0, yt, lt}, {x1, yt, lt}, {x1, yb, lb}, {x0, yb, lb}}}, \
+  { c + 1, {{x1, yt, lt}, {x2, yt, lt}, {x2, yb, lb}, {x1, yb, lb}} }
 constexpr ArtQuad kArt[] = {
-    {0, {{80, 440, 0}, {230, 410, 0}, {237, 423, 0}, {86, 453, 0}}},
-    {1, {{80, 440, 0}, {230, 410, 0}, {233, 415, 0}, {82, 445, 0}}},
-    {0, {{719, 494, 0}, {869, 467, 0}, {876, 481, 0}, {724, 508, 0}}},
-    {1, {{719, 494, 0}, {869, 467, 0}, {872, 472, 0}, {721, 499, 0}}},
-    ART_COL(2, 128, 171, 183, 205, 0, 432, 0),
-    ART_COL(4, 131, 167, 176, 140, 1, 207, 0),
-    ART_COL(6, 135, 164, 172, 112, 2, 142, 1),
-    ART_COL(2, 769, 807, 820, 258, 0, 490, 0),
-    ART_COL(4, 772, 802, 813, 195, 1, 260, 0),
-    ART_COL(6, 776, 799, 808, 140, 2, 197, 1),
-    {0, {{745, 151, 2}, {822, 132, 2}, {824, 141, 2}, {747, 160, 2}}},
-    {0, {{128, 104, 2}, {176, 104, 2}, {178, 114, 2}, {130, 114, 2}}},
-    {0, {{768, 133, 2}, {812, 133, 2}, {814, 142, 2}, {770, 142, 2}}},
-    {8, {{36, 92, 2}, {708, 150, 2}, {708, 159, 2}, {36, 101, 2}}},
-    {9, {{708, 150, 2}, {905, 100, 2}, {905, 109, 2}, {708, 159, 2}}},
-    {10, {{36, 92, 2}, {237, 41, 2}, {905, 100, 2}, {708, 150, 2}}},
+    // Back left leg
+    {0, {{215, 712, 0}, {355, 648, 0}, {373, 658, 0}, {233, 727, 0}}},
+    {1, {{215, 712, 0}, {355, 648, 0}, {362, 652, 0}, {222, 716, 0}}},
+    ART_COL(2, 268, 302, 322, 472, 0, 690, 0),
+    ART_COL(4, 264, 300, 310, 410, 1, 474, 0),
+    ART_COL(6, 266, 298, 306, 345, 2, 412, 1),
+    // Front right leg
+    {0, {{938, 852, 0}, {1030, 768, 0}, {1052, 775, 0}, {965, 866, 0}}},
+    {1, {{938, 852, 0}, {1030, 768, 0}, {1040, 771, 0}, {948, 856, 0}}},
+    ART_COL(2, 982, 1022, 1036, 570, 0, 845, 0),
+    ART_COL(4, 986, 1022, 1032, 495, 1, 572, 0),
+    ART_COL(6, 990, 1022, 1030, 420, 2, 497, 1),
+    // Top
+    {8, {{131, 331, 2}, {960, 425, 2}, {960, 433, 2}, {133, 341, 2}}},
+    {9, {{960, 425, 2}, {1085, 342, 2}, {1085, 352, 2}, {960, 433, 2}}},
+    {10, {{300, 291, 2}, {1085, 342, 2}, {960, 425, 2}, {131, 331, 2}}},
+    // Monitor arm and the two curved screens
+    {13, {{815, 320, 2}, {880, 316, 2}, {882, 332, 2}, {815, 328, 2}}},
+    {12, {{853, 236, 2}, {868, 238, 2}, {868, 322, 2}, {853, 322, 2}}},
+    {18, {{552, 49, 2}, {1054, 69, 2}, {1048, 278, 2}, {554, 228, 2}}},
+    {11, {{558, 55, 2}, {820, 62, 2}, {820, 240, 2}, {560, 222, 2}}},
+    {11, {{824, 62, 2}, {1048, 75, 2}, {1042, 272, 2}, {824, 240, 2}}},
+    // Laptop: screen with its rim, deck, front edge
+    {18, {{311, 165, 2}, {504, 163, 2}, {502, 291, 2}, {313, 293, 2}}},
+    {11, {{316, 170, 2}, {499, 168, 2}, {497, 289, 2}, {318, 291, 2}}},
+    {14, {{318, 290, 2}, {497, 288, 2}, {500, 318, 2}, {304, 322, 2}}},
+    {15, {{304, 322, 2}, {500, 318, 2}, {500, 326, 2}, {305, 328, 2}}},
+    // Keyboard and mouse
+    {16, {{612, 326, 2}, {752, 334, 2}, {754, 346, 2}, {608, 341, 2}}},
+    {17, {{800, 345, 2}, {840, 332, 2}, {858, 350, 2}, {805, 365, 2}}},
 };
 #undef ART_COL
-// The part of the view in use: the top at 1300 mm down to the right foot.
-constexpr int kArtX0 = 36, kArtY0 = -230, kArtW = 870, kArtH = 740;
+// The part of the render in use: the monitors at the desk's highest (1270 mm) down to the right foot.
+constexpr int kArtX0 = 128, kArtY0 = -235, kArtW = 962, kArtH = 1105;
+constexpr int kArtMinMm = 650, kArtMaxMm = 1270;
+constexpr float kArtPxPerMm = 0.54f;
 
 void drawDesk(lv_event_t *e) {
   const Live *live = static_cast<const Live *>(lv_event_get_user_data(e));
@@ -190,7 +210,7 @@ void drawDesk(lv_event_t *e) {
   lv_obj_get_coords(lv_event_get_target(e), &a);
   const float k = std::min((float)lv_area_get_width(&a) / kArtW, (float)lv_area_get_height(&a) / kArtH);
   const float ox = a.x1 + (lv_area_get_width(&a) - kArtW * k) / 2, oy = a.y1 + (lv_area_get_height(&a) - kArtH * k) / 2;
-  const float lift = (std::max(650, std::min(1300, live->curMm ? live->curMm : 750)) - 740) * (348.0f / 740);
+  const float lift = (std::max(kArtMinMm, std::min(kArtMaxMm, live->curMm ? live->curMm : 750)) - 740) * kArtPxPerMm;
   lv_draw_rect_dsc_t d;
   lv_draw_rect_dsc_init(&d);
   for (const ArtQuad &q : kArt) {

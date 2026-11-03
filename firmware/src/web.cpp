@@ -133,6 +133,7 @@ void handleState() {
   const bool priv = server.hasArg("pin") && checkPin(server.arg("pin"));
   JsonDocument doc(psram_json());
   doc["v"] = FIRMWARE_VERSION;
+  doc["board"] = BOARD_NAME;
   doc["host"] = HOSTNAME ".local";
   doc["maxAccounts"] = MAX_ACCOUNTS;
   doc["maxImage"] = slot ? slot->size : 0;
