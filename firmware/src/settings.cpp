@@ -102,6 +102,10 @@ String toJson(const Settings &s, bool backup = false) {
     o["label"] = c.label;
     o["url"] = backup ? seal(c.url) : c.url;
     o["color"] = c.color;
+    if (c.user.length()) {
+      o["user"] = c.user;
+      o["pass"] = backup ? seal(c.pass) : c.pass;
+    }
   }
   doc["brightness"] = s.brightness;
   doc["volume"] = s.volume;
@@ -181,7 +185,8 @@ bool fromJson(const String &json, Settings &s) {
   }
   s.ics.clear();
   for (JsonObject o : doc["ics"].as<JsonArray>()) {
-    if (s.ics.size() < kMaxIcs) s.ics.push_back({o["label"] | "", unseal(String(o["url"] | "")), o["color"] | 0x4FD1C5u});
+    if (s.ics.size() < kMaxIcs) s.ics.push_back({o["label"] | "", unseal(String(o["url"] | "")), o["color"] | 0x4FD1C5u,
+                                                 o["user"] | "", unseal(String(o["pass"] | ""))});
   }
   s.brightness = doc["brightness"] | d.brightness;
   s.volume = doc["volume"] | d.volume;

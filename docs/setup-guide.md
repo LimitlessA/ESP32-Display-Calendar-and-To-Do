@@ -18,7 +18,7 @@ The steps, in order:
 3. [Open the setup page](#3-open-the-setup-page)
 4. [Deploy the Google script for each account](#4-deploy-the-google-script-for-each-account)
 5. [Add the accounts to the display](#5-add-the-accounts-to-the-display)
-6. [Add Outlook, iCloud or other calendars](#6-add-outlook-icloud-or-other-calendars-optional)
+6. [Add Outlook, iCloud, CalDAV or other calendars](#6-add-outlook-icloud-caldav-or-other-calendars-optional)
 7. [Connect the smart desk](#7-connect-the-smart-desk-optional)
 
 ## 1. Flash the first firmware
@@ -189,7 +189,7 @@ Common errors:
   code.
 - `HTTP` and a number: check the URL.
 
-## 6. Add Outlook, iCloud or other calendars (optional)
+## 6. Add Outlook, iCloud, CalDAV or other calendars (optional)
 
 You can add calendars from other services with a published **ICS link**.
 
@@ -205,6 +205,19 @@ On the setup page, **Accounts** tab, **Outlook, iCloud & other (ICS)**:
 - **iCloud**: in the Calendar app, share the calendar as a **Public Calendar**
   and copy the link.
 - **Other**: any link ending in `.ics`, or starting with `webcal://`.
+
+**A private CalDAV calendar** (Radicale, Nextcloud, Baïkal, Fastmail...)
+- Put the calendar's own URL in the link box, for example
+  `https://andreidragan.ro/caldav/andrei/calendar/`. The server or discovery
+  URL (`.../caldav/`) is not enough.
+- Open **Needs a login (CalDAV)** and enter the username and password. The
+  password stays on the display: the setup page never shows it again, and
+  leaving it empty when you edit the calendar keeps the saved one.
+- The display passes the login to the first Google account's script, which
+  reads the calendar over HTTPS with HTTP Basic auth. The script must be the
+  version from 2026-11-03 or newer (redeploy it after pasting the new `Code.gs`).
+- Read only: events show on the display, but dismissing one only hides it on
+  the display; nothing is written back to the CalDAV server.
 
 **Important**
 - The **first Google account's script reads these links**. Add a Google account

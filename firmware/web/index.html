@@ -77,13 +77,17 @@ nav button.on{border-top-color:var(--ac)}
 <li>Run <b>preview</b> once to allow access, then Deploy &rsaquo; New deployment &rsaquo; Web app (Execute as: Me, Access: Anyone).</li>
 <li>Paste the web app URL and the token here.</li></ol></details></div>
 
-<div class=c><h2>Outlook, iCloud &amp; other (ICS)</h2><div id=il></div>
+<div class=c><h2>Outlook, iCloud, CalDAV &amp; other (ICS)</h2><div id=il></div>
 <form id=if><label for=iname>Name shown on the display</label><input id=iname name=label maxlength=20 placeholder="Work (Outlook)" required>
-<label for=iu>Calendar link (ICS)</label><input id=iu name=url placeholder="https://... or webcal://..." required pattern="(https?|webcal)://.+">
+<label for=iu>Calendar link (ICS or CalDAV)</label><input id=iu name=url placeholder="https://... or webcal://..." required pattern="(https?|webcal)://.+">
+<details><summary>Needs a login (CalDAV)</summary>
+<label for=ius>Username</label><input id=ius name=user autocomplete=off placeholder="empty for a public link">
+<label for=ipw>Password</label><input id=ipw name=pass type=password autocomplete=new-password></details>
 <button class=b>Add calendar</button><p class=msg id=im></p></form>
 <details><summary>Where to find the link</summary><ol>
 <li><b>Outlook</b>: Settings &rsaquo; Calendar &rsaquo; Shared calendars &rsaquo; Publish a calendar, then copy the ICS link.</li>
 <li><b>iCloud</b>: in the Calendar app, share the calendar as a Public Calendar and copy the link.</li>
+<li><b>CalDAV</b> (Radicale, Nextcloud, Ba&iuml;kal, Fastmail...): the calendar's own URL, like <code>https://example.com/caldav/user/calendar/</code>, not the server's. Put the login under &ldquo;Needs a login&rdquo;.</li>
 <li><b>Other</b>: any link ending in <code>.ics</code> or starting with <code>webcal://</code>.</li></ol>
 The first Google account's script reads these links, so add a Google account first.</details></div>
 </section>
@@ -154,8 +158,10 @@ function edit(r,ed,i,m){
   if(!a||a.url==null){say(m,'Enter the PIN at the top first.','er');return}
   fld('Name shown on the display','l',a.label);fld(ed.n,'u',a.url);
   if(ed.t)fld('Token','t','','unchanged if empty').type='password';
+  if(ed.k=='ics'){fld('Username (CalDAV)','s',a.user||'','empty for a public link');fld('Password','p','',a.login?'unchanged if empty':'').type='password'}
   c.type='button';c.onclick=function(){load()};f.appendChild(b);f.appendChild(c);f.appendChild(s);
-  f.onsubmit=function(e){e.preventDefault();post(ed.u,{i:i,label:$(n+'l').value,url:$(n+'u').value,token:ed.t?$(n+'t').value:''},s,function(t){say(m,t,'ok');load()})};
+  f.onsubmit=function(e){e.preventDefault();var o={i:i,label:$(n+'l').value,url:$(n+'u').value,token:ed.t?$(n+'t').value:''};
+   if(ed.k=='ics'){o.user=$(n+'s').value;o.pass=$(n+'p').value}post(ed.u,o,s,function(t){say(m,t,'ok');load()})};
   r.textContent='';r.className='li ed';r.appendChild(f);$(n+'l').focus()})
  .catch(function(){say(m,'No answer from the display.','er')})}
 function list(id,a,empty,f){var l=$(id);l.textContent='';if(!a.length&&empty)l.appendChild(el('p','m',empty));a.forEach(function(x,i){l.appendChild(f(x,i))})}
@@ -170,7 +176,7 @@ function render(d,fill){
  $('gf').querySelector('button').disabled=d.accounts.length>=d.maxAccounts;
  $('if').querySelector('button').disabled=d.ics.length>=d.maxIcs;
  list('il',d.ics,'No published calendars yet.',function(c,i){
-  return row(c.color,c.label,c.error||(c.synced?'Synced \u00b7 '+c.events+' events'+(c.name&&c.name!=c.label?' \u00b7 '+c.name:''):'Not synced yet'),
+  return row(c.color,c.label,c.error||(c.synced?'Synced \u00b7 '+c.events+' events'+(c.login?' \u00b7 login':'')+(c.name&&c.name!=c.label?' \u00b7 '+c.name:''):'Not synced yet'),
    c.error?'er':c.synced?'ok':'','/ics/remove',i,$('im'),{k:'ics',u:'/ics/edit',n:'Calendar link (ICS)'})});
  s=$('ds');s.textContent='';
  if(!k.on)s.appendChild(el('p','st wn','Desk control is off. Turn it on at the display: Settings › Features › Smart desk.'));

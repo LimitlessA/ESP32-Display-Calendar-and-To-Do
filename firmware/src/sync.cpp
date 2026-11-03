@@ -524,7 +524,15 @@ time_t thisMonday() {
 String icsQuery(const Settings &s) {
   String q;
   for (const IcsCalendar &c : s.ics) {
-    if (c.url.length()) q += "&ics=" + urlEncode(c.url);
+    if (!c.url.length()) continue;
+    // A CalDAV login rides in the link as https://user:pass@host/...; the script
+    // takes it out again and sends it as an Authorization header.
+    String url = c.url;
+    const int at = url.indexOf("://");
+    if (c.user.length() && at > 0) {
+      url = url.substring(0, at + 3) + urlEncode(c.user) + ":" + urlEncode(c.pass) + "@" + url.substring(at + 3);
+    }
+    q += "&ics=" + urlEncode(url);
   }
   return q;
 }
@@ -916,7 +924,8 @@ void workerLoop(void *) {
       bool icsChanged = next.ics.size() != s.ics.size();
       for (size_t i = 0; !icsChanged && i < next.ics.size(); i++) {
         icsChanged = next.ics[i].url != s.ics[i].url || next.ics[i].label != s.ics[i].label ||
-                     next.ics[i].color != s.ics[i].color;
+                     next.ics[i].color != s.ics[i].color || next.ics[i].user != s.ics[i].user ||
+                     next.ics[i].pass != s.ics[i].pass;
       }
       s = next;
       if (accountsChanged) {

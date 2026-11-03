@@ -15,10 +15,15 @@ struct Account {
 // A published calendar link (Outlook "Publish calendar" ICS, iCloud public
 // calendar, any .ics). The first Google account's script fetches and expands
 // it, so its events arrive in the same feed as that account's.
+// A private CalDAV calendar (Radicale, Nextcloud, Baikal...) is the same: its
+// collection URL answers GET with the whole calendar as .ics, behind HTTP
+// Basic auth, so it only adds a username and password.
 struct IcsCalendar {
   String label;      // "Work (Outlook)"
-  String url;        // https:// or webcal:// link to the .ics
+  String url;        // https:// or webcal:// link to the .ics, or a CalDAV calendar URL
   uint32_t color;
+  String user;       // CalDAV login; empty for a public link
+  String pass;
 };
 constexpr uint8_t kMaxIcs = 6;
 // How often the display asks for changes (Settings > Sync), in minutes.

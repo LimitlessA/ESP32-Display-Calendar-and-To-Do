@@ -10,7 +10,8 @@
  *     &v=2                             compact format; events from this week's Monday
  *                                      through next week (&from=MS: the display's Monday)
  *     &since=HASH                      answer {same:true} if the feed has not changed
- *     &ics=URL (repeatable)            also read these published calendars (v=2 only)
+ *     &ics=URL (repeatable)            also read these published calendars (v=2 only);
+ *                                      https://user:pass@host/... is a CalDAV calendar with a login
  *   action=range&from=MS&to=MS         events in a time range (week view; &v=2 and &ics= as above)
  *   action=complete&list=L&task=ID     mark a task done (a task deleted elsewhere counts as done)
  *   action=uncomplete&list=L&task=ID   undo that (the Done tab's Restore; the due date is kept)
@@ -596,15 +597,32 @@ function icsUrls_(e) {
   return list.slice(0, CONFIG.MAX_ICS);
 }
 
+// A private CalDAV calendar (Radicale, Nextcloud, Baikal...) arrives as
+// https://user:pass@host/path/to/calendar/ (the display percent-encodes both).
+// Its collection URL answers GET with the whole calendar as one .ics, so it
+// goes through the same parser; the login moves into an Authorization header.
 function icsEvents_(url, from, to, tz) {
   url = String(url || '').trim().replace(/^webcal:\/\//i, 'https://');
   if (!/^https?:\/\//i.test(url)) throw new Error('not an https:// or webcal:// link');
-  return cached_('ics:' + hash_(url) + ':' + from + ':' + to, CACHE_MINUTES_ICS * 60, () => {
-    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+  const headers = {};
+  const login = url.match(/^(https?:\/\/)([^\/?#@]*)@/i);
+  if (login) {
+    const c = login[2].indexOf(':');
+    const user = decodeURIComponent(c < 0 ? login[2] : login[2].substring(0, c));
+    const pass = c < 0 ? '' : decodeURIComponent(login[2].substring(c + 1));
+    headers.Authorization = 'Basic ' + Utilities.base64Encode(user + ':' + pass, Utilities.Charset.UTF_8);
+    url = login[1] + url.substring(login[0].length);
+  }
+  return cached_('ics:' + hash_(url + '|' + (headers.Authorization || '')) + ':' + from + ':' + to, CACHE_MINUTES_ICS * 60, () => {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: headers });
     const code = res.getResponseCode();
+    if (code === 401) throw new Error(login ? 'wrong username or password' : 'needs a login (add the username and password)');
+    if (code === 403) throw new Error('HTTP 403: this login can\'t read that calendar');
     if (code !== 200) throw new Error('HTTP ' + code);
     const text = res.getContentText('UTF-8');
-    if (text.indexOf('BEGIN:VCALENDAR') < 0) throw new Error('not a calendar (ICS) file');
+    if (text.indexOf('BEGIN:VCALENDAR') < 0) {
+      throw new Error(login ? 'not a calendar: use the calendar\'s own URL, like .../caldav/user/calendar/' : 'not a calendar (ICS) file');
+    }
     return parseIcs_(text, from, to, tz);
   });
 }
