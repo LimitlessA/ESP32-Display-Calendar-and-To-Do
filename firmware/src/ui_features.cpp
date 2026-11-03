@@ -33,10 +33,10 @@ constexpr const char *kPair = "Pair a phone";
 constexpr const char *kForget = "Forget";
 constexpr const char *kForgotten = "Paired phones removed. Also remove \"Calendar display\" in your phone's Bluetooth settings.";
 constexpr const char *kVariant = "%s \xC2\xB7 %s";  // letter, layout name
-constexpr const char *kLetters[] = {"A", "B", "C"};
+constexpr const char *kLetters[] = {"A", "B", "C", "D"};
 
-// The names of each screen's three layouts, in the order of Layout in settings.h.
-const char *const kVariants[kLayoutCount][3] = {
+// The names of each screen's layouts (three, the smart desk four), in the order of Layout in settings.h.
+const char *const kVariants[kLayoutCount][kMaxVariants] = {
     {"Keyboard", "Frequent tiles", "Sheet over list"},        // quick add task
     {"Big ring", "Split", "Header strip"},                    // focus timer
     {"Stat tiles", "Timeline", "Briefing"},                   // daily summary
@@ -50,7 +50,7 @@ const char *const kVariants[kLayoutCount][3] = {
     {"On the card", "Big counter", "Weekly receipt"},         // meeting cost
     {"Glowing tasks", "Nudge popup", "Radar view"},           // procrastination radar
     {"Wheel", "Card deck", "Slot machine"},                   // task roulette
-    {"Dock on Home", "Desk screen", "Follows calendar"},      // smart desk
+    {"Dock", "Desk tab", "Calendar", "Dock + tab"},          // smart desk (short: four fit on one row)
 };
 
 enum class Opt { None, SummaryAt, ReviewAt, LeaveLead, FocusMinutes, CostRate, AwayMinutes, RadarMoves, SleepStart, SleepEnd, RemindMinutes, SleepIdle, NightStart, NightEnd, DimAfter, DimLevel };
@@ -523,13 +523,14 @@ void showDialog(int i) {
     set_flex(row, LV_FLEX_FLOW_ROW, 10);
     lv_obj_t *l = mk_label(row, &font_14b, t.muted, kLayoutRow);
     lv_obj_set_width(l, 70);
-    String names[3];
-    const char *labels[3];
-    for (int v = 0; v < 3; v++) {
+    const int n = kVariants[f.layout][3] ? 4 : 3;
+    String names[kMaxVariants];
+    const char *labels[kMaxVariants];
+    for (int v = 0; v < n; v++) {
       names[v] = strf(kVariant, kLetters[v], kVariants[f.layout][v]);
       labels[v] = names[v].c_str();
     }
-    mk_segmented(row, labels, 3, g_settings.layouts[f.layout], (INNER_W - 80 - 4) / 3, [](int v, void *) {
+    mk_segmented(row, labels, n, g_settings.layouts[f.layout], (INNER_W - 80 - 4) / n, [](int v, void *) {
       lv_async_call([](void *p) {
         flushPending();
         Settings s = g_settings;
@@ -549,6 +550,15 @@ void showDialog(int i) {
 }
 
 }  // namespace
+
+void features_dialog(bool Settings::*on) {
+  for (int i = 0; i < kFeatureCount; i++) {
+    if (kFeatures[i].on == on) {
+      showDialog(i);
+      return;
+    }
+  }
+}
 
 lv_obj_t *features_create() {
   const Theme &t = theme();

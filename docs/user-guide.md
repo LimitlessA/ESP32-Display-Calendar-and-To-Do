@@ -474,15 +474,17 @@ Without a desk login, only **Stop** works. With a login you also get the
 **memory buttons**, **hold to raise or lower**, the **sit/stand timer** and away
 mode. The login needs the desk's **user** role.
 
-The three layouts:
+The four layouts (hold the Desk tab to change them):
 - **A, Dock on Home**: a bar along the bottom of Home. It shows the height and
   state, a timer button, M1 to M4, two arrow buttons (with login) and **Stop**
   (which covers the memory buttons while the desk moves).
 - **B, Desk screen**: a **Desk** tab. A drawn desk that moves with the real one,
   the height, the four memory buttons, **Hold to raise** and **Hold to lower**,
-  **Stop**, the timer card, and a **Desk settings** button.
+  **Stop** and the timer card. Hold the **Desk** tab for the Smart desk options,
+  where **Desk address, login and connection test** is.
 - **C, Follows calendar**: the Desk screen plus rules (below) and a timeline of
   your day.
+- **D, Dock + tab**: the dock on Home and the Desk tab (layout B) together.
 
 **Memory buttons M1 to M4**
 - Tap one and the desk goes to that position.

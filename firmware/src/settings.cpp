@@ -251,7 +251,7 @@ bool fromJson(const String &json, Settings &s) {
   JsonArray layouts = doc["layouts"].as<JsonArray>();
   for (uint8_t i = 0; i < kLayoutCount; i++) {
     const uint8_t v = i < layouts.size() ? layouts[i].as<uint8_t>() : kDefaultLayouts[i];
-    s.layouts[i] = v < 3 ? v : kDefaultLayouts[i];
+    s.layouts[i] = v < layout_variants(i) ? v : kDefaultLayouts[i];
   }
   return true;
 }

@@ -30,6 +30,9 @@ enum class Layout : uint8_t {
   MeetTimer, Presence, Cost, Radar, Roulette, Desk, Count
 };
 constexpr uint8_t kLayoutCount = (uint8_t)Layout::Count;
+// The smart desk has a fourth, D: the dock on Home and the Desk tab together.
+constexpr uint8_t kMaxVariants = 4;
+inline uint8_t layout_variants(uint8_t layout) { return layout == (uint8_t)Layout::Desk ? 4 : 3; }
 // The ones picked from the mockups: 1B 2A 3A 4A 5B 7B 8C 9C (the photo frame, row 6, was dropped),
 // then A for the meeting timer, phone presence, cost meter, radar, roulette and desk.
 constexpr uint8_t kDefaultLayouts[kLayoutCount] = {1, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 0, 0, 0};

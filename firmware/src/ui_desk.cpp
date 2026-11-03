@@ -30,7 +30,6 @@ constexpr const char *kMemories = "MEMORY POSITIONS";
 constexpr const char *kRaise = "Hold to raise";
 constexpr const char *kLower = "Hold to lower";
 constexpr const char *kNeedsLogin = "Add the desk login in Desk settings to raise, lower and run the timer.";
-constexpr const char *kDeskSettings = "Desk settings";
 constexpr int kTimerMin = 5, kTimerMax = 90, kTimerStep = 5, kTimerDefault = 30;
 constexpr const char *kMin = "min";
 constexpr const char *kThen = "then %s %d";
@@ -526,13 +525,10 @@ void buildScreenB(const DeskStatus &st) {
   own(live, left);  // the first child, so it goes first when the view is cleared
   lv_obj_set_size(left, 300, BODY_H);
   lv_obj_clear_flag(left, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_t *cfg = mk_chip(left, kDeskSettings, false, 32);
-  lv_obj_set_pos(cfg, 10, 8);
-  on_click(cfg, [](lv_event_t *) { lv_async_call([](void *) { desk_settings_show(); }, nullptr); });
-  // A drawn desk that moves up and down with the real one.
+  // A drawn desk that moves up and down with the real one. (Its settings: hold the Desk tab.)
   live.deskTop = transparent(left);
-  lv_obj_set_pos(live.deskTop, 10, 46);
-  lv_obj_set_size(live.deskTop, 280, BODY_H - 46 - 104);
+  lv_obj_set_pos(live.deskTop, 10, 10);
+  lv_obj_set_size(live.deskTop, 280, BODY_H - 10 - 104);
   lv_obj_add_event_cb(live.deskTop, drawDesk, LV_EVENT_DRAW_MAIN_END, &live);
   lv_obj_t *col = transparent(left);
   lv_obj_set_width(col, 300);
@@ -892,11 +888,11 @@ void sample(const DeskStatus &st, time_t now) {
 
 }  // namespace
 
-bool desk_tab() { return g_settings.desk && g_settings.layout(Layout::Desk) != 0; }
+bool desk_tab() { return g_settings.desk && g_settings.layout(Layout::Desk) != 0; }  // B, C and D
 
-// A: the dock along the bottom of Home.
+// A and D: the dock along the bottom of Home.
 lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w) {
-  if (!on(0)) return nullptr;
+  if (!on(0) && !on(3)) return nullptr;
   const Theme &t = theme();
   const DeskStatus st = desk_status();
   Live &live = dockLive;

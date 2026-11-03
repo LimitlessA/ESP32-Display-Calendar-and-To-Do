@@ -525,7 +525,17 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
     set_flex(b, LV_FLEX_FLOW_ROW, 8);
     mk_label(b, &font_16, on ? t.text : t.muted, tab.icon);
     if (tab.label) mk_label(b, &font_14b, on ? t.text : t.muted, tab.label);
-    on_click(b, go, (void *)(intptr_t)tab.screen);
+    // A tap opens the screen; holding a feature's tab opens that feature's options instead
+    // (SHORT_CLICKED: CLICKED would also fire when a long press is let go).
+    lv_obj_add_event_cb(b, go, LV_EVENT_SHORT_CLICKED, (void *)(intptr_t)tab.screen);
+    lv_obj_add_event_cb(b, [](lv_event_t *e) {
+      switch ((Screen)(intptr_t)lv_event_get_user_data(e)) {
+        case Screen::Desk: features_dialog(&Settings::desk); break;
+        case Screen::Dates: features_dialog(g_settings.countdowns ? &Settings::countdowns : &Settings::dates); break;
+        case Screen::Settings: ui_show(Screen::Features); break;
+        default: break;
+      }
+    }, LV_EVENT_LONG_PRESSED, (void *)(intptr_t)tab.screen);
   }
   return h;
 }

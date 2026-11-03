@@ -91,6 +91,7 @@ void settings_refresh();
 
 lv_obj_t *features_create();
 void features_refresh();
+void features_dialog(bool Settings::*on);  // one feature's options, over any screen (hold its top tab)
 int features_on_count();
 lv_obj_t *dates_create();
 void dates_refresh();
