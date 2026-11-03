@@ -39,7 +39,7 @@ void note(const char *fmt, ...) {
   if (now > 1700000000) {
     struct tm tm;
     localtime_r(&now, &tm);
-    strftime(stamp, sizeof(stamp), "%d %H:%M:%S", &tm);
+    snprintf(stamp, sizeof(stamp), "%02d %02d:%02d:%02d", tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);  // not strftime: 13 KB
   } else {
     snprintf(stamp, sizeof(stamp), "+%lus", (unsigned long)(millis() / 1000));
   }
@@ -51,6 +51,24 @@ void note(const char *fmt, ...) {
   portEXIT_CRITICAL(&logMux);
 }
 
+// The common reasons, by name (WiFi.disconnectReasonName() costs ~6 KB of flash).
+const char *reasonName(uint8_t r) {
+  switch (r) {
+    case 2: return "auth expired";
+    case 3: return "deauth by router";
+    case 4: return "inactive";
+    case 6: case 7: return "not authenticated";
+    case 8: return "left";
+    case 15: case 204: return "handshake timeout";
+    case 200: return "beacon timeout";
+    case 201: return "no AP found";
+    case 202: return "auth failed";
+    case 203: return "assoc failed";
+    case 205: return "connection failed";
+    default: return "other";
+  }
+}
+
 void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
   switch (event) {
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
@@ -58,7 +76,7 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
       break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
       note("link dropped, reason %u (%s), %d dBm", info.wifi_sta_disconnected.reason,
-           WiFi.disconnectReasonName((wifi_err_reason_t)info.wifi_sta_disconnected.reason),
+           reasonName(info.wifi_sta_disconnected.reason),
            info.wifi_sta_disconnected.rssi);
       break;
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
