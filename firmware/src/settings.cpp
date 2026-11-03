@@ -145,6 +145,7 @@ String toJson(const Settings &s, bool backup = false) {
   doc["roulette"] = s.roulette;
   doc["desk"] = s.desk;
   doc["deskHost"] = s.deskHost;
+  doc["deskIp"] = s.deskIp;
   doc["deskUser"] = s.deskUser;
   doc["deskPassword"] = backup ? seal(s.deskPassword) : s.deskPassword;
   doc["deskSitMin"] = s.deskSitMin;
@@ -226,6 +227,7 @@ bool fromJson(const String &json, Settings &s) {
   s.roulette = doc["roulette"] | d.roulette;
   s.desk = doc["desk"] | d.desk;
   s.deskHost = doc["deskHost"] | d.deskHost;
+  s.deskIp = doc["deskIp"] | "";
   s.deskUser = doc["deskUser"] | d.deskUser;
   s.deskPassword = unseal(String(doc["deskPassword"] | d.deskPassword.c_str()));
   s.deskSitMin = doc["deskSitMin"] | d.deskSitMin;

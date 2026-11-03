@@ -84,6 +84,7 @@ struct Settings {
   bool roulette = true;         // let the display pick a task for you
   bool desk = false;            // control a smart standing desk over Wi-Fi
   String deskHost = "smartdesk-a43c.local";
+  String deskIp;                // "host|ip" the .local name last resolved to, used when the lookup fails
   String deskUser;              // desk web UI account; empty = guest (memory buttons only)
   String deskPassword;
   uint8_t deskSitMin = 0;       // sit/stand timer lengths sent to the desk; 0 = as saved on the desk

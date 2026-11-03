@@ -20,7 +20,7 @@ constexpr uint32_t kPollMs = 2000;         // status while the desk stands still
 constexpr uint32_t kPollMovingMs = 500;    // ...and while it moves
 constexpr uint32_t kHoldBeatMs = 350;      // the desk stops a hold 10 s (hold_timeout_ms) without a beat
 constexpr uint32_t kMemoryEveryMs = 300000;  // memory heights change rarely
-constexpr uint32_t kResolveEveryMs = 60000;  // look the .local name up again after failures
+constexpr uint32_t kResolveEveryMs = 10000;  // look the .local name up again after failures
 constexpr uint16_t kTimeoutMs = 1500;
 // A login checks the password hash, writes the session to flash and wakes the desk:
 // 0.6-1.6 s for a wrong password, longer for a right one, so 1.5 s often timed out.
@@ -92,6 +92,20 @@ bool baseUrl(const Settings &s, String &url) {
       lastResolve = millis();
       resolvedFor = host;
       ip = MDNS.queryHost(host.substring(0, host.length() - 6), 2000);
+      // The lookup often fails for minutes after a restart: use the address it had last time.
+      // Kept in the settings, which the main loop writes (this task's stack is in PSRAM, so it
+      // must not write flash itself).
+      const String known = s.deskIp;
+      if (ip != IPAddress()) {
+        const String now = host + "|" + ip.toString();
+        if (now != known) {
+          Settings fresh = settings_get();
+          fresh.deskIp = now;
+          settings_save(fresh);
+        }
+      } else if (known.startsWith(host + "|")) {
+        ip.fromString(known.substring(host.length() + 1));
+      }
     }
     if (ip == IPAddress()) return false;
     url = "http://" + ip.toString();
