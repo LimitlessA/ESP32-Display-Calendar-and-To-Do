@@ -159,31 +159,32 @@ constexpr uint32_t kArtColors[] = {
     0x53585F, 0x3A3E43,            // inner column, its side
     0x9DA1A6, 0x8A8E93, 0xC4C7CB,  // top: front edge, side edge, surface
     0x141618, 0x9A9EA4, 0x1E2023,  // monitor screens, arm, its base
-    0x4A4F55, 0x2E3236, 0x2E3135,  // laptop deck, its front edge, keyboard
-    0x3C3F44, 0x4A4E54,            // mouse, screen rims (so black screens show on a dark theme)
+    0x4A4F55, 0x2E3236, 0x232528,  // laptop deck, its front edge, keyboard edges
+    0x3A3D42, 0x4A4E54,            // mouse, screen rims (so black screens show on a dark theme)
+    0x36393E, 0x50555C,            // keyboard case, key field
+    0xA9ACB1, 0x6A6F76,            // shadows on the desktop, light on the mouse
 };
 // Columns: front face and side face of one stage, from x0 to x1 (front) and x2 (side).
 #define ART_COL(c, x0, x1, x2, yt, lt, yb, lb)                   \
   {c, {{x0, yt, lt}, {x1, yt, lt}, {x1, yb, lb}, {x0, yb, lb}}}, \
   { c + 1, {{x1, yt, lt}, {x2, yt, lt}, {x2, yb, lb}, {x1, yb, lb}} }
 constexpr ArtQuad kArt[] = {
-    // Back left leg: foot (front face, side face, top), then the outer column, which narrows a
-    // little in perspective and stands on the foot, then the middle and inner stages.
+    // Back left leg: foot (front face, side face, top), then three straight stages on one vertical
+    // axis, each a little narrower than the one below. The inner stage starts under the desktop,
+    // which is drawn after it, so the leg always reaches the top.
     {0, {{215, 711, 0}, {247, 714, 0}, {247, 729, 0}, {215, 725, 0}}},
     {0, {{247, 714, 0}, {372, 652, 0}, {372, 665, 0}, {247, 729, 0}}},
     {1, {{215, 711, 0}, {347, 646, 0}, {372, 652, 0}, {247, 714, 0}}},
-    {2, {{264, 472, 0}, {292, 472, 0}, {300, 686, 0}, {272, 686, 0}}},
-    {3, {{292, 472, 0}, {314, 472, 0}, {322, 675, 0}, {300, 686, 0}}},
-    ART_COL(4, 263, 291, 311, 408, 1, 474, 0),
-    ART_COL(6, 265, 292, 304, 345, 2, 410, 1),
+    ART_COL(2, 266, 296, 314, 472, 0, 688, 0),
+    ART_COL(4, 268, 295, 311, 408, 1, 474, 0),
+    ART_COL(6, 270, 294, 308, 335, 2, 410, 1),
     // Front right leg, the same way
     {0, {{937, 847, 0}, {970, 852, 0}, {977, 869, 0}, {937, 862, 0}}},
     {0, {{970, 852, 0}, {1052, 768, 0}, {1052, 782, 0}, {977, 869, 0}}},
     {1, {{939, 847, 0}, {1025, 764, 0}, {1052, 768, 0}, {970, 852, 0}}},
-    {2, {{980, 570, 0}, {1012, 570, 0}, {1011, 811, 0}, {974, 811, 0}}},
-    {3, {{1012, 570, 0}, {1032, 570, 0}, {1026, 795, 0}, {1011, 811, 0}}},
-    ART_COL(4, 985, 1020, 1031, 497, 1, 572, 0),
-    ART_COL(6, 991, 1022, 1030, 420, 2, 499, 1),
+    ART_COL(2, 980, 1012, 1030, 570, 0, 806, 0),
+    ART_COL(4, 982, 1011, 1028, 497, 1, 572, 0),
+    ART_COL(6, 984, 1010, 1026, 380, 2, 499, 1),
     // Top
     {8, {{131, 331, 2}, {960, 425, 2}, {960, 433, 2}, {133, 341, 2}}},
     {9, {{960, 425, 2}, {1085, 342, 2}, {1085, 352, 2}, {960, 433, 2}}},
@@ -199,9 +200,17 @@ constexpr ArtQuad kArt[] = {
     {11, {{316, 170, 2}, {499, 168, 2}, {497, 289, 2}, {318, 291, 2}}},
     {14, {{318, 290, 2}, {497, 288, 2}, {500, 318, 2}, {304, 322, 2}}},
     {15, {{304, 322, 2}, {500, 318, 2}, {500, 326, 2}, {305, 328, 2}}},
-    // Keyboard and mouse
-    {16, {{612, 326, 2}, {752, 334, 2}, {754, 346, 2}, {608, 341, 2}}},
-    {17, {{800, 345, 2}, {840, 332, 2}, {858, 350, 2}, {805, 365, 2}}},
+    // Keyboard: shadow on the desk, front and right edges, the case, the key field
+    {21, {{609, 339, 2}, {735, 350, 2}, {740, 355, 2}, {613, 344, 2}}},
+    {16, {{608, 337, 2}, {736, 348, 2}, {733, 352, 2}, {609, 340, 2}}},
+    {16, {{751, 335, 2}, {755, 340, 2}, {733, 352, 2}, {736, 348, 2}}},
+    {19, {{632, 325, 2}, {751, 335, 2}, {736, 348, 2}, {608, 337, 2}}},
+    {20, {{636, 327, 2}, {746, 336, 2}, {733, 345, 2}, {613, 336, 2}}},
+    // Mouse: an oval (an octagon in three quads), and the light on its thumb rest
+    {17, {{855, 360, 2}, {844, 367, 2}, {821, 364, 2}, {802, 353, 2}}},
+    {17, {{855, 360, 2}, {802, 353, 2}, {797, 340, 2}, {850, 347, 2}}},
+    {17, {{797, 340, 2}, {808, 333, 2}, {831, 336, 2}, {850, 347, 2}}},
+    {22, {{834, 350, 2}, {848, 352, 2}, {846, 358, 2}, {832, 356, 2}}},
 };
 #undef ART_COL
 // The part of the render in use: the monitors at the desk's highest (1270 mm) down to the right foot.
