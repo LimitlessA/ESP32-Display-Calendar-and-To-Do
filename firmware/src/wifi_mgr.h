@@ -25,6 +25,10 @@ bool wifi_service();
 // every 3 minutes until a reply comes. The display never restarts for it.
 void wifi_net_result(bool ok);
 
+// The last connection events (drops with the access point's reason, IP lost
+// or got, watchdog actions), oldest first, one per line.
+String wifi_log();
+
 // Low power: stops the radio before a light sleep (the connection drops) and
 // starts it again after; the sync worker then reconnects at once.
 void wifi_sleep(bool sleep);

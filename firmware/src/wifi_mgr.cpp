@@ -20,6 +20,58 @@ String requestSsid, requestPassword;
 
 uint32_t lastAttempt = 0;
 
+// The last connection events, newest last, for the setup page and Serial:
+// why the link dropped (the access point's reason code), IP lost/got, and
+// what the watchdog did. Written from the Wi-Fi event task too, hence the lock.
+constexpr uint8_t kLogLines = 10;
+char logLines[kLogLines][72];
+uint8_t logNext = 0, logCount = 0;
+portMUX_TYPE logMux = portMUX_INITIALIZER_UNLOCKED;
+
+void note(const char *fmt, ...) {
+  char text[56];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(text, sizeof(text), fmt, ap);
+  va_end(ap);
+  char stamp[16];
+  const time_t now = time(nullptr);
+  if (now > 1700000000) {
+    struct tm tm;
+    localtime_r(&now, &tm);
+    strftime(stamp, sizeof(stamp), "%d %H:%M:%S", &tm);
+  } else {
+    snprintf(stamp, sizeof(stamp), "+%lus", (unsigned long)(millis() / 1000));
+  }
+  Serial.printf("[wifi] %s\n", text);
+  portENTER_CRITICAL(&logMux);
+  snprintf(logLines[logNext], sizeof(logLines[0]), "%s %s", stamp, text);
+  logNext = (logNext + 1) % kLogLines;
+  if (logCount < kLogLines) logCount++;
+  portEXIT_CRITICAL(&logMux);
+}
+
+void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  switch (event) {
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      note("joined, channel %u", info.wifi_sta_connected.channel);
+      break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      note("link dropped, reason %u (%s), %d dBm", info.wifi_sta_disconnected.reason,
+           WiFi.disconnectReasonName((wifi_err_reason_t)info.wifi_sta_disconnected.reason),
+           info.wifi_sta_disconnected.rssi);
+      break;
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      note("got IP %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+      break;
+    case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+      note("lost IP address");
+      break;
+    default:
+      break;
+  }
+}
+
 // Network watchdog (wifi_net_result()).
 constexpr uint32_t kDeadAfterMs = 3 * 60 * 1000;      // no reply for this long, with failures...
 constexpr uint8_t kDeadFailures = 3;                  // ...at least this many: reconnect
@@ -49,6 +101,21 @@ void wifi_begin() {
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(HOSTNAME);
   WiFi.setAutoReconnect(true);
+  WiFi.onEvent(onEvent);
+}
+
+String wifi_log() {
+  String out;
+  portENTER_CRITICAL(&logMux);
+  char copy[kLogLines][72];
+  const uint8_t n = logCount, first = (logNext + kLogLines - logCount) % kLogLines;
+  for (uint8_t i = 0; i < n; i++) memcpy(copy[i], logLines[(first + i) % kLogLines], sizeof(copy[0]));
+  portEXIT_CRITICAL(&logMux);
+  for (uint8_t i = 0; i < n; i++) {
+    out += copy[i];
+    out += '\n';
+  }
+  return out;
 }
 
 bool wifi_service() {
@@ -89,8 +156,8 @@ bool wifi_service() {
       // First a plain reconnect; if that did not help, the radio is switched
       // off and on again as well (still no restart of the display).
       const bool hard = kicks++ > 0;
-      Serial.printf("[wifi] connected, but %u requests failed in %lu s: %s\n", netFailures,
-                    (unsigned long)(silent / 1000), hard ? "radio off and on" : "reconnect");
+      note("stuck: %u failed, %lu s silent, %d dBm: %s", netFailures, (unsigned long)(silent / 1000),
+           (int)WiFi.RSSI(), hard ? "radio off/on" : "reconnect");
       lastKick = now;
       netFailures = 0;
       WiFi.disconnect();

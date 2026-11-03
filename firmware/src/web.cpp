@@ -143,6 +143,7 @@ void handleState() {
   wifi["ssid"] = wifi_ssid();
   wifi["rssi"] = wifi_rssi();
   wifi["ip"] = wifi_ip();
+  wifi["log"] = wifi_log();
 
   JsonArray accounts = doc["accounts"].to<JsonArray>();
   for (size_t i = 0; i < s.accounts.size(); i++) {

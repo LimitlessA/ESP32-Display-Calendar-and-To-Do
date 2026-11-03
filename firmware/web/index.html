@@ -185,6 +185,7 @@ function render(d,fill){
  var r=el('div','li'),g=el('div','g');g.appendChild(el('b',0,w.ssid||'No network'));
  g.appendChild(el('div','m',w.ok?w.rssi+' dBm ('+(w.rssi>-60?'strong':w.rssi>-72?'good':'weak')+') · '+w.ip+' · '+d.host:'Not connected'));
  r.appendChild(g);r.appendChild(el('span',w.ok?'ok':'er',w.ok?'Connected':'Offline'));s.appendChild(r);
+ if(w.log){var lg=el('details'),pr=el('pre','m',w.log);lg.appendChild(el('summary',0,'Connection log'));pr.style.whiteSpace='pre-wrap';lg.appendChild(pr);s.appendChild(lg)}
  s=$('fi');s.textContent='';
  s.appendChild(el('p','m','Installed: v'+d.v+'. Auto-update is '+(d.autoUpdate?'on: new versions install by themselves.':'off (Settings › Auto-update on the display).')));
  if(o.state=='available')s.appendChild(el('p','st wn','Version '+o.latest+' is available. Install it from Settings on the display.'));
