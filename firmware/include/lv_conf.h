@@ -40,6 +40,9 @@
 
 // Fonts: generated Montserrat with Latin Extended + icons (tools/gen_fonts.sh)
 #define LV_FONT_MONTSERRAT_14 0
+/* The big fonts (26 px and up: headings, clocks, timers) are stored compressed;
+   they are drawn rarely, so unpacking costs nothing noticeable and saves ~60 KB. */
+#define LV_USE_FONT_COMPRESSED 1
 #define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(font_16)
 #define LV_FONT_DEFAULT &font_16
 #define LV_TXT_ENC LV_TXT_ENC_UTF8
