@@ -495,7 +495,7 @@ void buildTimerCard(const DeskStatus &st) {
   mk_label(head, &font_20b, col, sit ? kSitting : kStanding);
   const char *next = sit ? kStand : kSit;
   const int nextMin = timerLength(sit, st);
-  mk_label(side, &font_14, t.muted, strf(last ? kNext : kThen, next, nextMin).c_str());
+  mk_label(head, &font_14, t.muted, strf(last ? kNext : kThen, next, nextMin).c_str());  // same line as the phase
   lv_obj_t *btns = transparent(side);
   lv_obj_set_size(btns, lv_pct(100), 44);
   set_flex(btns, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
