@@ -52,6 +52,15 @@ jobs:
             SIZE=$(stat -c%s firmware/.pio/build/$E/firmware.bin)
             echo "::notice::$E firmware $SIZE of 1966080 bytes ($((SIZE * 100 / 1966080))% of an update slot, $(((1966080 - SIZE) / 1024)) KB free)"
           done
+      - name: Size report (what takes the flash)
+        run: |
+          mkdir -p dist
+          NM=$(find ~/.platformio/packages -name 'xtensa-esp32s3-elf-nm' -type f | head -1)
+          for E in crowpanel_7inch crowpanel_5inch; do
+            B=firmware/.pio/build/$E
+            python3 firmware/tools/size_report.py "$NM" $B/firmware.elf $B/firmware.map > dist/size-$E.txt || true
+          done
+          head -60 dist/size-crowpanel_7inch.txt
       - name: Make the factory images and manifests
         run: |
           mkdir -p dist
