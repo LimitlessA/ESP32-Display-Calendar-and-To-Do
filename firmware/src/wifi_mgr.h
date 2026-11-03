@@ -21,7 +21,8 @@ bool wifi_service();
 // ok = any reply from a server, failed = no connection or no DNS. Wi-Fi can
 // stay "connected" while nothing gets through (seen 2026-11-03: DNS and every
 // connection failing for minutes, the setup page down); then the connection is
-// dropped and made again, and if that does not help, the display restarts.
+// dropped and made again (the second time with the radio off and on too),
+// every 3 minutes until a reply comes. The display never restarts for it.
 void wifi_net_result(bool ok);
 
 // Low power: stops the radio before a light sleep (the connection drops) and
