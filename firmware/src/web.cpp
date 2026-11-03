@@ -162,6 +162,8 @@ void handleState() {
     JsonObject c = ics.add<JsonObject>();
     c["label"] = s.ics[i].label;
     if (priv) c["url"] = s.ics[i].url;
+    if (priv) c["user"] = s.ics[i].user;  // the password never leaves the display
+    c["login"] = s.ics[i].user.length() > 0;
     c["color"] = hex(s.ics[i].color);
     c["name"] = st.name;
     c["synced"] = st.synced;
@@ -276,7 +278,10 @@ void handleAddIcs() {
   String label = server.arg("label");
   label.trim();
   const size_t n = sizeof(kAccountColors) / sizeof(kAccountColors[0]);
-  s.ics.push_back({label.substring(0, kMaxLabel), url, kAccountColors[(s.accounts.size() + s.ics.size()) % n]});
+  String user = server.arg("user");
+  user.trim();
+  s.ics.push_back({label.substring(0, kMaxLabel), url, kAccountColors[(s.accounts.size() + s.ics.size()) % n],
+                   user, user.length() ? server.arg("pass") : String()});
   settings_save(s);
   sync_refresh();
   reply(kIcsAdded);
@@ -299,9 +304,17 @@ void handleEditIcs() {
   String label = server.arg("label");
   label.trim();
   label = label.substring(0, kMaxLabel);
-  const bool changed = url != s.ics[i].url || label != s.ics[i].label;
+  String user = server.arg("user");
+  user.trim();
+  // An empty password keeps the saved one; no username means no login at all.
+  String pass = server.arg("pass");
+  if (!pass.length() && user.length()) pass = s.ics[i].pass;
+  if (!user.length()) pass = "";
+  const bool changed = url != s.ics[i].url || label != s.ics[i].label || user != s.ics[i].user || pass != s.ics[i].pass;
   s.ics[i].label = label;
   s.ics[i].url = url;
+  s.ics[i].user = user;
+  s.ics[i].pass = pass;
   settings_save(s);
   if (changed) sync_refresh();
   reply(kIcsEdited);

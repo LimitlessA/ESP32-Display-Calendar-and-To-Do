@@ -136,7 +136,8 @@ String deskName() {
   return h;
 }
 
-String icsKind(const String &url) {
+String icsKind(const String &url, bool login = false) {
+  if (login) return "CalDAV";
   const char *u = url.c_str();
   if (strstr(u, "icloud.com")) return "iCloud";
   if (strstr(u, "outlook.") || strstr(u, "office365") || strstr(u, "live.com")) return "Outlook";
@@ -433,7 +434,7 @@ void accounts_refresh() {
   for (uint8_t i = 0; i < g_settings.ics.size(); i++) {
     const IcsStatus st = icsStatus(i);
     const bool bad = g_settings.accounts.empty() || st.error.length() > 0;
-    item(Kind::Ics, i, g_settings.ics[i].color, icsName(i), bad ? String(kNeedsAttention) : icsKind(g_settings.ics[i].url), bad);
+    item(Kind::Ics, i, g_settings.ics[i].color, icsName(i), bad ? String(kNeedsAttention) : icsKind(g_settings.ics[i].url, g_settings.ics[i].user.length()), bad);
   }
   group(kGroupDesk);
   uint32_t deskColor;
