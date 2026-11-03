@@ -20,13 +20,93 @@ String requestSsid, requestPassword;
 
 uint32_t lastAttempt = 0;
 
+// The last connection events, newest last, for the setup page and Serial:
+// why the link dropped (the access point's reason code), IP lost/got, and
+// what the watchdog did. Written from the Wi-Fi event task too, hence the lock.
+constexpr uint8_t kLogLines = 10;
+char logLines[kLogLines][72];
+uint8_t logNext = 0, logCount = 0;
+portMUX_TYPE logMux = portMUX_INITIALIZER_UNLOCKED;
+
+void note(const char *fmt, ...) {
+  char text[56];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(text, sizeof(text), fmt, ap);
+  va_end(ap);
+  char stamp[16];
+  const time_t now = time(nullptr);
+  if (now > 1700000000) {
+    struct tm tm;
+    localtime_r(&now, &tm);
+    snprintf(stamp, sizeof(stamp), "%02d %02d:%02d:%02d", tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);  // not strftime: 13 KB
+  } else {
+    snprintf(stamp, sizeof(stamp), "+%lus", (unsigned long)(millis() / 1000));
+  }
+  Serial.printf("[wifi] %s\n", text);
+  portENTER_CRITICAL(&logMux);
+  snprintf(logLines[logNext], sizeof(logLines[0]), "%s %s", stamp, text);
+  logNext = (logNext + 1) % kLogLines;
+  if (logCount < kLogLines) logCount++;
+  portEXIT_CRITICAL(&logMux);
+}
+
+// The common reasons, by name (WiFi.disconnectReasonName() costs ~6 KB of flash).
+const char *reasonName(uint8_t r) {
+  switch (r) {
+    case 2: return "auth expired";
+    case 3: return "deauth by router";
+    case 4: return "inactive";
+    case 6: case 7: return "not authenticated";
+    case 8: return "left";
+    case 15: case 204: return "handshake timeout";
+    case 200: return "beacon timeout";
+    case 201: return "no AP found";
+    case 202: return "auth failed";
+    case 203: return "assoc failed";
+    case 205: return "connection failed";
+    default: return "other";
+  }
+}
+
+void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  switch (event) {
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      note("joined, channel %u", info.wifi_sta_connected.channel);
+      break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      note("link dropped, reason %u (%s), %d dBm", info.wifi_sta_disconnected.reason,
+           reasonName(info.wifi_sta_disconnected.reason),
+           info.wifi_sta_disconnected.rssi);
+      break;
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      note("got IP %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+      break;
+    case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+      note("lost IP address");
+      break;
+    default:
+      break;
+  }
+}
+
+// Network watchdog (wifi_net_result()).
+constexpr uint32_t kDeadAfterMs = 3 * 60 * 1000;      // no reply for this long, with failures...
+constexpr uint8_t kDeadFailures = 3;                  // ...at least this many: reconnect
+uint8_t kicks = 0;  // reconnects in a row without a reply in between
+volatile uint32_t lastNetOk = 0;   // millis() of the last reply from any server
+volatile uint8_t netFailures = 0;  // failed requests since then
+uint32_t lastKick = 0;
+
 bool tryConnect(const String &ssid, const String &password) {
   state = WifiState::Connecting;
   WiFi.disconnect();
   WiFi.begin(ssid.c_str(), password.c_str());
   const uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < kConnectTimeoutMs) delay(200);
-  return WiFi.status() == WL_CONNECTED;
+  if (WiFi.status() != WL_CONNECTED) return false;
+  if (!lastKick) lastNetOk = 0;  // a fresh connection starts the watchdog over; after a kick it keeps counting
+  return true;
 }
 
 }  // namespace
@@ -39,6 +119,21 @@ void wifi_begin() {
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(HOSTNAME);
   WiFi.setAutoReconnect(true);
+  WiFi.onEvent(onEvent);
+}
+
+String wifi_log() {
+  String out;
+  portENTER_CRITICAL(&logMux);
+  char copy[kLogLines][72];
+  const uint8_t n = logCount, first = (logNext + kLogLines - logCount) % kLogLines;
+  for (uint8_t i = 0; i < n; i++) memcpy(copy[i], logLines[(first + i) % kLogLines], sizeof(copy[0]));
+  portEXIT_CRITICAL(&logMux);
+  for (uint8_t i = 0; i < n; i++) {
+    out += copy[i];
+    out += '\n';
+  }
+  return out;
 }
 
 bool wifi_service() {
@@ -72,7 +167,28 @@ bool wifi_service() {
 
   if (WiFi.status() == WL_CONNECTED) {
     if (state != WifiState::Failed) state = WifiState::Connected;
-    return true;
+    const uint32_t now = millis();
+    if (!lastNetOk) lastNetOk = now;
+    const uint32_t silent = now - lastNetOk;
+    if (netFailures >= kDeadFailures && silent > kDeadAfterMs && (!lastKick || now - lastKick > kDeadAfterMs)) {
+      // First a plain reconnect; if that did not help, the radio is switched
+      // off and on again as well (still no restart of the display).
+      const bool hard = kicks++ > 0;
+      note("stuck: %u failed, %lu s silent, %d dBm: %s", netFailures, (unsigned long)(silent / 1000),
+           (int)WiFi.RSSI(), hard ? "radio off/on" : "reconnect");
+      lastKick = now;
+      netFailures = 0;
+      WiFi.disconnect();
+      if (hard) {
+        WiFi.mode(WIFI_OFF);
+        delay(500);
+        WiFi.mode(WIFI_STA);
+        WiFi.setHostname(HOSTNAME);
+      }
+      lastAttempt = 0;  // tryConnect() below, at once
+    } else {
+      return true;
+    }
   }
 
   const Settings s = settings_get();
@@ -92,12 +208,27 @@ bool wifi_service() {
   return false;
 }
 
+void wifi_net_result(bool ok) {
+  if (ok) {
+    lastNetOk = millis();
+    netFailures = 0;
+    lastKick = 0;
+    kicks = 0;
+  } else if (netFailures < 255) {
+    netFailures++;
+  }
+}
+
 void wifi_sleep(bool sleep) {
   if (sleep) {
     esp_wifi_stop();  // the driver and its settings stay in RAM
     return;
   }
   esp_wifi_start();
+  lastNetOk = 0;  // asleep is not silent: start the watchdog over
+  lastKick = 0;
+  kicks = 0;
+  netFailures = 0;
   lastAttempt = 0;  // reconnect at the next wifi_service(), not 30 s later
 }
 

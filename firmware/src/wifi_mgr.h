@@ -17,6 +17,18 @@ void wifi_begin();
 // requests from the Wi-Fi screen. Returns true while connected.
 bool wifi_service();
 
+// Network watchdog. The sync and desk code report how each request went:
+// ok = any reply from a server, failed = no connection or no DNS. Wi-Fi can
+// stay "connected" while nothing gets through (seen 2026-11-03: DNS and every
+// connection failing for minutes, the setup page down); then the connection is
+// dropped and made again (the second time with the radio off and on too),
+// every 3 minutes until a reply comes. The display never restarts for it.
+void wifi_net_result(bool ok);
+
+// The last connection events (drops with the access point's reason, IP lost
+// or got, watchdog actions), oldest first, one per line.
+String wifi_log();
+
 // Low power: stops the radio before a light sleep (the connection drops) and
 // starts it again after; the sync worker then reconnects at once.
 void wifi_sleep(bool sleep);

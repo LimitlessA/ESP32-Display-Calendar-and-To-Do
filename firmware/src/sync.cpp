@@ -261,6 +261,7 @@ bool httpGet(const String &url, String &body, String &err, int *status = nullptr
       if (code > 0 || !reused) break;
     }
     if (status) *status = code;
+    wifi_net_result(code > 0);  // any reply means the network works
     if (code == HTTP_CODE_OK) return true;
     if (code >= 300 && code < 400 && location.length()) {
       if (location.startsWith("/")) {

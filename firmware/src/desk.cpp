@@ -11,6 +11,7 @@
 
 #include "psram.h"
 #include "settings.h"
+#include "wifi_mgr.h"
 
 namespace {
 
@@ -211,6 +212,7 @@ void poll(const String &base) {
     return;
   }
   missed = 0;
+  wifi_net_result(true);  // only successes: the desk may simply be off
   // The desk says is_moving only for its first second; after that the height changing is the sign.
   const int before = goodMm;
   bool moving = doc["is_moving"] | false;
