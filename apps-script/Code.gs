@@ -953,7 +953,21 @@ function json_(obj) {
 
 /** Run this once from the editor to grant permissions and preview the output. */
 function preview() {
+  authorize();
   Logger.log(JSON.stringify(feed_({}, []), null, 2));
+}
+
+/**
+ * Run this from the editor if the display says "no permission to call
+ * UrlFetchApp.fetch" (script.external_request). Google's consent screen lets
+ * you untick single permissions, and it only asks again when a function that
+ * needs the missing one runs; this one asks for all of them, then fetches a
+ * page so the published-calendar (ICS/CalDAV) permission is really in place.
+ */
+function authorize() {
+  if (ScriptApp.requireAllScopes) ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
+  const code = UrlFetchApp.fetch('https://www.google.com/generate_204', { muteHttpExceptions: true }).getResponseCode();
+  Logger.log('External requests allowed (HTTP ' + code + ').');
 }
 
 /** Run from the editor to bring back everything you dismissed on the display. */
