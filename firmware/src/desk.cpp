@@ -175,6 +175,7 @@ int authed(const String &base, const Settings &s, const String &path, const char
 // stands still are two readings that agree taken anyway (a move made while the display was not
 // polling), so a real change shows a poll later at worst.
 int goodMm = 0, doubtMm = 0;
+int missed = 0;  // status polls in a row the desk did not answer
 uint32_t goodAt = 0;
 
 int plausibleHeight(int mm, bool moving) {
@@ -196,7 +197,12 @@ int plausibleHeight(int mm, bool moving) {
 void poll(const String &base) {
   String out;
   JsonDocument doc(psram_json());
-  if (request(base + "/api/desk/status", "GET", "", out, false) != 200 || deserializeJson(doc, out)) {
+  const int code = request(base + "/api/desk/status", "GET", "", out, false);
+  if (code != 200 || deserializeJson(doc, out)) {
+    // The desk serves one request at a time, so an answer now and then misses the 1.5 s limit
+    // while it moves or serves the other display. Only three misses in a row mean offline.
+    Serial.printf("[desk] status -> %d (miss %d)\n", code, missed + 1);
+    if (++missed < 3) return;
     ip = IPAddress();  // look the name up again next time
     update([&](DeskStatus &st) {
       st.online = false;
@@ -204,6 +210,7 @@ void poll(const String &base) {
     });
     return;
   }
+  missed = 0;
   // The desk says is_moving only for its first second; after that the height changing is the sign.
   const int before = goodMm;
   bool moving = doc["is_moving"] | false;
