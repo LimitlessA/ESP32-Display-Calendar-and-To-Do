@@ -869,9 +869,13 @@ void sample(const DeskStatus &st, time_t now) {
     standMinutesToday = changesToday = 0;
   }
   const String s = st.online ? stateText(st) : String("");
+  // Before the clock is set (just after a restart) "now" is a few seconds since boot, and
+  // "Sitting for" then read 498,000 hours once it was: count only from a set clock.
   if (s != lastState) {
-    if (!st.moving) stateSince = now;
+    if (!st.moving) stateSince = clock_valid() ? now : 0;
     lastState = s;
+  } else if (!stateSince && clock_valid() && st.online && !st.moving) {
+    stateSince = now;
   }
   if (!st.online || st.moving || !clock_valid()) return;
   struct tm tm;
