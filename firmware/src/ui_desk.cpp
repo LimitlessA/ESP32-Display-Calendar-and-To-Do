@@ -367,9 +367,9 @@ void updateLive(Live &live, const DeskStatus &st) {
       lv_anim_set_exec_cb(&a, deskGlide);
       lv_anim_set_values(&a, live.curMm, mm);
       if (st.moving) {
-        // While it moves, at the desk's own speed (about 40 mm/s), so the drawing runs on
+        // While it moves, at the desk's own speed (about 28 mm/s), so the drawing runs on
         // steadily between readings instead of rushing to each one and waiting.
-        lv_anim_set_time(&a, std::max(200, std::min(2000, abs(mm - live.curMm) * 1000 / 40)));
+        lv_anim_set_time(&a, std::max(200, std::min(2000, abs(mm - live.curMm) * 1000 / 28)));
         lv_anim_set_path_cb(&a, lv_anim_path_linear);
       } else {
         lv_anim_set_time(&a, 600);

@@ -18,7 +18,7 @@ namespace {
 
 constexpr uint32_t kPollMs = 2000;         // status while the desk stands still
 constexpr uint32_t kPollMovingMs = 500;    // ...and while it moves
-constexpr uint32_t kMaxMmPerS = 50;       // a little faster than the desk's 35-40 mm/s
+constexpr uint32_t kMaxMmPerS = 50;       // well above the desk's 28 mm/s (measured 802 to 1220 mm in 15 s)
 constexpr uint32_t kHoldBeatMs = 350;     // the desk stops a hold 10 s (hold_timeout_ms) without a beat
 constexpr uint32_t kMemoryEveryMs = 300000;  // memory heights change rarely
 constexpr uint32_t kResolveEveryMs = 10000;  // look the .local name up again after failures
@@ -170,7 +170,7 @@ int authed(const String &base, const Settings &s, const String &path, const char
 }
 
 // When a memory recall starts, the desk briefly reports the memory's saved height before the real
-// one, and the drawing jumped there and back. The desk moves at about 35-40 mm/s, so a reading
+// one, and the drawing jumped there and back. The desk moves at about 28 mm/s, so a reading
 // further from the last good one than it can travel in the time between is skipped. Only while it
 // stands still are two readings that agree taken anyway (a move made while the display was not
 // polling), so a real change shows a poll later at worst.
@@ -204,8 +204,11 @@ void poll(const String &base) {
     });
     return;
   }
-  const bool moving = doc["is_moving"] | false;
+  // The desk says is_moving only for its first second; after that the height changing is the sign.
+  const int before = goodMm;
+  bool moving = doc["is_moving"] | false;
   const int height = plausibleHeight(doc["height_mm"] | 0, moving);
+  moving = moving || (before && abs(height - before) >= 3);
   const String state = doc["state"] | "";
   update([&](DeskStatus &st) {
     if (!st.online) st.error = "";
