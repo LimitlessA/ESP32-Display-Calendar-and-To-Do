@@ -144,6 +144,8 @@ void handleState() {
   wifi["rssi"] = wifi_rssi();
   wifi["ip"] = wifi_ip();
   wifi["log"] = wifi_log();
+  String brief, detail;
+  if (wifi_problem(brief, detail)) wifi["problem"] = detail;
 
   JsonArray accounts = doc["accounts"].to<JsonArray>();
   for (size_t i = 0; i < s.accounts.size(); i++) {
