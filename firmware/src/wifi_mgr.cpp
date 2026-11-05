@@ -93,13 +93,15 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
       lastReason = info.wifi_sta_disconnected.reason;
       lastDropRssi = info.wifi_sta_disconnected.rssi;
       markDown();
-      note("link dropped, reason %u (%s), %d dBm", info.wifi_sta_disconnected.reason,
-           reasonName(info.wifi_sta_disconnected.reason),
-           info.wifi_sta_disconnected.rssi);
+      // Internal RAM in KB too: Wi-Fi can't join without it (2026-11-05).
+      note("link dropped, reason %u (%s), %d dBm, %uK", info.wifi_sta_disconnected.reason,
+           reasonName(info.wifi_sta_disconnected.reason), info.wifi_sta_disconnected.rssi,
+           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
       break;
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
       if (!stuck) downSinceMs = 0;  // a stuck link is fine only once the router answers again
-      note("got IP %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+      note("got IP %s, %uK", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str(),
+           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
       break;
     case ARDUINO_EVENT_WIFI_STA_LOST_IP:
       note("lost IP address");

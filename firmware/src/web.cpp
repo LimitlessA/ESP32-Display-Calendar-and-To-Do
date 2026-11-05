@@ -146,6 +146,11 @@ void handleState() {
   wifi["log"] = wifi_log();
   String brief, detail;
   if (wifi_problem(brief, detail)) wifi["problem"] = detail;
+  // Internal RAM: free now, lowest since start, largest block (Wi-Fi needs it).
+  JsonObject ram = doc["ram"].to<JsonObject>();
+  ram["free"] = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  ram["min"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+  ram["block"] = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
 
   JsonArray accounts = doc["accounts"].to<JsonArray>();
   for (size_t i = 0; i < s.accounts.size(); i++) {

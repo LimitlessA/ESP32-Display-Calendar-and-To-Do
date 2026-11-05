@@ -201,6 +201,11 @@ void begin() {
   scan->setActiveScan(false);
   scan->setInterval(kScanInterval);
   scan->setWindow(kScanWindow);
+  // Keep no list of what was seen. NimBLE otherwise stores every advertiser
+  // forever during an endless scan (phones and tags change address every
+  // few minutes), in internal RAM: after a few hours Wi-Fi had none left
+  // to join the router ("esp-aes: Failed to allocate memory", 2026-11-05).
+  scan->setMaxResults(0);
   loadIrks();
 }
 
