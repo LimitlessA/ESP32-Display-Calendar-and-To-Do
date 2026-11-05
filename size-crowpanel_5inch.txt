@@ -1,0 +1,194 @@
+== Bytes per library / app file (flash sections) ==
+   153061    8.2%  libnet80211.a
+   123329    6.6%  lvgl (objects)
+   115831    6.2%  SPI.cpp.o
+    86896    4.7%  libmbedcrypto.a
+    77077    4.1%  libc.a
+    70655    3.8%  libbtdm_app.a
+    62629    3.4%  app: sync.cpp.o
+    61735    3.3%  liblwip.a
+    60072    3.2%  libFrameworkArduino.a
+    52966    2.8%  libwpa_supplicant.a
+    43545    2.3%  libpp.a
+    34183    1.8%  libespressif__mdns.a
+    31991    1.7%  libesp_hw_support.a
+    31301    1.7%  libphy.a
+    24174    1.3%  app: desk.cpp.o
+    23603    1.3%  app: web.cpp.o
+    20625    1.1%  libhal.a
+    20484    1.1%  libmbedtls_2.a
+    19977    1.1%  app: font_20b.c.o
+    18620    1.0%  app: settings.cpp.o
+    18524    1.0%  libfatfs.a
+    15285    0.8%  app: font_34b.c.o
+    15174    0.8%  libesp_driver_rmt.a
+    15005    0.8%  libesp_driver_uart.a
+    14738    0.8%  app: ota.cpp.o
+    14701    0.8%  libfreertos.a
+    14593    0.8%  libnvs_flash.a
+    13301    0.7%  app: font_16s.c.o
+    13292    0.7%  libesp_driver_i2c.a
+    13281    0.7%  app: ui_desk.cpp.o
+    13143    0.7%  libspi_flash.a
+    13143    0.7%  HTTPClient.cpp.o
+    13099    0.7%  app: font_16.c.o
+    12596    0.7%  libesp_system.a
+    12499    0.7%  app: ui.cpp.o
+    11046    0.6%  app: font_14b.c.o
+    10793    0.6%  app: ui_features.cpp.o
+    10792    0.6%  app: font_14.c.o
+    10792    0.6%  app: font_26b.c.o
+    10499    0.6%  app: font_150.c.o
+     9584    0.5%  libesp_lcd.a
+     9218    0.5%  app: ui_common.cpp.o
+     8916    0.5%  app: ui_daily.cpp.o
+     8866    0.5%  app: ui_accounts.cpp.o
+     8543    0.5%  app: font_12.c.o
+     8446    0.5%  app: ui_radar.cpp.o
+     8376    0.5%  WebServer.cpp.o
+     8357    0.4%  libdriver.a
+     8221    0.4%  libheap.a
+     8184    0.4%  Parsing.cpp.o
+     8160    0.4%  libesp_common.a
+     8067    0.4%  libmbedx509.a
+     8039    0.4%  libesp_netif.a
+     7478    0.4%  app: ui_roulette.cpp.o
+     7473    0.4%  libesp_mm.a
+     7173    0.4%  app: ble_sm.c.o
+     6916    0.4%  app: wifi_mgr.cpp.o
+     6913    0.4%  lgfx_v1_platforms.cpp.o
+     6834    0.4%  app: font_72.c.o
+     6810    0.4%  app: ui_alerts.cpp.o
+     6612    0.4%  libesp_wifi.a
+     6607    0.4%  libstdc++.a
+     6587    0.4%  app: ble_gap.c.o
+     6377    0.3%  libvfs.a
+     6116    0.3%  app: ui_meeting.cpp.o
+     6092    0.3%  NetworkInterface.cpp.o
+     5765    0.3%  HTTPUpdate.cpp.o
+     5652    0.3%  app: ble_gattc.c.o
+     5647    0.3%  Wire.cpp.o
+     5617    0.3%  libesp_driver_ledc.a
+  1860614  total
+
+== Biggest symbols (text/rodata/data) ==
+    18327  d  glyph_bitmap
+    14155  d  glyph_bitmap
+    11651  d  glyph_bitmap
+    11449  d  glyph_bitmap
+    11413  T  _vfprintf_r
+    11222  T  _svfprintf_r
+    10291  d  glyph_bitmap
+     9662  d  glyph_bitmap
+     9396  d  glyph_bitmap
+     9285  t  (anonymous namespace)::workerLoop(void*)
+     9209  t  (anonymous namespace)::task(void*)
+     9142  d  glyph_bitmap
+     9093  d  OTA_ROOT_CAS
+     8765  T  __ssvfscanf_r
+     7529  T  __ssvfiscanf_r
+     7277  d  kWebPage
+     6893  d  glyph_bitmap
+     6554  d  glyph_bitmap
+     4431  t  mdns_parse_packet
+     4192  D  port_IntStack
+     4146  d  GOOGLE_ROOT_CAS
+     4098  T  hostap_recv_mgmt
+     3986  T  lv_draw_sw_rect
+     3965  t  (anonymous namespace)::handleState()
+     3895  t  _ZN12_GLOBAL__N_18fromJsonERK6StringR8Settings$constprop$0
+     3386  T  summary_show()
+     3330  t  tcp_receive
+     3294  T  _strtod_l
+     3223  T  _dtoa_r
+     3189  T  scan_parse_beacon
+     3105  t  (anonymous namespace)::fetchAll(Settings const&, bool)
+     3096  T  ieee80211_sta_new_state
+     3093  t  (anonymous namespace)::applyFeed(String const&, Settings const&, unsigned char, std::vector<Event, std::allocator<Event> >&, std::vector<Tas
+     3090  T  esp_lcd_new_rgb_panel
+     3076  T  mbedtls_ssl_handshake_client_step
+     3041  T  desk_refresh()
+     2957  T  WebServer::_parseRequest(NetworkClient&)
+     2936  t  (anonymous namespace)::toJson(Settings const&, bool)
+     2925  T  tcp_input
+     2910  T  WebServer::_parseForm(NetworkClient&, String const&, unsigned long)
+     2821  T  tasks_refresh()
+     2799  T  lv_draw_sw_arc
+     2736  T  wifi_nvs_cfg_init
+     2735  T  lv_draw_sw_blend_basic
+     2663  T  sta_recv_mgmt
+     2534  T  lv_theme_default_init
+     2532  D  r_ip_funcs_ro
+     2486  T  wifi_softap_set_config
+     2464  T  i2cSlaveInit
+     2432  T  HTTPUpdate::handleUpdate(HTTPClient&, String const&, unsigned char, std::function<void (HTTPClient*)>)
+     2421  T  wpa_sm_rx_eapol
+     2412  T  accounts_refresh()
+     2375  T  ui_update(Snapshot const&)
+     2350  t  (anonymous namespace)::showDialog(int)
+     2245  t  rgb_panel_draw_bitmap
+     2225  T  meeting_tick()
+     2184  T  qrcodegen_encodeSegmentsAdvanced
+     2183  T  home_refresh()
+     2173  t  mbedtls_x509_crt_parse_der_internal
+     2167  T  mbedtls_high_level_strerr
+     2146  T  start_ssl_client(sslclient_context*, IPAddress const&, unsigned long, char const*, int, char const*, bool, char const*, char const*, char co
+     2059  T  rmt_new_tx_channel
+     2054  T  ieee80211_parse_rsn
+     2040  t  uart_rx_intr_handler_default
+     1994  T  NetworkInterface::config(IPAddress, IPAddress, IPAddress, IPAddress, IPAddress, IPAddress)
+     1944  T  ui_tick()
+     1926  T  ppTxFragmentProc
+     1919  T  HTTPClient::setCookie(String, String)
+     1915  T  lv_obj_get_scrollbar_area
+     1883  t  flex_update
+     1870  T  lv_draw_sw_line
+     1864  d  esp_err_msg_table
+     1854  T  lv_indev_read_timer_cb
+     1850  T  roulette_show()
+     1828  t  lv_slider_event
+     1825  T  uartSetPins
+     1816  T  hostap_input
+     1814  t  lv_arc_event
+     1808  T  lld_adv_end_ind_handler_hack
+     1803  T  lv_draw_sw_transform
+     1800  T  scan_profile_check
+     1773  T  i2s_driver_install
+     1745  T  rtc_init
+     1696  t  (anonymous namespace)::buildReview()
+     1686  T  f_mkfs
+     1681  T  f_lld_adv_rep_ind_handler_hack
+     1678  t  (anonymous namespace)::check()
+     1663  t  _vsnprintf
+     1656  T  week_refresh()
+     1655  t  lv_img_event
+     1654  T  f_hci_le_set_ext_adv_en_cmd_handler
+     1623  t  (anonymous namespace)::stepped(int, void*)
+     1622  t  (anonymous namespace)::build()
+     1613  T  strptime_l
+     1589  T  sta_recv_assoc
+     1586  t  (anonymous namespace)::showWelcome(long)
+     1575  T  rmt_new_rx_channel
+     1550  T  desk_tick()
+     1542  T  _lv_disp_refr_timer
+     1535  t  refr_area_part
+     1518  T  radar_update()
+     1514  t  (anonymous namespace)::updateLive((anonymous namespace)::Live&, DeskStatus const&)
+     1510  t  (anonymous namespace)::fetchWeek(Settings const&, long long)
+     1500  T  radar_view_show()
+     1494  T  web_begin()
+     1493  t  sswu
+     1478  t  handle_dhcp
+     1472  T  btdm_controller_init
+     1466  T  wifi_service()
+     1462  T  draw_border_generic
+     1460  T  lv_draw_label
+     1441  T  alerts_tick()
+     1412  t  (anonymous namespace)::httpGet(String const&, String&, String&, int*)
+     1411  T  sync_uncomplete_task(Task const&)
+     1410  T  sync_get_if_newer(unsigned long, Snapshot&)
+     1404  T  freq_i2c_write_set
+     1400  t  draw_indic
+     1400  d  glyph_dsc
+     1400  d  glyph_dsc
+     1400  d  glyph_dsc
