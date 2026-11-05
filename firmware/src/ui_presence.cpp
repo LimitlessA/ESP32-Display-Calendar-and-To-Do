@@ -198,6 +198,7 @@ String event_title(const Event &ev) { return presence_private() ? String(kBusy) 
 String presence_status() {
   if (!g_settings.presence) return kStatusOff;
   if (const char *err = presence_error()) return err;
+  if (presence_paused()) return "Paused: memory low, Wi-Fi first";
   const int n = presence_paired_count();
   if (!n) return kStatusNone;
   const long ago = presence_seen_ago();

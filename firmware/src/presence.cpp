@@ -96,15 +96,15 @@ volatile bool everSeen = false;
 volatile int connected = 0;
 // Identity keys of paired phones, reversed for AES. Fixed size, no heap: the
 // scan checks them for every advertisement it hears (many per second).
-constexpr uint8_t kMaxIrks = 4;
+constexpr uint8_t kMaxIrks = 4;  // NimBLE keeps 3 bonds (CONFIG_BT_NIMBLE_MAX_BONDS)
 uint8_t irks[kMaxIrks][16];
 uint8_t irkCount = 0;
 volatile uint32_t irkGen = 0;  // bumped when the keys change; the scan then forgets its cache
 
 // Guards for Wi-Fi: below this much free internal RAM the scan pauses (Wi-Fi
 // needs it to stay joined), and resumes above the second value.
-constexpr size_t kScanPauseBelow = 20 * 1024;
-constexpr size_t kScanResumeAbove = 30 * 1024;
+constexpr size_t kScanPauseBelow = 16 * 1024;  // the 7" runs with ~27 KB free
+constexpr size_t kScanResumeAbove = 24 * 1024;
 bool scanPausedForRam = false;
 uint32_t scanRestarts = 0;
 portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
@@ -307,16 +307,17 @@ void keepScanning() {
     scanPausedForRam = true;
     scan->stop();
     scan->clearResults();
-    log_w("presence: scan paused, only %u bytes internal RAM free", (unsigned)freeRam);
+    Serial.printf("[presence] scan paused, %u bytes internal RAM free\n", (unsigned)freeRam);
     return;
   }
   if (scanPausedForRam) {
     if (freeRam < kScanResumeAbove) return;
     scanPausedForRam = false;
-    log_i("presence: scan resumed, %u bytes internal RAM free", (unsigned)freeRam);
+    Serial.printf("[presence] scan resumed, %u bytes internal RAM free\n", (unsigned)freeRam);
   }
   if (!scan->isScanning()) {
     scanRestarts++;
+    Serial.printf("[presence] scan had stopped, restarted (%lu)\n", (unsigned long)scanRestarts);
     scan->clearResults();
     scan->start(0, nullptr, false);
   }
@@ -361,6 +362,10 @@ void presence_apply(bool on) {
 const char *presence_error() { return bt == Bt::Failed ? errorText : nullptr; }
 
 bool presence_ready() { return bt == Bt::Ready; }
+
+bool presence_paused() { return running && scanPausedForRam; }
+
+uint32_t presence_scan_restarts() { return scanRestarts; }
 
 size_t presence_ram_used() { return ramUsed; }
 

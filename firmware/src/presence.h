@@ -14,6 +14,10 @@ void presence_apply(bool on);
 // Why Bluetooth could not start (e.g. too little free memory), or nullptr.
 const char *presence_error();
 bool presence_ready();  // Bluetooth is up (paired phones can be counted)
+// The scan is paused because internal RAM is low (Wi-Fi comes first); the
+// phone then counts as near, so the screen never goes off because of it.
+bool presence_paused();
+uint32_t presence_scan_restarts();  // times the scan had stopped by itself
 size_t presence_ram_used();  // internal RAM Bluetooth took when it started (bytes), 0 before
 PhoneState presence_state(uint8_t awayMinutes);
 // Seconds since the phone was last seen, or -1 if never.
