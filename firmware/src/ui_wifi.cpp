@@ -210,3 +210,39 @@ void wifi_tick() {
       break;
   }
 }
+
+// ---- Why Wi-Fi is down (the header badge) ------------------------------------
+
+namespace {
+lv_obj_t *problemLayer = nullptr;
+}
+
+void wifi_problem_open() {
+  const Theme &t = theme();
+  String brief, detail;
+  if (!wifi_problem(brief, detail)) detail = "Wi-Fi works again.";
+  lv_obj_t *layer = mk_overlay(true, &problemLayer);
+  on_click(layer, [](lv_event_t *) { close_overlay(&problemLayer); });
+  lv_obj_t *card = mk_box(layer, t.card, 24);
+  lv_obj_set_width(card, 620);
+  lv_obj_set_style_pad_all(card, 22, 0);
+  set_flex(card, LV_FLEX_FLOW_COLUMN, 12, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);  // taps on the card keep it open
+  lv_obj_center(card);
+  mk_label(card, &font_20b, t.badFg, (String(ICON_WIFI "  ") + (brief.length() ? brief : String(kTitle))).c_str());
+  lv_obj_t *msg = mk_label(card, &font_14, t.text, detail.c_str());
+  lv_obj_set_width(msg, 576);
+  lv_label_set_long_mode(msg, LV_LABEL_LONG_WRAP);
+  lv_obj_t *log = mk_label(card, &font_12, t.muted, wifi_log().c_str());
+  lv_obj_set_width(log, 576);
+  lv_label_set_long_mode(log, LV_LABEL_LONG_WRAP);
+  lv_obj_t *row = mk_box(card, 0, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_width(row, 576);
+  set_flex(row, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);
+  on_click(mk_text_button(row, kTitle, false, 120), [](lv_event_t *) {
+    close_overlay(&problemLayer);
+    ui_show(Screen::Wifi);
+  });
+  on_click(mk_text_button(row, "Close", true, 120), [](lv_event_t *) { close_overlay(&problemLayer); });
+}

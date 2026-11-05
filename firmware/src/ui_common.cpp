@@ -473,6 +473,17 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   on_click(offline, [](lv_event_t *) { toast(g_snap.error.length() ? g_snap.error : String(kSavedCopyHint)); });
   lv_obj_add_flag(offline, LV_OBJ_FLAG_HIDDEN);
 
+  // Wi-Fi badge while Wi-Fi is down or the router does not answer: since
+  // when; tap it for the reason, the signal and the connection log.
+  lv_obj_t *wifiBadge = mk_button(h, t.badBg, 16);
+  lv_obj_set_size(wifiBadge, LV_SIZE_CONTENT, 32);
+  lv_obj_set_style_pad_hor(wifiBadge, 10, 0);
+  set_flex(wifiBadge, LV_FLEX_FLOW_ROW, 6);
+  mk_label(wifiBadge, &font_14, t.badFg, ICON_WIFI);
+  mk_label(wifiBadge, &font_14b, t.badFg, "");
+  lv_obj_add_flag(wifiBadge, LV_OBJ_FLAG_HIDDEN);
+  on_click(wifiBadge, [](lv_event_t *) { wifi_problem_open(); });
+
   lv_obj_t *spacer = mk_box(h, 0, 0);
   lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(spacer, 1);
@@ -510,7 +521,7 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
     const Event *ev = leave_next(at);
     if (ev) ui_open_event(*ev);
   });
-  register_status(pill, leave, offline);
+  register_status(pill, leave, offline, wifiBadge);
 
   lv_obj_t *nav = mk_box(h, 0, 0);
   lv_obj_set_style_bg_opa(nav, LV_OPA_TRANSP, 0);

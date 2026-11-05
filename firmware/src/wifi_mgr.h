@@ -17,17 +17,22 @@ void wifi_begin();
 // requests from the Wi-Fi screen. Returns true while connected.
 bool wifi_service();
 
-// Network watchdog. The sync and desk code report how each request went:
-// ok = any reply from a server, failed = no connection or no DNS. Wi-Fi can
-// stay "connected" while nothing gets through (seen 2026-11-03: DNS and every
-// connection failing for minutes, the setup page down); then the connection is
-// dropped and made again (the second time with the radio off and on too),
-// every 3 minutes until a reply comes. The display never restarts for it.
+// Network watchdog. The sync and desk code report how each request went
+// (ok = any reply from a server). Wi-Fi can stay "connected" while nothing
+// gets through (7", 2026-11-03 and -05), so wifi_service() also asks the
+// router for a DNS name once a minute when no server answered lately. Three
+// unanswered checks: the link is joined again (then with the radio off and on
+// too). The display never restarts for it.
 void wifi_net_result(bool ok);
 
 // The last connection events (drops with the access point's reason, IP lost
 // or got, watchdog actions), oldest first, one per line.
 String wifi_log();
+
+// True while Wi-Fi is down or stuck (joined, but the router does not answer).
+// brief: for the header badge ("Wi-Fi down 14:02"); detail: why, since when,
+// signal strength and what the display does about it.
+bool wifi_problem(String &brief, String &detail);
 
 // Low power: stops the radio before a light sleep (the connection drops) and
 // starts it again after; the sync worker then reconnects at once.

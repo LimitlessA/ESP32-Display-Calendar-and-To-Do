@@ -7,7 +7,6 @@
 #include <nvs.h>
 #include <mbedtls/aes.h>
 
-#include <array>
 #include <vector>
 
 // nimconfig.h picks INTERNAL unless sdkconfig.h sets EXTERNAL.
@@ -95,7 +94,19 @@ volatile uint32_t pairUntil = 0;
 volatile uint32_t lastSeenMs = 0;
 volatile bool everSeen = false;
 volatile int connected = 0;
-std::vector<std::array<uint8_t, 16>> irks;  // identity keys of paired phones, reversed for AES
+// Identity keys of paired phones, reversed for AES. Fixed size, no heap: the
+// scan checks them for every advertisement it hears (many per second).
+constexpr uint8_t kMaxIrks = 4;  // NimBLE keeps 3 bonds (CONFIG_BT_NIMBLE_MAX_BONDS)
+uint8_t irks[kMaxIrks][16];
+uint8_t irkCount = 0;
+volatile uint32_t irkGen = 0;  // bumped when the keys change; the scan then forgets its cache
+
+// Guards for Wi-Fi: below this much free internal RAM the scan pauses (Wi-Fi
+// needs it to stay joined), and resumes above the second value.
+constexpr size_t kScanPauseBelow = 16 * 1024;  // the 7" runs with ~27 KB free
+constexpr size_t kScanResumeAbove = 24 * 1024;
+bool scanPausedForRam = false;
+uint32_t scanRestarts = 0;
 portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 
 // ---- Code --------------------------------------------------------------------
@@ -107,44 +118,77 @@ void seen() {
 
 // Reads the identity resolving keys of every bonded phone from NimBLE's store.
 void loadIrks() {
-  std::vector<std::array<uint8_t, 16>> found;
-  for (int i = 0; i < NimBLEDevice::getNumBonds(); i++) {
+  uint8_t found[kMaxIrks][16];
+  uint8_t n = 0;
+  for (int i = 0; i < NimBLEDevice::getNumBonds() && n < kMaxIrks; i++) {
     const NimBLEAddress addr = NimBLEDevice::getBondedAddress(i);
     struct ble_store_key_sec key = {};
     key.peer_addr.type = addr.getType();
     memcpy(key.peer_addr.val, addr.getNative(), 6);
     struct ble_store_value_sec value;
     if (ble_store_read_peer_sec(&key, &value) == 0 && value.irk_present) {
-      std::array<uint8_t, 16> k;
-      for (int b = 0; b < 16; b++) k[b] = value.irk[15 - b];  // NimBLE keeps keys little-endian
-      found.push_back(k);
+      for (int b = 0; b < 16; b++) found[n][b] = value.irk[15 - b];  // NimBLE keeps keys little-endian
+      n++;
     }
   }
   portENTER_CRITICAL(&lock);
-  irks.swap(found);
+  memcpy(irks, found, sizeof(irks));
+  irkCount = n;
+  irkGen++;
   portEXIT_CRITICAL(&lock);
 }
 
 // Resolvable private address check from the Bluetooth spec: ah(IRK, prand) == hash.
+// Runs on NimBLE's host task only. A phone repeats its address in every
+// advertisement until it changes it (every ~15 min), so the last answers are
+// cached and each address costs one AES pass per key, once. No heap use.
+struct Seen {
+  uint8_t addr[6];
+  bool match;
+};
+constexpr uint8_t kCache = 32;
+Seen cache[kCache];
+uint8_t cacheNext = 0, cacheCount = 0;
+uint32_t cacheGen = UINT32_MAX;
+
 bool resolves(const uint8_t *addr) {
   if ((addr[5] & 0xC0) != 0x40) return false;  // not a resolvable private address
+  uint8_t keys[kMaxIrks][16];
+  uint8_t n;
+  uint32_t gen;
+  portENTER_CRITICAL(&lock);
+  n = irkCount;
+  gen = irkGen;
+  memcpy(keys, irks, sizeof(keys));
+  portEXIT_CRITICAL(&lock);
+  if (!n) return false;
+  if (gen != cacheGen) {
+    cacheGen = gen;
+    cacheCount = 0;
+    cacheNext = 0;
+  }
+  for (uint8_t i = 0; i < cacheCount; i++) {
+    if (!memcmp(cache[i].addr, addr, 6)) return cache[i].match;
+  }
   uint8_t in[16] = {0}, out[16];
   in[13] = addr[5];
   in[14] = addr[4];
   in[15] = addr[3];
-  std::vector<std::array<uint8_t, 16>> keys;
-  portENTER_CRITICAL(&lock);
-  keys = irks;
-  portEXIT_CRITICAL(&lock);
-  for (const auto &k : keys) {
+  bool match = false;
+  for (uint8_t k = 0; k < n && !match; k++) {
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
-    mbedtls_aes_setkey_enc(&aes, k.data(), 128);
-    mbedtls_aes_crypt_ecb(&aes, MBEDTLS_AES_ENCRYPT, in, out);
+    if (mbedtls_aes_setkey_enc(&aes, keys[k], 128) == 0 &&
+        mbedtls_aes_crypt_ecb(&aes, MBEDTLS_AES_ENCRYPT, in, out) == 0) {
+      match = out[15] == addr[0] && out[14] == addr[1] && out[13] == addr[2];
+    }
     mbedtls_aes_free(&aes);
-    if (out[15] == addr[0] && out[14] == addr[1] && out[13] == addr[2]) return true;
   }
-  return false;
+  memcpy(cache[cacheNext].addr, addr, 6);
+  cache[cacheNext].match = match;
+  cacheNext = (cacheNext + 1) % kCache;
+  if (cacheCount < kCache) cacheCount++;
+  return match;
 }
 
 class ServerEvents : public NimBLEServerCallbacks {
@@ -201,6 +245,11 @@ void begin() {
   scan->setActiveScan(false);
   scan->setInterval(kScanInterval);
   scan->setWindow(kScanWindow);
+  // Keep no list of what was seen. NimBLE otherwise stores every advertiser
+  // forever during an endless scan (phones and tags change address every
+  // few minutes), in internal RAM: after a few hours Wi-Fi had none left
+  // to join the router ("esp-aes: Failed to allocate memory", 2026-11-05).
+  scan->setMaxResults(0);
   loadIrks();
 }
 
@@ -246,6 +295,35 @@ void setBonding(bool open) {
   NimBLEDevice::setSecurityAuth(open, false, true);  // bond, no PIN (the display has no keypad), secure connections
 }
 
+
+// Once a second while running: Wi-Fi first. The scan pauses while internal
+// RAM is low, and starts again if it stopped by itself (NimBLE ends it on a
+// host reset or some connection events). Advertising too, so the phone can
+// always reconnect.
+void keepScanning() {
+  NimBLEScan *scan = NimBLEDevice::getScan();
+  const size_t freeRam = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  if (!scanPausedForRam && freeRam < kScanPauseBelow) {
+    scanPausedForRam = true;
+    scan->stop();
+    scan->clearResults();
+    Serial.printf("[presence] scan paused, %u bytes internal RAM free\n", (unsigned)freeRam);
+    return;
+  }
+  if (scanPausedForRam) {
+    if (freeRam < kScanResumeAbove) return;
+    scanPausedForRam = false;
+    Serial.printf("[presence] scan resumed, %u bytes internal RAM free\n", (unsigned)freeRam);
+  }
+  if (!scan->isScanning()) {
+    scanRestarts++;
+    Serial.printf("[presence] scan had stopped, restarted (%lu)\n", (unsigned long)scanRestarts);
+    scan->clearResults();
+    scan->start(0, nullptr, false);
+  }
+  if (!NimBLEDevice::getAdvertising()->isAdvertising() && connected < 2) NimBLEDevice::startAdvertising();
+}
+
 }  // namespace
 
 // Called every second: Bluetooth comes up in the background, and
@@ -264,6 +342,7 @@ void presence_apply(bool on) {
       NimBLEDevice::startAdvertising();
       NimBLEDevice::getScan()->start(0, nullptr, false);
     }
+    if (bt == Bt::Ready && running) keepScanning();
     return;
   }
   pairing = false;
@@ -284,6 +363,10 @@ const char *presence_error() { return bt == Bt::Failed ? errorText : nullptr; }
 
 bool presence_ready() { return bt == Bt::Ready; }
 
+bool presence_paused() { return running && scanPausedForRam; }
+
+uint32_t presence_scan_restarts() { return scanRestarts; }
+
 size_t presence_ram_used() { return ramUsed; }
 
 PhoneState presence_state(uint8_t awayMinutes) {
@@ -291,6 +374,7 @@ PhoneState presence_state(uint8_t awayMinutes) {
   if (pairing && millis() - pairUntil < 0x80000000UL) pairing = false;  // window over
   if (!pairing && bondingOpen) setBonding(false);
   if (connected > 0) seen();
+  if (scanPausedForRam) seen();  // not scanning is no reason to call the phone away
   if (!presence_paired_count()) return PhoneState::NotPaired;
   if (!everSeen) return PhoneState::Away;
   return millis() - lastSeenMs < awayMinutes * 60000UL ? PhoneState::Near : PhoneState::Away;

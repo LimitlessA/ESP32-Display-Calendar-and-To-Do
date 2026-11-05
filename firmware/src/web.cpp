@@ -12,6 +12,7 @@
 #include "sync.h"
 #include "web.h"
 #include "web_page.h"
+#include "presence.h"
 #include "wifi_mgr.h"
 #include "harness.h"
 
@@ -144,6 +145,18 @@ void handleState() {
   wifi["rssi"] = wifi_rssi();
   wifi["ip"] = wifi_ip();
   wifi["log"] = wifi_log();
+  String brief, detail;
+  if (wifi_problem(brief, detail)) wifi["problem"] = detail;
+  // Internal RAM: free now, lowest since start, largest block (Wi-Fi needs it).
+  JsonObject ram = doc["ram"].to<JsonObject>();
+  ram["free"] = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  ram["min"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+  ram["block"] = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+  JsonObject ble = doc["presence"].to<JsonObject>();
+  ble["on"] = s.presence;
+  ble["ready"] = presence_ready();
+  ble["paused"] = presence_paused();
+  ble["restarts"] = presence_scan_restarts();
 
   JsonArray accounts = doc["accounts"].to<JsonArray>();
   for (size_t i = 0; i < s.accounts.size(); i++) {

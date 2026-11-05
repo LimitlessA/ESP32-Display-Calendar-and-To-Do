@@ -84,6 +84,7 @@ void night_refresh();
 lv_obj_t *wifi_create();
 void wifi_on_show();
 void wifi_tick();
+void wifi_problem_open();  // why Wi-Fi is down, with the connection log
 lv_obj_t *accounts_create();
 void accounts_refresh();
 lv_obj_t *settings_create();
@@ -250,7 +251,7 @@ T *attach(lv_obj_t *obj, const T &value) {
 void register_clock(lv_obj_t *time_label, lv_obj_t *date_label);
 // Space in the nav header for the focus timer, leave-by countdown and offline
 // badge; ui.cpp keeps every one up to date.
-void register_status(lv_obj_t *focus_pill, lv_obj_t *leave_chip, lv_obj_t *offline);
+void register_status(lv_obj_t *focus_pill, lv_obj_t *leave_chip, lv_obj_t *offline, lv_obj_t *wifi_badge);
 
 // Formatting (local time)
 bool clock_valid();

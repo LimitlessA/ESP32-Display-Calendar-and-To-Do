@@ -45,7 +45,7 @@ struct ClockLabels {
 };
 std::vector<ClockLabels> clocks;
 struct StatusSlot {
-  lv_obj_t *pill, *leave, *offline;
+  lv_obj_t *pill, *leave, *offline, *wifi;
 };
 std::vector<StatusSlot> statusSlots;
 uint32_t lastAmbient = 0;
@@ -210,6 +210,8 @@ void refreshStatus() {
     const long secs = (long)(leaveAt - ui_now());
     leaveText = secs > 0 ? strf("Leave in %ld:%02ld", secs / 60, secs % 60) : String("Leave now");
   }
+  String wifiBrief, wifiDetail;
+  const bool wifiBad = wifi_problem(wifiBrief, wifiDetail);
   for (const StatusSlot &st : statusSlots) {
     if (focusOn) {
       lv_obj_clear_flag(st.pill, LV_OBJ_FLAG_HIDDEN);
@@ -227,6 +229,13 @@ void refreshStatus() {
     }
     if (g_snap.offline) lv_obj_clear_flag(st.offline, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(st.offline, LV_OBJ_FLAG_HIDDEN);
+    if (wifiBad) {
+      lv_obj_clear_flag(st.wifi, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_t *l = lv_obj_get_child(st.wifi, 1);
+      if (strcmp(lv_label_get_text(l), wifiBrief.c_str())) lv_label_set_text(l, wifiBrief.c_str());
+    } else {
+      lv_obj_add_flag(st.wifi, LV_OBJ_FLAG_HIDDEN);
+    }
   }
 }
 
@@ -402,8 +411,8 @@ uint8_t day_brightness() {
   return max<uint8_t>(kAmbientMinPercent, (uint8_t)(g_settings.brightness * f));
 }
 
-void register_status(lv_obj_t *pill, lv_obj_t *leave, lv_obj_t *offline) {
-  statusSlots.push_back({pill, leave, offline});
+void register_status(lv_obj_t *pill, lv_obj_t *leave, lv_obj_t *offline, lv_obj_t *wifi) {
+  statusSlots.push_back({pill, leave, offline, wifi});
 }
 
 int ui_reminder_override(const String &key) {

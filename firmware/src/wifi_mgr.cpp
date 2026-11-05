@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include <algorithm>
 #include <esp_wifi.h>
 
@@ -69,18 +70,38 @@ const char *reasonName(uint8_t r) {
   }
 }
 
+// What the screen shows while Wi-Fi is down (wifi_problem()).
+volatile uint32_t downSinceMs = 0;  // millis() when the trouble began, 0 = fine
+volatile time_t downSince = 0;      // the same as a clock time, if the clock was set
+volatile uint8_t lastReason = 0;    // access point's reason code of the last drop
+volatile int8_t lastDropRssi = 0;
+volatile bool stuck = false;        // joined, but the router does not answer
+
+void markDown() {
+  if (downSinceMs) return;
+  downSinceMs = millis() | 1;
+  const time_t now = time(nullptr);
+  downSince = now > 1700000000 ? now : 0;
+}
+
 void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
   switch (event) {
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
       note("joined, channel %u", info.wifi_sta_connected.channel);
       break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-      note("link dropped, reason %u (%s), %d dBm", info.wifi_sta_disconnected.reason,
-           reasonName(info.wifi_sta_disconnected.reason),
-           info.wifi_sta_disconnected.rssi);
+      lastReason = info.wifi_sta_disconnected.reason;
+      lastDropRssi = info.wifi_sta_disconnected.rssi;
+      markDown();
+      // Internal RAM in KB too: Wi-Fi can't join without it (2026-11-05).
+      note("link dropped, reason %u (%s), %d dBm, %uK", info.wifi_sta_disconnected.reason,
+           reasonName(info.wifi_sta_disconnected.reason), info.wifi_sta_disconnected.rssi,
+           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
       break;
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-      note("got IP %s", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str());
+      if (!stuck) downSinceMs = 0;  // a stuck link is fine only once the router answers again
+      note("got IP %s, %uK", IPAddress(info.got_ip.ip_info.ip.addr).toString().c_str(),
+           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
       break;
     case ARDUINO_EVENT_WIFI_STA_LOST_IP:
       note("lost IP address");
@@ -90,13 +111,55 @@ void onEvent(arduino_event_id_t event, arduino_event_info_t info) {
   }
 }
 
-// Network watchdog (wifi_net_result()).
-constexpr uint32_t kDeadAfterMs = 3 * 60 * 1000;      // no reply for this long, with failures...
-constexpr uint8_t kDeadFailures = 3;                  // ...at least this many: reconnect
+// Network watchdog. Wi-Fi can stay "connected" while nothing gets through
+// (2026-11-03 and 2026-11-05 on the 7": no DNS, no ARP, the setup page
+// down). So once a minute, unless a server answered just before, the display
+// asks the router (its DNS server) for a name over UDP. Three unanswered
+// checks in a row (about a minute, they are 20 s apart once one fails) mean
+// the link is stuck: it is dropped and joined again, which also fetches new
+// keys from the router; if that did not help, the radio is switched off and on
+// as well. Never a restart (Andrei does not want those).
+constexpr uint32_t kProbeEveryMs = 60 * 1000;
+constexpr uint32_t kProbeRetryMs = 20 * 1000;
+constexpr uint8_t kProbeFailures = 3;
+constexpr uint32_t kKickAgainMs = 2 * 60 * 1000;  // after a kick, the next one no sooner than this
 uint8_t kicks = 0;  // reconnects in a row without a reply in between
 volatile uint32_t lastNetOk = 0;   // millis() of the last reply from any server
-volatile uint8_t netFailures = 0;  // failed requests since then
+uint8_t probeFails = 0;
+uint32_t lastProbe = 0;
 uint32_t lastKick = 0;
+uint16_t probeId = 0;
+
+// One DNS question to the router; true if it answered (any answer will do).
+bool probeRouter() {
+  IPAddress dns = WiFi.dnsIP(0);
+  if (dns == IPAddress((uint32_t)0)) dns = WiFi.gatewayIP();
+  WiFiUDP udp;
+  if (!udp.begin(0)) return false;
+  // Header (id, recursion desired, 1 question), then "pool.ntp.org" A IN.
+  static const uint8_t kQuestion[] = {4, 'p', 'o', 'o', 'l', 3, 'n', 't', 'p', 3, 'o', 'r', 'g', 0, 0, 1, 0, 1};
+  const uint16_t id = ++probeId;
+  uint8_t q[12 + sizeof(kQuestion)] = {(uint8_t)(id >> 8), (uint8_t)id, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0};
+  memcpy(q + 12, kQuestion, sizeof(kQuestion));
+  bool ok = false;
+  for (int attempt = 0; attempt < 2 && !ok; attempt++) {
+    if (!udp.beginPacket(dns, 53)) break;
+    udp.write(q, sizeof(q));
+    if (!udp.endPacket()) break;
+    const uint32_t t0 = millis();
+    while (!ok && millis() - t0 < 1500) {
+      if (udp.parsePacket() >= 12) {
+        uint8_t h[2];
+        ok = udp.read(h, 2) == 2 && h[0] == q[0] && h[1] == q[1];
+        udp.flush();
+      } else {
+        delay(20);
+      }
+    }
+  }
+  udp.stop();
+  return ok;
+}
 
 bool tryConnect(const String &ssid, const String &password) {
   state = WifiState::Connecting;
@@ -105,7 +168,9 @@ bool tryConnect(const String &ssid, const String &password) {
   const uint32_t t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < kConnectTimeoutMs) delay(200);
   if (WiFi.status() != WL_CONNECTED) return false;
-  if (!lastKick) lastNetOk = 0;  // a fresh connection starts the watchdog over; after a kick it keeps counting
+  probeFails = 0;
+  lastProbe = millis() - kProbeEveryMs + 10000;  // check the new link 10 s from now
+  if (!stuck) downSinceMs = 0;
   return true;
 }
 
@@ -168,27 +233,42 @@ bool wifi_service() {
   if (WiFi.status() == WL_CONNECTED) {
     if (state != WifiState::Failed) state = WifiState::Connected;
     const uint32_t now = millis();
-    if (!lastNetOk) lastNetOk = now;
-    const uint32_t silent = now - lastNetOk;
-    if (netFailures >= kDeadFailures && silent > kDeadAfterMs && (!lastKick || now - lastKick > kDeadAfterMs)) {
-      // First a plain reconnect; if that did not help, the radio is switched
-      // off and on again as well (still no restart of the display).
-      const bool hard = kicks++ > 0;
-      note("stuck: %u failed, %lu s silent, %d dBm: %s", netFailures, (unsigned long)(silent / 1000),
-           (int)WiFi.RSSI(), hard ? "radio off/on" : "reconnect");
-      lastKick = now;
-      netFailures = 0;
-      WiFi.disconnect();
-      if (hard) {
-        WiFi.mode(WIFI_OFF);
-        delay(500);
-        WiFi.mode(WIFI_STA);
-        WiFi.setHostname(HOSTNAME);
-      }
-      lastAttempt = 0;  // tryConnect() below, at once
-    } else {
+    const uint32_t every = probeFails ? kProbeRetryMs : kProbeEveryMs;
+    // A server answered lately: the link works, no need to ask the router.
+    const bool recentOk = lastNetOk && now - lastNetOk < every;
+    if (now - lastProbe < every || recentOk) {
+      if (recentOk) lastProbe = now;
+      return !stuck;
+    }
+    lastProbe = now;
+    if (probeRouter()) {
+      if (stuck || probeFails) note("router answers again, %d dBm", (int)WiFi.RSSI());
+      wifi_net_result(true);
       return true;
     }
+    probeFails++;
+    note("router did not answer (%u), %d dBm", probeFails, (int)WiFi.RSSI());
+    if (probeFails < kProbeFailures) return !stuck;
+    if (!stuck) {
+      stuck = true;
+      markDown();
+      lastReason = 0;
+      lastDropRssi = (int8_t)WiFi.RSSI();
+    }
+    if (lastKick && now - lastKick < kKickAgainMs) return false;
+    // First a plain reconnect; if that did not help, the radio is switched
+    // off and on again as well (still no restart of the display).
+    const bool hard = kicks++ > 0;
+    note("stuck, %d dBm: %s", (int)WiFi.RSSI(), hard ? "radio off/on" : "reconnect");
+    lastKick = now;
+    WiFi.disconnect();
+    if (hard) {
+      WiFi.mode(WIFI_OFF);
+      delay(500);
+      WiFi.mode(WIFI_STA);
+      WiFi.setHostname(HOSTNAME);
+    }
+    lastAttempt = 0;  // tryConnect() below, at once
   }
 
   const Settings s = settings_get();
@@ -210,13 +290,46 @@ bool wifi_service() {
 
 void wifi_net_result(bool ok) {
   if (ok) {
-    lastNetOk = millis();
-    netFailures = 0;
+    lastNetOk = millis() | 1;
+    probeFails = 0;
     lastKick = 0;
     kicks = 0;
-  } else if (netFailures < 255) {
-    netFailures++;
+    stuck = false;
+    if (WiFi.status() == WL_CONNECTED) downSinceMs = 0;
+  } else if (!probeFails) {
+    lastProbe = 0;  // a request failed: check the router at once
   }
+}
+
+bool wifi_problem(String &brief, String &detail) {
+  const Settings s = settings_get();
+  if (!s.wifiSsid.length() || state == WifiState::Connecting) return false;
+  const uint32_t since = downSinceMs;
+  const bool down = WiFi.status() != WL_CONNECTED;
+  if (!since || (!down && !stuck)) return false;
+  const uint32_t mins = (millis() - since) / 60000;
+  char at[8] = "";
+  const time_t t = downSince;
+  if (t) {
+    struct tm tm;
+    localtime_r(&t, &tm);
+    snprintf(at, sizeof(at), "%02d:%02d", tm.tm_hour, tm.tm_min);
+  }
+  const char *what = stuck && !down ? "No answer from router" : "Wi-Fi down";
+  brief = t ? String(what) + " " + at : String(what);
+  char text[200];
+  if (stuck && !down) {
+    snprintf(text, sizeof(text),
+             "%s for %lu min (since %s). Wi-Fi is joined, %d dBm, but the router does not answer. "
+             "The display reconnects by itself.",
+             what, (unsigned long)mins, t ? at : "start", (int)WiFi.RSSI());
+  } else {
+    snprintf(text, sizeof(text), "%s for %lu min (since %s). Last drop: reason %u (%s), %d dBm. Retrying every 30 s.",
+             what, (unsigned long)mins, t ? at : "start", lastReason, lastReason ? reasonName(lastReason) : "none",
+             (int)lastDropRssi);
+  }
+  detail = text;
+  return true;
 }
 
 void wifi_sleep(bool sleep) {
@@ -228,7 +341,9 @@ void wifi_sleep(bool sleep) {
   lastNetOk = 0;  // asleep is not silent: start the watchdog over
   lastKick = 0;
   kicks = 0;
-  netFailures = 0;
+  probeFails = 0;
+  stuck = false;
+  downSinceMs = 0;
   lastAttempt = 0;  // reconnect at the next wifi_service(), not 30 s later
 }
 
