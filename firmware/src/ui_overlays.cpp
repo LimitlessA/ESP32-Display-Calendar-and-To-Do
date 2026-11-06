@@ -34,7 +34,7 @@ constexpr const char *kThemeTitle = "Theme";
 constexpr const char *kTabColors = "Colors";
 constexpr const char *kTabTextSize = "Text size";
 constexpr const char *kTextSizeHint = "Drag to change the size of all text";
-constexpr const char *kTextSizeTicks[kTextSizes] = {"XS", "S", "Normal", "L", "XL"};
+constexpr const char *kTextSizeTicks[kTextSizes] = {"XXS", "XS", "S", "Normal", "L", "XL"};
 constexpr const char *kSmallA = "A";
 constexpr const char *kPreviewCaption = "PREVIEW";
 // The preview: a meeting and two tasks, drawn with the fonts Home uses for them.
@@ -44,7 +44,7 @@ constexpr const char *kPreviewMeta = "Meet \xC2\xB7 Work calendar";
 constexpr const char *kPreviewTask1 = "Order desk cable tray";
 constexpr const char *kPreviewTask1Due = "Due today";
 constexpr const char *kPreviewTask2 = "Call the bank";
-constexpr int kSliderW = 240;
+constexpr int kSliderW = 230;
 constexpr int kPreviewW = 330;
 constexpr const char *kDone = "Done";
 constexpr const char *kCalendarsTitle = "Calendars: %s";  // account name
@@ -330,7 +330,7 @@ void textSizeTab(lv_obj_t *card) {
   lv_obj_set_width(hint, 664 - kPreviewW - 22);
   lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
   lv_obj_t *row = clearBox(left);
-  set_flex(row, LV_FLEX_FLOW_ROW, 16, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  set_flex(row, LV_FLEX_FLOW_ROW, 14, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   mk_label(row, &font_14b, t.text, kSmallA);
   lv_obj_t *s = lv_slider_create(row);
   lv_obj_set_size(s, kSliderW, 8);
@@ -344,7 +344,7 @@ void textSizeTab(lv_obj_t *card) {
   lv_obj_set_ext_click_area(s, 20);
   mk_label(row, &font_26b, t.text, kSmallA);
   lv_obj_t *ticks = clearBox(left);
-  lv_obj_set_size(ticks, kSliderW + 60, 20);
+  lv_obj_set_size(ticks, kSliderW + 50, 20);
   for (uint8_t i = 0; i < kTextSizes; i++) tickLabels[i] = mk_label(ticks, &font_12, t.muted, kTextSizeTicks[i]);
   // Moving shows the size in the preview; letting go saves it and rebuilds the screens.
   lv_obj_add_event_cb(s, [](lv_event_t *e) {

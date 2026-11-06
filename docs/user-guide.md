@@ -376,8 +376,8 @@ Open it with the sliders icon. It is a dashboard.
   sync now.
 - **Time**: 24 h or 12 h.
 - **Theme**: opens the theme picker. Midnight, Ocean, Forest, Sunset, Paper (a
-  light theme) and High contrast. The **Text size** tab has a slider with five
-  sizes (XS, S, Normal, L, XL) and a preview of a meeting and two tasks that
+  light theme) and High contrast. The **Text size** tab has a slider with six
+  sizes (XXS, XS, S, Normal, L, XL) and a preview of a meeting and two tasks that
   changes as you drag; when you let go, every screen changes to that size. The
   big clocks and timers keep their size, and the Settings and Features pages,
   which must fit one screen, grow only up to L.

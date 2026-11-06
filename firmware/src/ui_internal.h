@@ -20,19 +20,20 @@ LV_FONT_DECLARE(font_16s);
 LV_FONT_DECLARE(font_20b);
 LV_FONT_DECLARE(font_26b);
 LV_FONT_DECLARE(font_34b);
+LV_FONT_DECLARE(font_10);
 LV_FONT_DECLARE(font_18);
 LV_FONT_DECLARE(font_20);
 LV_FONT_DECLARE(font_72);
 LV_FONT_DECLARE(font_150);
 
-// Text size (Theme screen, Text size tab: XS, S, Normal, L, XL). Screens never
+// Text size (Theme screen, Text size tab: XXS, XS, S, Normal, L, XL). Screens never
 // name a font file: they ask for a role, F_12 ... F_34B, named after its size
 // at Normal, and the table maps each role to a bigger or smaller font. The big
 // clock and timer digits (font_72, font_150) do not change.
 enum FontRole : uint8_t { kF12, kF14, kF14b, kF16, kF16s, kF20b, kF26b, kF34b, kFontRoles };
-constexpr uint8_t kTextSizes = 5;  // XS, S, Normal, L, XL
-constexpr uint8_t kTextNormal = 2;
-constexpr uint8_t kTextLarge = 3;
+constexpr uint8_t kTextSizes = 6;  // XXS, XS, S, Normal, L, XL
+constexpr uint8_t kTextNormal = 3;
+constexpr uint8_t kTextLarge = 4;
 extern const lv_font_t *g_fonts[kFontRoles];
 void fonts_select(uint8_t textSize);  // before the screens are built
 #define F_12 (g_fonts[kF12])

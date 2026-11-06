@@ -493,7 +493,7 @@ int main(int argc, char **argv) {
   s.ics = {{"Work (Outlook)", "https://outlook.office365.com/owa/calendar/abc/calendar.ics", 0xF5A524},
            {"Family (iCloud)", "webcal://p23-caldav.icloud.com/published/2/xyz", 0xE57CD8}};
   s.wifiSsid = "Popescu-5G";
-  if (getenv("SIM_TEXT_SIZE")) s.textSize = atoi(getenv("SIM_TEXT_SIZE"));  // 0-4, see Settings::textSize
+  if (getenv("SIM_TEXT_SIZE")) s.textSize = atoi(getenv("SIM_TEXT_SIZE"));  // 0-5, see Settings::textSize
   sim_set_settings(s);
   sampleData();
 
