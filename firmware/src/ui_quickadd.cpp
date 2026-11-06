@@ -114,7 +114,7 @@ void mkDueChips(lv_obj_t *parent) {
   dueRow = mk_box(parent, 0, 0);
   lv_obj_set_style_bg_opa(dueRow, LV_OPA_TRANSP, 0);
   set_flex(dueRow, LV_FLEX_FLOW_ROW, 6);
-  mk_label(dueRow, &font_14, theme().muted, kDueLabel);
+  mk_label(dueRow, F_14, theme().muted, kDueLabel);
   for (int i = 0; i < (int)Due::Count; i++) {
     lv_obj_t *chip = mk_chip(dueRow, kDueNames[i], (Due)i == due);
     lv_obj_set_user_data(chip, (void *)(intptr_t)i);
@@ -135,7 +135,7 @@ void mkListChip(lv_obj_t *parent) {
   lv_obj_set_style_border_width(listChip, 2, 0);
   set_flex(listChip, LV_FLEX_FLOW_ROW, 8);
   mk_dot(listChip, listColor());
-  mk_label(listChip, &font_14b, t.text, listName().c_str());
+  mk_label(listChip, F_14B, t.text, listName().c_str());
   on_click(listChip, [](lv_event_t *) {
     if (g_snap.lists.empty()) return;
     listIndex = (listIndex + 1) % g_snap.lists.size();
@@ -153,9 +153,9 @@ lv_obj_t *topBar(lv_obj_t *parent, const char *title) {
   lv_obj_t *cancel = mk_button(bar, t.header, 22);
   lv_obj_set_size(cancel, LV_SIZE_CONTENT, TOUCH);
   lv_obj_set_style_pad_hor(cancel, 16, 0);
-  lv_obj_center(mk_label(cancel, &font_16s, t.muted, kCancel));
+  lv_obj_center(mk_label(cancel, F_16S, t.muted, kCancel));
   on_click(cancel, [](lv_event_t *) { close(); });
-  mk_label(bar, &font_16s, t.text, title);
+  mk_label(bar, F_16S, t.text, title);
   return bar;
 }
 
@@ -216,8 +216,8 @@ void buildTiles() {
   lv_obj_set_style_border_color(own, c(t.line), 0);
   lv_obj_set_style_border_width(own, 2, 0);
   set_flex(own, LV_FLEX_FLOW_ROW, 8);
-  mk_label(own, &font_16, t.text, ICON_KEYBOARD);
-  mk_label(own, &font_14b, t.text, kTypeOwn);
+  mk_label(own, F_16, t.text, ICON_KEYBOARD);
+  mk_label(own, F_14B, t.text, kTypeOwn);
   on_click(own, [](lv_event_t *) { lv_async_call([](void *) { buildKeyboard(); }, nullptr); });
 
   lv_obj_t *hint = mk_box(layer, 0, 0);
@@ -225,9 +225,9 @@ void buildTiles() {
   lv_obj_set_pos(hint, PAD, HEADER_H + 10);
   lv_obj_set_width(hint, SCREEN_W - 2 * PAD);
   set_flex(hint, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
-  lv_obj_t *h = mk_label(hint, &font_12, t.muted, kFrequent);
+  lv_obj_t *h = mk_label(hint, F_12, t.muted, kFrequent);
   lv_obj_set_style_text_letter_space(h, 1, 0);
-  mk_label(hint, &font_12, t.muted, kFrequentHint);
+  mk_label(hint, F_12, t.muted, kFrequentHint);
 
   const int gridY = HEADER_H + 34, footH = 64;
   const int gridH = SCREEN_H - gridY - footH - 10;
@@ -247,13 +247,13 @@ void buildTiles() {
     lv_obj_set_style_border_width(tile, 2, 0);
     lv_obj_set_style_border_color(tile, c(t.card), 0);
     lv_obj_set_style_pad_all(tile, 12, 0);
-    lv_obj_t *l = mk_label(tile, &font_16s, t.text, title.c_str());
+    lv_obj_t *l = mk_label(tile, F_16S, t.text, title.c_str());
     lv_obj_set_width(l, tw - 24);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_obj_add_event_cb(tile, pickTile, LV_EVENT_CLICKED, attach(tile, title));
   }
   if (!n) {
-    lv_obj_t *l = mk_label(grid, &font_16, t.muted, kNoFrequent);
+    lv_obj_t *l = mk_label(grid, F_16, t.muted, kNoFrequent);
     lv_obj_set_width(l, SCREEN_W - 2 * PAD);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
   }
@@ -300,7 +300,7 @@ void refreshSuggestions() {
       lv_textarea_set_text(input, static_cast<String *>(lv_event_get_user_data(e))->c_str());
     }, LV_EVENT_CLICKED, attach(chip, f));
   }
-  if (found.size()) mk_label(suggest, &font_12, theme().muted, kFromPast);
+  if (found.size()) mk_label(suggest, F_12, theme().muted, kFromPast);
 }
 
 // C: a sheet over the current screen.

@@ -83,9 +83,9 @@ lv_obj_t *line(lv_obj_t *parent, const char *icon, uint32_t color, const String 
   lv_obj_t *row = mk_box(parent, 0, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 12);
-  lv_obj_t *i = mk_label(row, &font_16, color, icon);
+  lv_obj_t *i = mk_label(row, F_16, color, icon);
   lv_obj_set_width(i, 22);
-  mk_label(row, &font_16, t.text, text.c_str());
+  mk_label(row, F_16, t.text, text.c_str());
   return row;
 }
 
@@ -113,8 +113,8 @@ void showWelcome(long awaySecs) {
   lv_obj_set_style_pad_all(card, 26, 0);
   set_flex(card, LV_FLEX_FLOW_COLUMN, 12, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_center(card);
-  mk_label(card, &font_34b, t.text, kWelcome);
-  mk_label(card, &font_14, t.muted, strf(kAwayFor, duration(awaySecs).c_str()).c_str());
+  mk_label(card, F_34B, t.text, kWelcome);
+  mk_label(card, F_14, t.muted, strf(kAwayFor, duration(awaySecs).c_str()).c_str());
   lv_obj_t *list = mk_box(card, 0, 0);
   lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
   lv_obj_set_style_pad_ver(list, 6, 0);
@@ -129,7 +129,7 @@ void showWelcome(long awaySecs) {
   lv_obj_set_width(next, 508);
   lv_obj_set_style_pad_all(next, 14, 0);
   set_flex(next, LV_FLEX_FLOW_COLUMN, 4, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *h = mk_label(next, &font_12, t.muted, kNext);
+  lv_obj_t *h = mk_label(next, F_12, t.muted, kNext);
   lv_obj_set_style_text_letter_space(h, 1, 0);
   const time_t nowT = ui_now();
   const Event *upcoming = nullptr;
@@ -140,10 +140,10 @@ void showWelcome(long awaySecs) {
     }
   }
   String nextText = upcoming ? fmt_time(upcoming->start / 1000) + "  " + upcoming->title : String(kNoNext);
-  lv_obj_t *nl = mk_label(next, &font_16s, t.text, nextText.c_str());
+  lv_obj_t *nl = mk_label(next, F_16S, t.text, nextText.c_str());
   lv_obj_set_width(nl, 480);
   lv_label_set_long_mode(nl, LV_LABEL_LONG_DOT);
-  if (upcoming) mk_label(next, &font_12, t.accent, until_text(upcoming->start).c_str());
+  if (upcoming) mk_label(next, F_12, t.accent, until_text(upcoming->start).c_str());
 
   lv_obj_t *row = mk_box(card, 0, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
@@ -217,12 +217,12 @@ void presence_pair_show() {
   lv_obj_set_style_pad_all(card, 26, 0);
   set_flex(card, LV_FLEX_FLOW_COLUMN, 14, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_center(card);
-  mk_label(card, &font_26b, t.text, kPairTitle);
-  lv_obj_t *steps = mk_label(card, &font_16, t.text, kPairSteps);
+  mk_label(card, F_26B, t.text, kPairTitle);
+  lv_obj_t *steps = mk_label(card, F_16, t.text, kPairSteps);
   lv_obj_set_width(steps, 508);
   lv_label_set_long_mode(steps, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_line_space(steps, 6, 0);
-  pairStatus = mk_label(card, &font_14b, t.accent, "");
+  pairStatus = mk_label(card, F_14B, t.accent, "");
   lv_obj_set_width(pairStatus, 508);
   lv_label_set_long_mode(pairStatus, LV_LABEL_LONG_WRAP);
   lv_obj_add_event_cb(pairStatus, [](lv_event_t *) { pairStatus = nullptr; }, LV_EVENT_DELETE, nullptr);

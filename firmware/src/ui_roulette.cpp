@@ -123,7 +123,7 @@ void closeButton(lv_obj_t *parent) {
 
 void emptyState() {
   const Theme &t = theme();
-  lv_obj_t *l = mk_label(layer, &font_20b, t.muted, kNoTasks);
+  lv_obj_t *l = mk_label(layer, F_20B, t.muted, kNoTasks);
   lv_obj_align(l, LV_ALIGN_CENTER, 0, -30);
   lv_obj_t *row = transparent(layer);
   lv_obj_set_size(row, LV_SIZE_CONTENT, 56);
@@ -147,12 +147,12 @@ void spinLater(lv_event_t *);
 void showWheelResult() {
   const Theme &t = theme();
   lv_obj_clean(resultBox);
-  lv_obj_t *head = mk_label(resultBox, &font_12, kSliceColors[picked % 6], kYourTask);
+  lv_obj_t *head = mk_label(resultBox, F_12, kSliceColors[picked % 6], kYourTask);
   lv_obj_set_style_text_letter_space(head, 1, 0);
-  lv_obj_t *title = mk_label(resultBox, &font_26b, t.text, pool[picked].title.c_str());
+  lv_obj_t *title = mk_label(resultBox, F_26B, t.text, pool[picked].title.c_str());
   lv_obj_set_width(title, 380);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
-  if (pool[picked].list.length()) mk_label(resultBox, &font_14, t.muted, pool[picked].list.c_str());
+  if (pool[picked].list.length()) mk_label(resultBox, F_14, t.muted, pool[picked].list.c_str());
   lv_obj_t *row = transparent(resultBox);
   lv_obj_set_size(row, 380, 56);
   lv_obj_set_style_pad_top(row, 0, 0);
@@ -166,12 +166,12 @@ void showWheelResult() {
 void wheelIntro() {
   const Theme &t = theme();
   lv_obj_clean(resultBox);
-  lv_obj_t *head = mk_label(resultBox, &font_12, t.muted, kCantDecide);
+  lv_obj_t *head = mk_label(resultBox, F_12, t.muted, kCantDecide);
   lv_obj_set_style_text_letter_space(head, 1, 0);
-  lv_obj_t *title = mk_label(resultBox, &font_26b, t.text, kWheelTitle);
+  lv_obj_t *title = mk_label(resultBox, F_26B, t.text, kWheelTitle);
   lv_obj_set_width(title, 380);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
-  mk_label(resultBox, &font_14, t.muted, kWheelHint);
+  mk_label(resultBox, F_14, t.muted, kWheelHint);
   lv_obj_t *row = transparent(resultBox);
   lv_obj_set_size(row, 380, 56);
   set_flex(row, LV_FLEX_FLOW_ROW, 10);
@@ -253,7 +253,7 @@ void buildWheel() {
     lv_obj_t *row = transparent(legend);
     set_flex(row, LV_FLEX_FLOW_ROW, 8);
     mk_dot(row, kSliceColors[i % 6], 10);
-    lv_obj_t *l = mk_label(row, &font_12, t.muted, pool[i].title.c_str());
+    lv_obj_t *l = mk_label(row, F_12, t.muted, pool[i].title.c_str());
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
     lv_obj_set_width(l, 320);  // clear of the close button in the corner
   }
@@ -323,14 +323,14 @@ void buildDeck() {
   lv_obj_set_style_border_width(top, 2, 0);
   lv_obj_set_style_pad_all(top, 24, 0);
   set_flex(top, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *head = mk_label(top, &font_12, t.accent, kYourCard);
+  lv_obj_t *head = mk_label(top, F_12, t.accent, kYourCard);
   lv_obj_set_style_text_letter_space(head, 1, 0);
-  cardTitle = mk_label(top, &font_26b, t.text, "");
+  cardTitle = mk_label(top, F_26B, t.text, "");
   lv_obj_set_width(cardTitle, 370);
   lv_label_set_long_mode(cardTitle, LV_LABEL_LONG_DOT);
   lv_obj_set_height(cardTitle, 70);
-  cardMeta = mk_label(top, &font_14, t.muted, "");
-  cardFoot = mk_label(top, &font_12, t.muted, "");
+  cardMeta = mk_label(top, F_14, t.muted, "");
+  cardFoot = mk_label(top, F_12, t.muted, "");
 
   lv_obj_t *row = transparent(layer);
   lv_obj_set_size(row, LV_SIZE_CONTENT, 56);
@@ -362,7 +362,7 @@ lv_obj_t *reel(lv_obj_t *parent) {
   lv_obj_set_style_border_width(r, 2, 0);
   set_flex(r, LV_FLEX_FLOW_COLUMN, 12, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   for (int i = 0; i < 3; i++) {
-    lv_obj_t *l = mk_label(r, i == 1 ? &font_16s : &font_14, i == 1 ? t.text : t.line, "");
+    lv_obj_t *l = mk_label(r, i == 1 ? F_16S : F_14, i == 1 ? t.text : t.line, "");
     lv_obj_set_width(l, 200);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
@@ -411,7 +411,7 @@ void buildSlots() {
   const Theme &t = theme();
   fillPool(12);
   if (pool.empty()) return emptyState();
-  lv_obj_t *head = mk_label(layer, &font_14b, t.accent, kSlotHead);
+  lv_obj_t *head = mk_label(layer, F_14B, t.accent, kSlotHead);
   lv_obj_set_style_text_letter_space(head, 2, 0);
   lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 40);
   lv_obj_t *machine = mk_box(layer, t.card, 22);
@@ -449,7 +449,7 @@ void roulette_show() {
   }
   // Always a way back, even while the wheel turns and its buttons are gone:
   // the close button in the corner, or a swipe down or to the right.
-  lv_obj_t *x = mk_icon_button(layer, ICON_CLOSE, theme().muted, &font_20b);
+  lv_obj_t *x = mk_icon_button(layer, ICON_CLOSE, theme().muted, F_20B);
   lv_obj_align(x, LV_ALIGN_TOP_RIGHT, -8, 8);
   on_click(x, [](lv_event_t *) { lv_async_call([](void *) { close(); }, nullptr); });
   lv_obj_clear_flag(layer, LV_OBJ_FLAG_GESTURE_BUBBLE);  // swipes on the buttons end up here

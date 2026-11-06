@@ -121,11 +121,11 @@ lv_obj_t *tile(lv_obj_t *parent, const char *caption, lv_obj_t **big, lv_event_c
   set_flex(cd, LV_FLEX_FLOW_COLUMN, 4, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_t *head = row(cd, 16);
   lv_obj_set_width(head, lv_pct(100));
-  lv_obj_t *cap = mk_label(head, &font_12, t.muted, caption);
+  lv_obj_t *cap = mk_label(head, F_12, t.muted, caption);
   lv_obj_set_style_text_letter_space(cap, 1, 0);
   spacer(head);
-  mk_label(head, &font_14, t.muted, ICON_RIGHT);
-  *big = line(cd, &font_20b, t.text);
+  mk_label(head, F_14, t.muted, ICON_RIGHT);
+  *big = line(cd, F_20B, t.text);
   on_click(cd, cb);
   return cd;
 }
@@ -137,8 +137,12 @@ lv_obj_t *titled(lv_obj_t *parent, const char *title, const char *sub) {
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(col, 1);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-  mk_label(col, &font_14b, t.text, title);
-  return mk_label(col, &font_12, t.muted, sub);
+  // The chips are narrow: their title stays at the Normal size so it is not cut short.
+  for (lv_obj_t *l : {mk_label(col, font_upto(kF14b, 1), t.text, title), mk_label(col, F_12, t.muted, sub)}) {
+    lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);  // one line each, "..." when too long
+    lv_obj_set_size(l, lv_pct(100), lv_font_get_line_height(lv_obj_get_style_text_font(l, LV_PART_MAIN)));
+  }
+  return lv_obj_get_child(col, 1);
 }
 
 // Toggle chip: title, a small line and a switch.
@@ -177,6 +181,7 @@ void intervalStepped(int i, void *) {
 }  // namespace
 
 lv_obj_t *settings_create() {
+  const FontCap cap(2);  // the tiles fit one screen up to Large text
   const Theme &t = theme();
   lv_obj_t *scr = mk_screen();
   mk_nav_header(scr, Screen::Settings);
@@ -188,9 +193,9 @@ lv_obj_t *settings_create() {
 
   lv_obj_t *tiles = row(body, TILE_H);
   lv_obj_t *wifi = tile(tiles, kCardWifi, &wifiName, [](lv_event_t *) { ui_show(Screen::Wifi); });
-  wifiInfo = line(wifi, &font_14, t.muted);
+  wifiInfo = line(wifi, F_14, t.muted);
   lv_obj_t *acc = tile(tiles, kCardAccounts, &accCount, [](lv_event_t *) { ui_show(Screen::Accounts); });
-  accInfo = line(acc, &font_14, t.muted);
+  accInfo = line(acc, F_14, t.muted);
   lv_obj_t *dev = tile(tiles, kCardDevice, &devInfo, [](lv_event_t *) { ota_dialog_show(); });
   lv_obj_t *fw = row(dev, 18);
   lv_obj_set_width(fw, lv_pct(100));
@@ -199,14 +204,14 @@ lv_obj_t *settings_create() {
   // version until the next restart (details: serial port, harness "crash").
   const String crash = crashlog_summary();
   if (crash.length()) {
-    lv_obj_t *why = mk_label(fw, &font_14, t.badFg, crash.c_str());
+    lv_obj_t *why = mk_label(fw, F_14, t.badFg, crash.c_str());
     lv_label_set_long_mode(why, LV_LABEL_LONG_DOT);
-    lv_obj_set_size(why, 1, lv_font_get_line_height(&font_14));  // one line, as wide as the row leaves
+    lv_obj_set_size(why, 1, lv_font_get_line_height(F_14));  // one line, as wide as the row leaves
     lv_obj_set_flex_grow(why, 1);
   } else {
-    mk_label(fw, &font_14, t.muted, strf(kFirmware, FIRMWARE_VERSION).c_str());
+    mk_label(fw, F_14, t.muted, strf(kFirmware, FIRMWARE_VERSION).c_str());
   }
-  mk_label(fw, &font_14b, t.accent, kUpdate);
+  mk_label(fw, F_14B, t.accent, kUpdate);
 
   lv_obj_t *sliders = mk_box(body, t.card, 14);
   lv_obj_set_size(sliders, BODY_W, LV_SIZE_CONTENT);
@@ -239,7 +244,7 @@ lv_obj_t *settings_create() {
 
   lv_obj_t *cells = row(body, CELL_H);
   lv_obj_t *sync = cell(cells, false, SYNC_W);
-  mk_label(sync, &font_14b, t.text, kSync);
+  mk_label(sync, F_14B, t.text, kSync);
   spacer(sync);
   mk_stepper(sync, intervalIndex(), 0, kSyncCount - 1, 1, intervalText, intervalStepped, nullptr, 56);
   on_click(mk_icon_button(sync, ICON_REFRESH, t.accent), [](lv_event_t *) {
@@ -248,7 +253,7 @@ lv_obj_t *settings_create() {
   });
 
   lv_obj_t *time = cell(cells, false, TIME_W);
-  mk_label(time, &font_14b, t.text, kTime);
+  mk_label(time, F_14B, t.text, kTime);
   spacer(time);
   mk_segmented(time, kFormats, 2, g.use24h ? 0 : 1, 52, [](int i, void *) {
     Settings s = g_settings;
@@ -259,12 +264,12 @@ lv_obj_t *settings_create() {
 
   lv_obj_t *th = cell(cells, true, THEME_W);
   themeName = titled(th, kTheme, "");
-  mk_label(th, &font_14, t.accent, ICON_PALETTE);
+  mk_label(th, F_14, t.accent, ICON_PALETTE);
   on_click(th, [](lv_event_t *) { theme_picker_show(); });
 
   lv_obj_t *feat = cell(cells, true);
   featuresOn = titled(feat, kFeatures, "");
-  mk_label(feat, &font_14, t.accent, ICON_RIGHT);
+  mk_label(feat, F_14, t.accent, ICON_RIGHT);
   on_click(feat, [](lv_event_t *) { ui_show(Screen::Features); });
   return scr;
 }

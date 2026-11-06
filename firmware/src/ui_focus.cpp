@@ -136,10 +136,10 @@ lv_obj_t *titleLabel(lv_obj_t *parent, const lv_font_t *font, int w) {
 // A: ring with the time inside, the task above, controls below.
 void buildRing() {
   const Theme &t = theme();
-  lv_obj_t *head = mk_label(layer, &font_14b, t.accent, kFocusingOn);
+  lv_obj_t *head = mk_label(layer, F_14B, t.accent, kFocusingOn);
   lv_obj_set_style_text_letter_space(head, 1, 0);
   lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 18);
-  lv_obj_t *title = titleLabel(layer, &font_20b, SCREEN_W - 120);
+  lv_obj_t *title = titleLabel(layer, F_20B, SCREEN_W - 120);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   lv_obj_set_height(title, 28);
@@ -160,7 +160,7 @@ void buildRing() {
 
   timeLabel = mk_label(arc, &font_72, t.text, "");
   lv_obj_align(timeLabel, LV_ALIGN_CENTER, 0, -10);
-  stateLabel = mk_label(arc, &font_14b, t.muted, kFocus);
+  stateLabel = mk_label(arc, F_14B, t.muted, kFocus);
   lv_obj_set_style_text_letter_space(stateLabel, 2, 0);
   lv_obj_align(stateLabel, LV_ALIGN_CENTER, 0, 48);
 
@@ -177,7 +177,7 @@ void buildSplit() {
   const int leftW = 430;
   lv_obj_t *left = mk_box(layer, t.panel, 0);
   lv_obj_set_size(left, leftW, SCREEN_H);
-  stateLabel = mk_label(left, &font_14b, t.accent, kFocus);
+  stateLabel = mk_label(left, F_14B, t.accent, kFocus);
   lv_obj_set_style_text_letter_space(stateLabel, 2, 0);
   lv_obj_align(stateLabel, LV_ALIGN_CENTER, 0, -80);
   timeLabel = mk_label(left, &font_72, t.text, "");
@@ -188,7 +188,7 @@ void buildSplit() {
   lv_bar_set_range(bar, 0, 1000);
   lv_obj_set_style_bg_color(bar, c(t.raised), LV_PART_MAIN);
   lv_obj_set_style_bg_color(bar, c(t.accent), LV_PART_INDICATOR);
-  lv_obj_t *of = mk_label(left, &font_14, t.muted, strf(kOfMinutes, (int)(total / 60)).c_str());
+  lv_obj_t *of = mk_label(left, F_14, t.muted, strf(kOfMinutes, (int)(total / 60)).c_str());
   lv_obj_align(of, LV_ALIGN_CENTER, 0, 90);
 
   const int rightW = SCREEN_W - leftW - 2 * 30;
@@ -196,10 +196,10 @@ void buildSplit() {
   lv_obj_set_pos(right, leftW + 30, 40);
   lv_obj_set_size(right, rightW, SCREEN_H - 80);
   set_flex(right, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *head = mk_label(right, &font_12, t.muted, kFocusingOn);
+  lv_obj_t *head = mk_label(right, F_12, t.muted, kFocusingOn);
   lv_obj_set_style_text_letter_space(head, 1, 0);
-  titleLabel(right, &font_26b, rightW);
-  if (task.list.length()) mk_label(right, &font_14, t.muted, task.list.c_str());
+  titleLabel(right, F_26B, rightW);
+  if (task.list.length()) mk_label(right, F_14, t.muted, task.list.c_str());
   lv_obj_t *fill = transparent(right);
   lv_obj_set_flex_grow(fill, 1);
 
@@ -234,13 +234,13 @@ void buildCard() {
   lv_obj_t *row = transparent(card);
   lv_obj_set_width(row, 572);
   set_flex(row, LV_FLEX_FLOW_ROW, 16, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-  timeLabel = mk_label(row, &font_34b, t.accent, "");
+  timeLabel = mk_label(row, F_34B, t.accent, "");
   lv_obj_t *col = transparent(row);
   lv_obj_set_flex_grow(col, 1);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  stateLabel = mk_label(col, &font_12, t.muted, kFocus);
+  stateLabel = mk_label(col, F_12, t.muted, kFocus);
   lv_obj_set_style_text_letter_space(stateLabel, 1, 0);
-  lv_obj_t *title = titleLabel(col, &font_16s, 400);
+  lv_obj_t *title = titleLabel(col, F_16S, 400);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   bar = lv_bar_create(card);
   lv_obj_set_size(bar, 572, 8);

@@ -292,8 +292,12 @@ lv_obj_t *memButton(lv_obj_t *parent, uint8_t slot, Live &live, int w, int h) {
   lv_obj_t *b = mk_button(parent, t.raised, 14);
   lv_obj_set_size(b, w, h);
   set_flex(b, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  mk_label(b, &font_14b, t.text, slotName(slot).c_str());
-  mk_label(b, &font_12, t.muted, "");
+  // Narrow buttons (the Home dock) keep the Normal text size: the dock has a fixed height.
+  const bool narrow = w < 120;
+  lv_obj_t *name = mk_label(b, narrow ? font_upto(kF14b, 1) : F_14B, t.text, slotName(slot).c_str());
+  one_line(name, w - 12);
+  lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
+  mk_label(b, narrow ? font_upto(kF12, 1) : F_12, t.muted, "");
   // A short tap moves the desk; a long press only names the button. LV_EVENT_CLICKED also fires when
   // a long press is released, which moved the desk as well, so use SHORT_CLICKED.
   lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
@@ -321,7 +325,7 @@ lv_obj_t *roundButton(lv_obj_t *parent, const char *icon, int size) {
   const Theme &t = theme();
   lv_obj_t *b = mk_button(parent, t.raised, size / 2);
   lv_obj_set_size(b, size, size);
-  lv_obj_center(mk_label(b, &font_20b, t.text, icon));
+  lv_obj_center(mk_label(b, F_20B, t.text, icon));
   return b;
 }
 
@@ -422,7 +426,7 @@ void timerButton(lv_obj_t *parent, uint32_t bg, uint32_t fg, const char *icon, i
   lv_obj_t *b = mk_button(parent, bg, 14);
   lv_obj_set_size(b, w, 44);
   if (w == 0) lv_obj_set_flex_grow(b, 1);
-  lv_obj_center(mk_label(b, &font_16, fg, icon));
+  lv_obj_center(mk_label(b, F_16, fg, icon));
   on_click(b, [](lv_event_t *e) { timerPress(lv_event_get_user_data(e)); }, (void *)(intptr_t)cmd);
 }
 
@@ -474,7 +478,7 @@ void buildTimerCard(const DeskStatus &st) {
       lv_obj_t *r = transparent(side);
       lv_obj_set_size(r, LV_SIZE_CONTENT, TOUCH);
       set_flex(r, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-      lv_obj_set_width(mk_label(r, &font_14b, t.muted, stand ? kStand : kSit), 50);
+      lv_obj_set_width(mk_label(r, F_14B, t.muted, stand ? kStand : kSit), LV_MAX(50, text_w(F_14B, kStand) + 4));
       mk_stepper(r, timerLength(stand, st), kTimerMin, kTimerMax, kTimerStep, numText, setTimerLength,
                  (void *)(intptr_t)stand, 44);
     }
@@ -484,17 +488,17 @@ void buildTimerCard(const DeskStatus &st) {
   lv_obj_set_size(num, 80, LV_SIZE_CONTENT);
   set_flex(num, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_center(num);
-  live.ringNum = mk_label(num, last ? &font_26b : &font_34b, last ? t.warnFg : t.text, "");
-  if (!last) mk_label(num, &font_12, t.muted, kMin);
+  live.ringNum = mk_label(num, last ? F_26B : F_34B, last ? t.warnFg : t.text, "");
+  if (!last) mk_label(num, F_12, t.muted, kMin);
   set_flex(side, LV_FLEX_FLOW_COLUMN, 3, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_t *head = transparent(side);
   lv_obj_set_size(head, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   set_flex(head, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
   mk_dot(head, col, 12);
-  mk_label(head, &font_20b, col, sit ? kSitting : kStanding);
+  mk_label(head, F_20B, col, sit ? kSitting : kStanding);
   const char *next = sit ? kStand : kSit;
   const int nextMin = timerLength(sit, st);
-  mk_label(head, &font_14, t.muted, strf(last ? kNext : kThen, next, nextMin).c_str());  // same line as the phase
+  mk_label(head, F_14, t.muted, strf(last ? kNext : kThen, next, nextMin).c_str());  // same line as the phase
   lv_obj_t *btns = transparent(side);
   lv_obj_set_size(btns, lv_pct(100), 44);
   set_flex(btns, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
@@ -534,15 +538,15 @@ void buildScreenB(const DeskStatus &st) {
   lv_obj_set_width(col, 300);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_align(col, LV_ALIGN_BOTTOM_MID, 0, -20);
-  live.height = mk_label(col, &font_34b, t.text, "");
-  live.state = mk_label(col, &font_14b, t.good, "");
+  live.height = mk_label(col, F_34B, t.text, "");
+  live.state = mk_label(col, F_14B, t.good, "");
   lv_obj_set_style_text_letter_space(live.state, 1, 0);
 
   const int rw = SCREEN_W - 2 * PAD - 300 - GAP;
   lv_obj_t *right = transparent(deskBody);
   lv_obj_set_size(right, rw, BODY_H);
   set_flex(right, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *h = mk_label(right, &font_12, t.muted, kMemories);
+  lv_obj_t *h = mk_label(right, F_12, t.muted, kMemories);
   lv_obj_set_style_text_letter_space(h, 1, 0);
   lv_obj_t *grid = transparent(right);
   lv_obj_set_width(grid, rw);
@@ -559,18 +563,18 @@ void buildScreenB(const DeskStatus &st) {
       lv_obj_t *b = mk_button(row, t.raised, 14);
       lv_obj_set_size(b, (rw - 120) / 2, 56);
       set_flex(b, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_CENTER);
-      mk_label(b, &font_16, t.text, dir > 0 ? ICON_CARET_UP : ICON_CARET_DN);
-      mk_label(b, &font_14b, t.text, dir > 0 ? kRaise : kLower);
+      mk_label(b, F_16, t.text, dir > 0 ? ICON_CARET_UP : ICON_CARET_DN);
+      mk_label(b, F_14B, t.text, dir > 0 ? kRaise : kLower);
       holdButton(b, dir);
     }
   } else {
-    lv_obj_t *hint = mk_label(row, &font_12, t.muted, kNeedsLogin);
+    lv_obj_t *hint = mk_label(row, F_12, t.muted, kNeedsLogin);
     lv_obj_set_width(hint, rw - 120);
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
   }
   lv_obj_t *stop = mk_button(row, t.badBg, 14);
   lv_obj_set_size(stop, 100, 56);
-  lv_obj_center(mk_label(stop, &font_14b, t.badFg, kStop));
+  lv_obj_center(mk_label(stop, F_14B, t.badFg, kStop));
   on_click(stop, [](lv_event_t *) { desk_stop(); });
 
   if (st.hasLogin) {  // the timer needs the desk login
@@ -581,7 +585,7 @@ void buildScreenB(const DeskStatus &st) {
     set_flex(live.card, LV_FLEX_FLOW_ROW, 14, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
     buildTimerCard(st);
   }
-  live.today = mk_label(right, &font_12, t.muted, "");
+  live.today = mk_label(right, F_12, t.muted, "");
 }
 
 // ---- C: the desk follows the calendar ----
@@ -602,7 +606,7 @@ void ruleRow(lv_obj_t *parent, const char *text, bool Settings::*field, int w) {
   lv_obj_t *row = transparent(parent);
   lv_obj_set_width(row, w);
   set_flex(row, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_SPACE_BETWEEN);
-  lv_obj_t *l = mk_label(row, &font_14, t.text, text);
+  lv_obj_t *l = mk_label(row, F_14, t.text, text);
   lv_obj_set_width(l, w - 70);
   lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
   // The member pointer goes through user data as an index into a small table.
@@ -626,7 +630,7 @@ void buildScreenC(const DeskStatus &st) {
   lv_obj_set_size(col, w, BODY_H);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   own(screenLive, col);
-  lv_obj_t *h = mk_label(col, &font_12, t.muted, kTodayAtDesk);
+  lv_obj_t *h = mk_label(col, F_12, t.muted, kTodayAtDesk);
   lv_obj_set_style_text_letter_space(h, 1, 0);
 
   // Timeline from kDayFrom to kDayTo: what happened, and the meetings ahead.
@@ -636,7 +640,7 @@ void buildScreenC(const DeskStatus &st) {
   const int lx = 14, lw = w - 28, ly = 36, lh = 22;
   const int span = (kDayTo - kDayFrom) * 60;
   for (int hr = kDayFrom; hr <= kDayTo; hr += 2) {
-    lv_obj_t *l = mk_label(line, &font_12, t.muted, strf("%02d:00", hr).c_str());
+    lv_obj_t *l = mk_label(line, F_12, t.muted, strf("%02d:00", hr).c_str());
     lv_obj_set_pos(l, lx + (hr - kDayFrom) * 60 * lw / span - (hr == kDayTo ? 36 : 0), 8);
   }
   lv_obj_t *track = mk_box(line, t.raised, 6);
@@ -689,7 +693,7 @@ void buildScreenC(const DeskStatus &st) {
     lv_obj_t *r = transparent(legend);
     set_flex(r, LV_FLEX_FLOW_ROW, 6);
     mk_dot(r, k.color, 10);
-    mk_label(r, &font_12, t.muted, k.text);
+    mk_label(r, F_12, t.muted, k.text);
   }
 
   lv_obj_t *bottom = transparent(col);
@@ -708,19 +712,19 @@ void buildScreenC(const DeskStatus &st) {
     const long in = (long)(ev->start / 1000 - now);
     String title = ev->title;
     title.toUpperCase();
-    lv_obj_t *hd = mk_label(next, &font_12, t.accent,
+    lv_obj_t *hd = mk_label(next, F_12, t.accent,
                             (in > 0 ? strf(kInMin, (in + 59) / 60, title.c_str()) : strf(kNowIn, title.c_str())).c_str());
     lv_obj_set_width(hd, cw - 32);
     lv_label_set_long_mode(hd, LV_LABEL_LONG_DOT);
-    mk_label(next, &font_20b, t.text, kStandingFor);
-    lv_obj_t *sub = mk_label(next, &font_12, t.muted,
+    mk_label(next, F_20B, t.text, kStandingFor);
+    lv_obj_t *sub = mk_label(next, F_12, t.muted,
                              strf(kStandPlan, g_settings.deskStandSlot, fmt_time(ev->start / 1000).c_str(),
                                   g_settings.deskSitSlot).c_str());
     lv_obj_set_width(sub, cw - 32);
     lv_label_set_long_mode(sub, LV_LABEL_LONG_WRAP);
   } else {
-    mk_label(next, &font_20b, t.text, kNoPlan);
-    mk_label(next, &font_12, t.muted, kNoPlanSub);
+    mk_label(next, F_20B, t.text, kNoPlan);
+    mk_label(next, F_12, t.muted, kNoPlanSub);
   }
   lv_obj_t *fill = transparent(next);
   lv_obj_set_flex_grow(fill, 1);
@@ -751,7 +755,7 @@ void buildScreenC(const DeskStatus &st) {
   lv_obj_set_size(rules, cw, lv_pct(100));
   lv_obj_set_style_pad_all(rules, 16, 0);
   set_flex(rules, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *rh = mk_label(rules, &font_12, t.muted, kRules);
+  lv_obj_t *rh = mk_label(rules, F_12, t.muted, kRules);
   lv_obj_set_style_text_letter_space(rh, 1, 0);
   ruleRow(rules, kRuleMeetings, &Settings::deskMeetings, cw - 32);
   ruleRow(rules, kRuleFocus, &Settings::deskFocus, cw - 32);
@@ -760,10 +764,10 @@ void buildScreenC(const DeskStatus &st) {
   lv_obj_set_flex_grow(f2, 1);
   lv_obj_t *status = transparent(rules);
   set_flex(status, LV_FLEX_FLOW_ROW, 6);
-  screenLive.height = mk_label(status, &font_12, t.muted, "");
-  mk_label(status, &font_12, t.muted, "\xC2\xB7");
-  screenLive.state = mk_label(status, &font_12, t.muted, "");
-  screenLive.today = mk_label(rules, &font_12, t.muted, "");
+  screenLive.height = mk_label(status, F_12, t.muted, "");
+  mk_label(status, F_12, t.muted, "\xC2\xB7");
+  screenLive.state = mk_label(status, F_12, t.muted, "");
+  screenLive.today = mk_label(rules, F_12, t.muted, "");
   (void)st;
 }
 
@@ -784,11 +788,11 @@ void showPrompt(const Event &ev) {
   lv_obj_center(card);
   String title = ev.title;
   title.toUpperCase();
-  lv_obj_t *hd = mk_label(card, &font_12, t.accent, strf(kInMin, 1L, title.c_str()).c_str());
+  lv_obj_t *hd = mk_label(card, F_12, t.accent, strf(kInMin, 1L, title.c_str()).c_str());
   lv_obj_set_width(hd, 432);
   lv_label_set_long_mode(hd, LV_LABEL_LONG_DOT);
-  mk_label(card, &font_26b, t.text, kStandingFor);
-  lv_obj_t *sub = mk_label(card, &font_14, t.muted,
+  mk_label(card, F_26B, t.text, kStandingFor);
+  lv_obj_t *sub = mk_label(card, F_14, t.muted,
                            strf(kStandPlan, g_settings.deskStandSlot, fmt_time(ev.start / 1000).c_str(),
                                 g_settings.deskSitSlot).c_str());
   lv_obj_set_width(sub, 432);
@@ -906,15 +910,15 @@ lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w) {
   lv_obj_t *hc = transparent(dock);
   lv_obj_set_width(hc, 110);
   set_flex(hc, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-  live.height = mk_label(hc, &font_20b, t.text, "");
-  live.state = mk_label(hc, &font_12, t.muted, "");
-  lv_label_set_long_mode(live.state, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(live.state, 110);
+  // The dock has a fixed height: only the height number grows, up to Large.
+  live.height = mk_label(hc, font_upto(kF20b, 2), t.text, "");
+  live.state = mk_label(hc, font_upto(kF12, 1), t.muted, "");
+  one_line(live.state, 110);
   // Timer: tap to start or stop it (needs the desk login).
   lv_obj_t *tc = mk_button(dock, t.card, 8);
   lv_obj_set_size(tc, 124, 48);
   set_flex(tc, LV_FLEX_FLOW_COLUMN, 4, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-  live.timer = mk_label(tc, &font_12, t.accent, "");
+  live.timer = mk_label(tc, font_upto(kF12, 1), t.accent, "");
   live.timerBar = lv_bar_create(tc);
   lv_obj_set_size(live.timerBar, 116, 5);
   lv_bar_set_range(live.timerBar, 0, 1000);
@@ -935,7 +939,7 @@ lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w) {
   lv_obj_add_flag(live.stop, LV_OBJ_FLAG_IGNORE_LAYOUT);
   lv_obj_set_size(live.stop, 4 * memW + 18, 52);
   lv_obj_align(live.stop, LV_ALIGN_LEFT_MID, 110 + 124 + 20, 0);
-  lv_obj_center(mk_label(live.stop, &font_14b, t.badFg, kStop));
+  lv_obj_center(mk_label(live.stop, F_14B, t.badFg, kStop));
   on_click(live.stop, [](lv_event_t *) { desk_stop(); });
   updateLive(live, st);
   return dock;

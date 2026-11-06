@@ -376,7 +376,10 @@ Open it with the sliders icon. It is a dashboard.
   sync now.
 - **Time**: 24 h or 12 h.
 - **Theme**: opens the theme picker. Midnight, Ocean, Forest, Sunset, Paper (a
-  light theme) and High contrast.
+  light theme) and High contrast. Under the colors, **Text size** makes all text
+  Small, Normal, Large or Extra large; the screens change at once. The big clocks
+  and timers keep their size, and the Settings and Features pages, which must fit
+  one screen, grow only up to Large.
 - **Features**: "N on". Opens the Features screen.
 
 Settings are saved about 5 seconds after your last change. Wait a few seconds

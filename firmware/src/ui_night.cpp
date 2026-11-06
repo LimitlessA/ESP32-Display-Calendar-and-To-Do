@@ -31,16 +31,16 @@ lv_obj_t *night_create() {
   set_flex(col, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_align(col, LV_ALIGN_CENTER, 0, -10);
   clockLabel = mk_label(col, &font_150, t.nightText, "");
-  dateLabel = mk_label(col, &font_20b, t.nightText, "");
+  dateLabel = mk_label(col, F_20B, t.nightText, "");
 
   lv_obj_t *info = mk_box(col, 0, 0);
   lv_obj_set_style_bg_opa(info, LV_OPA_TRANSP, 0);
   lv_obj_set_style_pad_top(info, 26, 0);
   set_flex(info, LV_FLEX_FLOW_ROW, 28);
-  nextLabel = mk_label(info, &font_16, t.nightText, "");
-  tasksLabel = mk_label(info, &font_16, t.nightText, "");
+  nextLabel = mk_label(info, F_16, t.nightText, "");
+  tasksLabel = mk_label(info, F_16, t.nightText, "");
 
-  footLabel = mk_label(scr, &font_14, t.nightText, "");
+  footLabel = mk_label(scr, F_14, t.nightText, "");
   lv_obj_align(footLabel, LV_ALIGN_BOTTOM_MID, 0, -18);
   return scr;
 }
