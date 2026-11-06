@@ -17,6 +17,8 @@ FLASH = re.compile(r"^\.(flash\.(text|rodata|appdesc)|iram0\.text|dram0\.data|ro
 
 if mapfile and os.path.exists(mapfile):
     per_lib = collections.Counter()
+    parts = collections.defaultdict(collections.Counter)  # lib -> input section -> bytes
+    where = {}  # lib -> one full object path
     section = ""
     pending = None
     line_re = re.compile(r"^\s*(\.\S+)?\s+0x([0-9a-f]+)\s+0x([0-9a-f]+)\s+(\S+)$")
@@ -47,11 +49,19 @@ if mapfile and os.path.exists(mapfile):
             else:
                 lib = os.path.basename(obj)
             per_lib[lib] += int(size, 16)
+            parts[lib][sub or section] += int(size, 16)
+            where.setdefault(lib, obj)
     print("== Bytes per library / app file (flash sections) ==")
     total = sum(per_lib.values())
     for lib, n in per_lib.most_common(70):
         print("%9d  %5.1f%%  %s" % (n, 100.0 * n / max(total, 1), lib))
     print("%9d  total" % total)
+    print()
+    print("== Biggest parts of the top 25 (input sections) ==")
+    for lib, n in per_lib.most_common(25):
+        print("%s  (%s)" % (lib, where[lib][-110:]))
+        for sec, b in parts[lib].most_common(8):
+            print("   %8d  %s" % (b, sec[:110]))
     print()
 else:
     print("(no linker map)\n")
