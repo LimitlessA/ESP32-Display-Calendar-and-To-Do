@@ -22,7 +22,7 @@ ICONS="0xF015,0xF133,0xF14A,0xF1DE,0xF1EB,0xF00D,0xF00C,0xF0F3,0xF053,0xF054,0xF
 # Fonts up to 20 px stay uncompressed: they draw most of the text and must be
 # fast. The big ones (headings, clocks, timers) are compressed, which saves
 # ~60 KB of flash; LVGL unpacks a glyph as it draws it (LV_USE_FONT_COMPRESSED).
-# 18 and 20 px are only drawn at the Large and Extra large text sizes, so they
+# 10, 18 and 20 px are only drawn at the XXS, L and XL text sizes, so they
 # are compressed too: uncompressed they would not fit in the update slot.
 gen() {  # name size weight [icons] [big]
   local extra=() pack=(--no-compress --no-prefilter)
@@ -34,6 +34,7 @@ gen() {  # name size weight [icons] [big]
     "${extra[@]}" -o "src/fonts/$1.c"
 }
 
+gen font_10 10 500 icons big
 gen font_12 12 500 icons
 gen font_14 14 500 icons
 gen font_14b 14 700 icons

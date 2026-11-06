@@ -11,12 +11,14 @@ const char *const kTomorrow = "Tomorrow";
 const char *const kAllDay = "All day";
 
 // Font for each role (columns: F_12 F_14 F_14B F_16 F_16S F_20B F_26B F_34B) at
-// each text size. 12 px is the floor: S makes body text smaller, XS headings too;
+// each text size. S makes body text smaller, XS headings too, XXS body text
+// smaller still (10 px, added for it; bold and headings stay as at XS);
 // L grows body text by about 2 px, XL by about 4 px; their headings stay, since
 // they are big already.
 // F_20B and smaller carry the icons, so they never map to 26 or 34 px, which have none.
-// (Only 18 and 20 px were added for this; the rest reuse the Normal fonts.)
+// (Only 10, 18 and 20 px were added for this; the rest reuse the Normal fonts.)
 static const lv_font_t *const kFontTable[kTextSizes][kFontRoles] = {
+    {&font_10, &font_10, &font_14b, &font_12, &font_14b, &font_16s, &font_20b, &font_26b},  // XXS
     {&font_12, &font_12, &font_14b, &font_14, &font_14b, &font_16s, &font_20b, &font_26b},  // XS
     {&font_12, &font_12, &font_14b, &font_14, &font_16s, &font_20b, &font_26b, &font_34b},  // S
     {&font_12, &font_14, &font_14b, &font_16, &font_16s, &font_20b, &font_26b, &font_34b},  // Normal

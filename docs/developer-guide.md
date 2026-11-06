@@ -188,14 +188,14 @@ feature: add the setting, add a row, and add the screens.
 
 ### Text size
 
-`Settings::textSize` (0 XS, 1 S, 2 Normal, 3 L, 4 XL) is chosen on the Text size
+`Settings::textSize` (0 XXS, 1 XS, 2 S, 3 Normal, 4 L, 5 XL; saved as "textSize2") is chosen on the Text size
 tab of the Theme picker (a slider with a live preview, `font_at()`). Screens never name a font file: they use the roles `F_12` ... `F_34B`
 from `ui_internal.h` (named after their size at Normal), and `kFontTable` in
 `ui_common.cpp` maps each role to a font for each size. `buildAll()` calls
 `fonts_select()` and rebuilds every screen, like a theme change.
 
 - `font_72` and `font_150` (the big clocks and timers) are used directly and never
-  change. 18 and 20 px Regular were added only for Large and Extra large, and are
+  change. 10, 18 and 20 px Regular were added only for XXS, L and XL, and are
   compressed to fit the flash.
 - `F_20B` and smaller carry the icons; 26 and 34 px have none, so the table never
   maps an icon role to them.
@@ -203,7 +203,7 @@ from `ui_internal.h` (named after their size at Normal), and `kFontTable` in
   `one_line()` keeps a label on one line ending in "...", `font_upto()` caps one
   label, and `FontCap cap(kTextLarge);` caps a whole screen (Settings, the Features grid and
   its options window cap at Large, since they must fit one screen).
-- Check new screens at every size: `SIM_TEXT_SIZE=4 .sim/sim out/` renders them all
+- Check new screens at every size: `SIM_TEXT_SIZE=5 .sim/sim out/` renders them all
   at Extra large after `sim/build.sh` has built the simulator.
 
 ## The code convention

@@ -120,7 +120,7 @@ String toJson(const Settings &s, bool backup = false) {
   doc["use24h"] = s.use24h;
   doc["syncMinutes"] = s.refreshMinutes;
   doc["theme"] = s.theme;
-  doc["textSize"] = s.textSize;
+  doc["textSize2"] = s.textSize;
   doc["updateUrl"] = s.updateUrl;
   doc["timezone"] = s.timezone;
   doc["autoUpdate"] = s.autoUpdate;
@@ -204,7 +204,9 @@ bool fromJson(const String &json, Settings &s) {
   // the old 5-minute default; dropping it moves those displays to the new one.
   s.refreshMinutes = max<uint8_t>(1, doc["syncMinutes"] | d.refreshMinutes);
   s.theme = doc["theme"] | d.theme;
-  s.textSize = min<uint8_t>(4, doc["textSize"] | d.textSize);
+  // "textSize2" replaces "textSize" (0-4), which had no XXS; the old key is
+  // read one step up so a chosen size stays the same.
+  s.textSize = min<uint8_t>(5, doc["textSize2"] | ((uint8_t)(doc["textSize"] | (int)d.textSize - 1) + 1));
   s.updateUrl = doc["updateUrl"] | d.updateUrl;
   s.timezone = doc["timezone"] | d.timezone;
   s.autoUpdate = doc["autoUpdate"] | d.autoUpdate;
