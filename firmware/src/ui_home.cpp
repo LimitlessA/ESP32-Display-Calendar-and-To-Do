@@ -52,8 +52,8 @@ lv_obj_t *column(lv_obj_t *body, const char *title, lv_obj_t **count) {
   lv_obj_set_style_bg_opa(left, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(left, 1);  // keeps the title on the left when there is no button
   set_flex(left, LV_FLEX_FLOW_ROW, 8);
-  mk_label(left, &font_14b, t.text, title);
-  if (count) *count = mk_label(left, &font_14, t.muted, "");
+  mk_label(left, F_14B, t.text, title);
+  if (count) *count = mk_label(left, F_14, t.muted, "");
   return col;
 }
 
@@ -92,7 +92,7 @@ void complete_with_undo(lv_obj_t *box, const Task &task) {
   lv_obj_set_style_bg_color(box, c(t.good), 0);
   lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(box, c(t.good), 0);
-  lv_obj_t *mark = mk_label(box, &font_14, t.dark ? t.bg : 0xFFFFFF, ICON_CHECK);
+  lv_obj_t *mark = mk_label(box, F_14, t.dark ? t.bg : 0xFFFFFF, ICON_CHECK);
   lv_obj_center(mark);
   lv_timer_t *timer = lv_timer_create([](lv_timer_t *tm) {
     Task *task = static_cast<Task *>(tm->user_data);
@@ -177,8 +177,8 @@ void layoutBody() {
     lv_obj_set_style_pad_hor(add, 10, 0);
     lv_obj_set_ext_click_area(add, 8);
     set_flex(add, LV_FLEX_FLOW_ROW, 6);
-    mk_label(add, &font_12, t.text, ICON_PLUS);
-    mk_label(add, &font_12, t.text, kAddTask);
+    mk_label(add, F_12, t.text, ICON_PLUS);
+    mk_label(add, F_12, t.text, kAddTask);
     on_click(add, [](lv_event_t *) { quick_add_show(); });
   }
   if (datesCol) {
@@ -217,8 +217,8 @@ void home_refresh() {
         lv_obj_set_style_border_width(card, 2, 0);
       }
       set_flex(card, LV_FLEX_FLOW_COLUMN, 3, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-      mk_label(card, &font_20b, live ? t.accent : t.text, ev.allDay ? kAllDay : fmt_time(start).c_str());
-      lv_obj_t *title = mk_label(card, &font_16s, t.text, event_title(ev).c_str());
+      mk_label(card, F_20B, live ? t.accent : t.text, ev.allDay ? kAllDay : fmt_time(start).c_str());
+      lv_obj_t *title = mk_label(card, F_16S, t.text, event_title(ev).c_str());
       lv_obj_set_width(title, colW - 12 - TOUCH - 4);
       lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
       lv_obj_t *meta = mk_box(card, 0, 0);
@@ -226,14 +226,14 @@ void home_refresh() {
       set_flex(meta, LV_FLEX_FLOW_ROW, 6);
       mk_dot(meta, ev.color);
       String m = ev.allDay ? String(kAllDay) : strf(live ? kNowUntil : kUntil, fmt_time(end).c_str());
-      lv_obj_t *ml = mk_label(meta, &font_12, t.muted, (m + " · " + ev.calendar).c_str());
+      lv_obj_t *ml = mk_label(meta, F_12, t.muted, (m + " · " + ev.calendar).c_str());
       lv_label_set_long_mode(ml, LV_LABEL_LONG_DOT);
       lv_obj_set_width(ml, colW - 12 - TOUCH - 4 - 14);
       if (live) mk_meeting_extras(card, ev, colW - 12 - TOUCH - 4);
       Event *copy = attach(card, ev);
       on_click(card, openEvent, copy);
 
-      lv_obj_t *x = mk_icon_button(card, ICON_CLOSE, t.muted, &font_14);
+      lv_obj_t *x = mk_icon_button(card, ICON_CLOSE, t.muted, F_14);
       lv_obj_add_flag(x, LV_OBJ_FLAG_IGNORE_LAYOUT);
       lv_obj_align(x, LV_ALIGN_TOP_RIGHT, TOUCH + 2, -6);
       on_click(x, dismissEvent, copy);
@@ -243,39 +243,41 @@ void home_refresh() {
     const long day = day_number(start);
     if (day != lastDay) {
       lastDay = day;
-      lv_obj_t *h = mk_label(upcomingList, &font_12, t.accent, day_heading(start).c_str());
+      lv_obj_t *h = mk_label(upcomingList, F_12, t.accent, day_heading(start).c_str());
       lv_obj_set_style_text_letter_space(h, 1, 0);
       lv_obj_set_style_pad_top(h, 8, 0);
     }
     lv_obj_t *row = mk_box(upcomingList, 0, 0);
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
-    lv_obj_set_size(row, colW - 14, TOUCH);
+    // "All day" takes two lines; bigger text sizes need a taller row for that.
+    const int rowH = LV_MAX(TOUCH, 2 * lv_font_get_line_height(F_14B) + 6);
+    lv_obj_set_size(row, colW - 14, rowH);
     set_flex(row, LV_FLEX_FLOW_ROW, 0);
     lv_obj_t *open = mk_button(row, t.panel, 8);
-    lv_obj_set_height(open, TOUCH);
+    lv_obj_set_height(open, rowH);
     lv_obj_set_flex_grow(open, 1);
     set_flex(open, LV_FLEX_FLOW_ROW, 8);
     mk_dot(open, ev.color);
     const bool clash = has_conflict(ev, conflicts);
-    lv_obj_t *tl = mk_label(open, &font_14b, clash ? t.badFg : t.muted, ev.allDay ? kAllDay : fmt_time(start).c_str());
-    lv_obj_set_width(tl, g_settings.use24h ? 44 : 64);
-    if (clash) mk_label(open, &font_12, t.badFg, ICON_WARNING);
-    lv_obj_t *title = mk_label(open, &font_14, t.text, event_title(ev).c_str());
+    lv_obj_t *tl = mk_label(open, F_14B, clash ? t.badFg : t.muted, ev.allDay ? kAllDay : fmt_time(start).c_str());
+    lv_obj_set_width(tl, LV_MAX(g_settings.use24h ? 44 : 64, text_w(F_14B, g_settings.use24h ? "00:00" : "00:00 PM") + 2));
+    if (clash) mk_label(open, F_12, t.badFg, ICON_WARNING);
+    lv_obj_t *title = mk_label(open, F_14, t.text, event_title(ev).c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(title, 1);
     Event *copy = attach(row, ev);
     on_click(open, openEvent, copy);
-    lv_obj_t *x = mk_icon_button(row, ICON_CLOSE, t.muted, &font_14);
+    lv_obj_t *x = mk_icon_button(row, ICON_CLOSE, t.muted, F_14);
     on_click(x, dismissEvent, copy);
   }
   if (!todayN) {
     lv_obj_t *empty = mk_box(todayList, t.card, 12);
     lv_obj_set_width(empty, colW);
     lv_obj_set_style_pad_all(empty, 14, 0);
-    mk_label(empty, &font_14, t.muted, clock_valid() ? kNoMoreToday : kWaitingClock);
+    mk_label(empty, F_14, t.muted, clock_valid() ? kNoMoreToday : kWaitingClock);
   }
   if (lastDay < 0) {
-    lv_obj_t *l = mk_label(upcomingList, &font_14, t.muted, kNothingUpcoming);
+    lv_obj_t *l = mk_label(upcomingList, F_14, t.muted, kNothingUpcoming);
     lv_obj_set_style_pad_ver(l, 8, 0);
   }
   lv_label_set_text_fmt(todayCount, "%d", todayN);
@@ -294,13 +296,13 @@ void home_refresh() {
     lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0);
     lv_obj_set_flex_grow(text, 1);
     set_flex(text, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_t *title = mk_label(text, &font_14b, t.text, task.title.c_str());
+    lv_obj_t *title = mk_label(text, F_14B, t.text, task.title.c_str());
     lv_obj_set_width(title, colW - 48 - 14);
     lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
     const String moved = radar_mark(card, task);
     if (moved.length()) lv_obj_set_width(title, colW - 48 - 14 - 40);  // room for the badge
     if (moved.length()) {
-      lv_obj_t *l = mk_label(text, &font_12, t.accent, moved.c_str());
+      lv_obj_t *l = mk_label(text, F_12, t.accent, moved.c_str());
       lv_obj_set_width(l, colW - 48 - 14 - 40);
       lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     } else {
@@ -313,7 +315,7 @@ void home_refresh() {
     lv_obj_t *empty = mk_box(taskList, t.card, 12);
     lv_obj_set_width(empty, colW);
     lv_obj_set_style_pad_all(empty, 14, 0);
-    mk_label(empty, &font_14, t.muted, g_snap.accounts.empty() ? kNoAccounts : kAllDone);
+    mk_label(empty, F_14, t.muted, g_snap.accounts.empty() ? kNoAccounts : kAllDone);
   }
   lv_label_set_text_fmt(taskCount, "%d", open);
 }

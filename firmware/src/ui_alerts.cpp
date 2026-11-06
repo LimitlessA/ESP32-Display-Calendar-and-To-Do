@@ -77,11 +77,11 @@ void eventColumn(lv_obj_t *parent, const Event &ev, int w) {
   lv_obj_set_style_border_width(col, 4, 0);
   lv_obj_set_style_border_color(col, c(ev.color), 0);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  mk_label(col, &font_20b, t.text, (fmt_time(ev.start / 1000) + " - " + fmt_time(ev.end / 1000)).c_str());
-  lv_obj_t *title = mk_label(col, &font_16s, t.text, event_title(ev).c_str());
+  mk_label(col, F_20B, t.text, (fmt_time(ev.start / 1000) + " - " + fmt_time(ev.end / 1000)).c_str());
+  lv_obj_t *title = mk_label(col, F_16S, t.text, event_title(ev).c_str());
   lv_obj_set_width(title, w - 32);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
-  lv_obj_t *cal = mk_label(col, &font_12, t.muted, ev.calendar.c_str());
+  lv_obj_t *cal = mk_label(col, F_12, t.muted, ev.calendar.c_str());
   lv_obj_set_width(cal, w - 32);
   lv_label_set_long_mode(cal, LV_LABEL_LONG_DOT);
   lv_obj_t *hide = mk_text_button(col, kHideOne, false, w - 32);
@@ -109,23 +109,23 @@ void leaveAlertShow(const Event &ev, time_t leaveAt) {
   lv_obj_t *icon = mk_box(leaveLayer, t.warnBg, 40);
   lv_obj_set_size(icon, 80, 80);
   lv_obj_align(icon, LV_ALIGN_TOP_MID, 0, 40);
-  lv_obj_center(mk_label(icon, &font_20b, t.accent, ICON_WALK));
+  lv_obj_center(mk_label(icon, F_20B, t.accent, ICON_WALK));
   const long mins = (long)((leaveAt - ui_now() + 59) / 60);
-  lv_obj_t *head = mk_label(leaveLayer, &font_34b, t.accent, mins > 0 ? strf(kLeaveIn, mins).c_str() : kLeaveNow);
+  lv_obj_t *head = mk_label(leaveLayer, F_34B, t.accent, mins > 0 ? strf(kLeaveIn, mins).c_str() : kLeaveNow);
   lv_obj_set_style_text_letter_space(head, 1, 0);
   lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 140);
-  lv_obj_t *title = mk_label(leaveLayer, &font_26b, t.text, event_title(ev).c_str());
+  lv_obj_t *title = mk_label(leaveLayer, F_26B, t.text, event_title(ev).c_str());
   lv_obj_set_width(title, SCREEN_W - 120);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 196);
   String info = strf(kStartsAt, fmt_time(ev.start / 1000).c_str()) + "    " + ev.location;
-  lv_obj_t *where = mk_label(leaveLayer, &font_16, t.muted, info.c_str());
+  lv_obj_t *where = mk_label(leaveLayer, F_16, t.muted, info.c_str());
   lv_obj_set_width(where, SCREEN_W - 120);
   lv_obj_set_style_text_align(where, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(where, LV_LABEL_LONG_DOT);
   lv_obj_align(where, LV_ALIGN_TOP_MID, 0, 240);
-  lv_obj_t *travel = mk_label(leaveLayer, &font_16s, t.text, travel_text(ev).c_str());
+  lv_obj_t *travel = mk_label(leaveLayer, F_16S, t.text, travel_text(ev).c_str());
   lv_obj_align(travel, LV_ALIGN_TOP_MID, 0, 272);
 
   lv_obj_t *row = transparent(leaveLayer);
@@ -191,11 +191,11 @@ void conflict_popup_show(const Conflict &cf) {
 
   lv_obj_t *head = transparent(card);
   set_flex(head, LV_FLEX_FLOW_ROW, 10);
-  mk_label(head, &font_16, t.badFg, ICON_WARNING);
-  lv_obj_t *h = mk_label(head, &font_14b, t.badFg, kConflict);
+  mk_label(head, F_16, t.badFg, ICON_WARNING);
+  lv_obj_t *h = mk_label(head, F_14B, t.badFg, kConflict);
   lv_obj_set_style_text_letter_space(h, 1, 0);
   const int mins = (int)((cf.to - cf.from) / 60);
-  mk_label(card, &font_16, t.muted, strf(kOverlapFor, fmt_time(cf.from).c_str(), fmt_time(cf.to).c_str(), mins).c_str());
+  mk_label(card, F_16, t.muted, strf(kOverlapFor, fmt_time(cf.from).c_str(), fmt_time(cf.to).c_str(), mins).c_str());
 
   lv_obj_t *cols = transparent(card);
   lv_obj_set_width(cols, 652);
@@ -218,16 +218,16 @@ lv_obj_t *mk_conflict_banner(lv_obj_t *parent, int w) {
   lv_obj_set_size(b, w, 44);
   lv_obj_set_style_pad_hor(b, 14, 0);
   set_flex(b, LV_FLEX_FLOW_ROW, 10);
-  mk_label(b, &font_16, t.badFg, ICON_WARNING);
+  mk_label(b, F_16, t.badFg, ICON_WARNING);
   String text = all.size() == 1
                     ? strf(kOverlapOne, cf.a.title.c_str(), cf.b.title.c_str(), fmt_time(cf.from).c_str(),
                            fmt_time(cf.to).c_str())
                     : strf(kOverlapMore, cf.a.title.c_str(), cf.b.title.c_str(), (int)all.size() - 1);
   if (day_number(cf.from) != day_number(ui_now())) text = fmt_date_short(cf.from) + ": " + text;
-  lv_obj_t *l = mk_label(b, &font_14b, t.badFg, text.c_str());
+  lv_obj_t *l = mk_label(b, F_14B, t.badFg, text.c_str());
   lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
   lv_obj_set_flex_grow(l, 1);
-  lv_obj_t *cmp = mk_label(b, &font_14b, t.text, kCompare);
+  lv_obj_t *cmp = mk_label(b, F_14B, t.text, kCompare);
   lv_obj_set_style_pad_left(cmp, 6, 0);
   Conflict *copy = attach(b, cf);
   on_click(b, [](lv_event_t *e) { conflict_popup_show(*static_cast<Conflict *>(lv_event_get_user_data(e))); }, copy);
@@ -269,17 +269,16 @@ lv_obj_t *mk_leave_card(lv_obj_t *parent, int w) {
   lv_obj_set_style_border_color(card, c(t.accent), 0);
   lv_obj_set_style_border_width(card, 2, 0);
   set_flex(card, LV_FLEX_FLOW_ROW, 12);
-  lv_obj_t *icon = mk_label(card, &font_20b, t.accent, ICON_WALK);
+  lv_obj_t *icon = mk_label(card, F_20B, t.accent, ICON_WALK);
   lv_obj_set_width(icon, 30);
   lv_obj_t *col = transparent(card);
   lv_obj_set_flex_grow(col, 1);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  leaveCardLabel = mk_label(col, w < 240 ? &font_16s : &font_20b, t.accent, leaveCardText(leaveAt).c_str());
+  leaveCardLabel = mk_label(col, w < 240 ? F_16S : F_20B, t.accent, leaveCardText(leaveAt).c_str());
   lv_obj_add_event_cb(card, [](lv_event_t *) { leaveCardLabel = nullptr; }, LV_EVENT_DELETE, nullptr);
-  lv_obj_t *title = mk_label(col, &font_14b, t.text, (event_title(*ev) + " \xC2\xB7 " + fmt_time(ev->start / 1000)).c_str());
-  lv_obj_set_width(title, w - 24 - 42);
-  lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
-  mk_label(col, &font_12, t.muted, strf(kTravel, (int)ev->travelMin).c_str());
+  lv_obj_t *title = mk_label(col, F_14B, t.text, (event_title(*ev) + " \xC2\xB7 " + fmt_time(ev->start / 1000)).c_str());
+  one_line(title, w - 24 - 42);
+  one_line(mk_label(col, F_12, t.muted, strf(kTravel, (int)ev->travelMin).c_str()), w - 24 - 42);
   Event *copy = attach(card, *ev);
   on_click(card, [](lv_event_t *e) { ui_open_event(*static_cast<Event *>(lv_event_get_user_data(e))); }, copy);
   return card;

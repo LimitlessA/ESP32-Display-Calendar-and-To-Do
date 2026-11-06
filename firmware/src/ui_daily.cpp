@@ -101,9 +101,9 @@ const Event *firstTimed(const Day &d) {
 // Greeting and date at the top left, close button at the bottom.
 void frame(const char *title, const String &sub) {
   const Theme &t = theme();
-  lv_obj_t *h = mk_label(layer, &font_34b, t.text, title);
+  lv_obj_t *h = mk_label(layer, F_34B, t.text, title);
   lv_obj_set_pos(h, 40, 28);
-  lv_obj_t *s = mk_label(layer, &font_16, t.muted, sub.c_str());
+  lv_obj_t *s = mk_label(layer, F_16, t.muted, sub.c_str());
   lv_obj_set_pos(s, 42, 74);
   lv_obj_set_width(s, SCREEN_W - 84);
   lv_label_set_long_mode(s, LV_LABEL_LONG_WRAP);
@@ -125,8 +125,8 @@ void tile(lv_obj_t *parent, const char *label, const String &value, uint32_t col
   lv_obj_set_size(b, w, 130);
   lv_obj_set_style_pad_all(b, 18, 0);
   set_flex(b, LV_FLEX_FLOW_COLUMN, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  mk_label(b, &font_14, t.muted, label);
-  mk_label(b, &font_34b, color, value.c_str());
+  mk_label(b, F_14, t.muted, label);
+  mk_label(b, F_34B, color, value.c_str());
 }
 
 // A: four numbers and a line for what else is today.
@@ -154,16 +154,16 @@ void summaryTiles(const Day &d) {
     lv_obj_t *r = transparent(list);
     set_flex(r, LV_FLEX_FLOW_ROW, 10);
     mk_dot(r, e.color);
-    lv_obj_t *tl = mk_label(r, &font_14b, t.muted, e.allDay ? kAllDay : fmt_time(e.start / 1000).c_str());
+    lv_obj_t *tl = mk_label(r, F_14B, t.muted, e.allDay ? kAllDay : fmt_time(e.start / 1000).c_str());
     lv_obj_set_width(tl, 64);
-    lv_obj_t *ti = mk_label(r, &font_16, t.text, e.title.c_str());
+    lv_obj_t *ti = mk_label(r, F_16, t.text, e.title.c_str());
     lv_label_set_long_mode(ti, LV_LABEL_LONG_DOT);
     lv_obj_set_width(ti, SCREEN_W - 80 - 240 - 100);
   }
   for (const DateItem &di : d.dates) {
-    mk_label(list, &font_14b, t.accent, (String(ICON_STAR) + "  " + di.title).c_str());
+    mk_label(list, F_14B, t.accent, (String(ICON_STAR) + "  " + di.title).c_str());
   }
-  if (d.events.empty()) mk_label(list, &font_16, t.muted, kFreeDay);
+  if (d.events.empty()) mk_label(list, F_16, t.muted, kFreeDay);
   footerButton(kStartDay, true, startDay);
 }
 
@@ -178,7 +178,7 @@ void summaryTimeline(const Day &d) {
   lv_obj_set_size(strip, w, h);
   const float perHour = (float)w / (kTimelineTo - kTimelineFrom);
   for (int hr = kTimelineFrom; hr <= kTimelineTo; hr += 2) {
-    lv_obj_t *l = mk_label(layer, &font_12, t.muted, fmt_time(base + hr * 3600).c_str());
+    lv_obj_t *l = mk_label(layer, F_12, t.muted, fmt_time(base + hr * 3600).c_str());
     lv_obj_set_pos(l, x0 + (int)((hr - kTimelineFrom) * perHour) - (hr == kTimelineTo ? 40 : hr == kTimelineFrom ? 0 : 18),
                    y + h + 6);
   }
@@ -194,7 +194,7 @@ void summaryTimeline(const Day &d) {
     lv_obj_set_size(b, bw > 6 ? bw - 4 : 4, h - 16);
     lv_obj_set_style_pad_all(b, 6, 0);
     if (bw > 70) {
-      lv_obj_t *l = mk_label(b, &font_12, 0x111111, e.title.c_str());
+      lv_obj_t *l = mk_label(b, F_12, 0x111111, e.title.c_str());
       lv_obj_set_width(l, bw - 16);
       lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     }
@@ -207,7 +207,7 @@ void summaryTimeline(const Day &d) {
     lv_obj_set_size(m, 2, h);
   }
 
-  lv_obj_t *head = mk_label(layer, &font_12, t.muted, kTasksToday);
+  lv_obj_t *head = mk_label(layer, F_12, t.muted, kTasksToday);
   lv_obj_set_style_text_letter_space(head, 1, 0);
   lv_obj_set_pos(head, 40, 262);
   lv_obj_t *list = transparent(layer);
@@ -221,13 +221,13 @@ void summaryTimeline(const Day &d) {
       lv_obj_t *r = transparent(list);
       set_flex(r, LV_FLEX_FLOW_ROW, 10);
       mk_dot(r, v == &d.overdue ? t.badFg : t.warnFg);
-      lv_obj_t *l = mk_label(r, &font_16, t.text, task.title.c_str());
+      lv_obj_t *l = mk_label(r, F_16, t.text, task.title.c_str());
       lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
       lv_obj_set_width(l, SCREEN_W - 80 - 240 - 30 - 200);
       mk_due(r, task.dueKey);
     }
   }
-  if (!n) mk_label(list, &font_16, t.muted, kNoTasks);
+  if (!n) mk_label(list, F_16, t.muted, kNoTasks);
   footerButton(kStartDay, true, startDay);
 }
 
@@ -236,7 +236,7 @@ void summaryBriefing(const Day &d) {
   const Theme &t = theme();
   lv_obj_t *clock = mk_label(layer, &font_72, t.text, fmt_clock().c_str());
   lv_obj_set_pos(clock, 40, 30);
-  lv_obj_t *date = mk_label(layer, &font_20b, t.accent, fmt_date_long(ui_now()).c_str());
+  lv_obj_t *date = mk_label(layer, F_20B, t.accent, fmt_date_long(ui_now()).c_str());
   lv_obj_set_pos(date, 44, 120);
 
   std::vector<String> lines;
@@ -274,7 +274,7 @@ void summaryBriefing(const Day &d) {
     set_flex(r, LV_FLEX_FLOW_ROW, 14, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_t *bar = mk_box(r, t.accent, 2);
     lv_obj_set_size(bar, 4, 22);
-    lv_obj_t *text = mk_label(r, &font_20b, t.text, l.c_str());
+    lv_obj_t *text = mk_label(r, F_20B, t.text, l.c_str());
     lv_obj_set_width(text, SCREEN_W - 80 - 20);
     lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
   }
@@ -314,7 +314,7 @@ void reviewChecklist() {
     lv_obj_set_style_pad_hor(row, 6, 0);
     set_flex(row, LV_FLEX_FLOW_ROW, 6);
     mk_check(row, task, 48);
-    lv_obj_t *title = mk_label(row, &font_16s, t.text, task.title.c_str());
+    lv_obj_t *title = mk_label(row, F_16S, t.text, task.title.c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(title, 1);
     mk_due(row, task.dueKey);
@@ -351,7 +351,7 @@ void reviewOneByOne() {
     return;
   }
   const Task &task = pending[current];
-  lv_obj_t *step = mk_label(layer, &font_14b, t.accent, strf(kOneOf, (int)current + 1, (int)pending.size()).c_str());
+  lv_obj_t *step = mk_label(layer, F_14B, t.accent, strf(kOneOf, (int)current + 1, (int)pending.size()).c_str());
   lv_obj_set_style_text_letter_space(step, 1, 0);
   lv_obj_align(step, LV_ALIGN_TOP_MID, 0, 36);
   lv_obj_t *card = mk_box(layer, t.card, 24);
@@ -359,12 +359,12 @@ void reviewOneByOne() {
   lv_obj_align(card, LV_ALIGN_TOP_MID, 0, 72);
   lv_obj_set_style_pad_all(card, 28, 0);
   set_flex(card, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_t *title = mk_label(card, &font_26b, t.text, task.title.c_str());
+  lv_obj_t *title = mk_label(card, F_26B, t.text, task.title.c_str());
   lv_obj_set_width(title, 560);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
   mk_due(card, task.dueKey);
-  mk_label(card, &font_14, t.muted, task.list.c_str());
+  mk_label(card, F_14, t.muted, task.list.c_str());
 
   lv_obj_t *row = transparent(layer);
   lv_obj_set_size(row, 620, 64);
@@ -407,7 +407,7 @@ void reviewPlan() {
     lv_obj_set_size(row, SCREEN_W - 80, 60);
     lv_obj_set_style_pad_hor(row, 14, 0);
     set_flex(row, LV_FLEX_FLOW_ROW, 6);
-    lv_obj_t *title = mk_label(row, &font_16s, t.text, task.title.c_str());
+    lv_obj_t *title = mk_label(row, F_16S, t.text, task.title.c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(title, 1);
     for (int i = 1; i <= kPlanDays + 1; i++) {

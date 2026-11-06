@@ -30,6 +30,22 @@ constexpr const char *kClose = "Close";
 constexpr const char *kInstall = "Install";
 
 constexpr const char *kThemeTitle = "Theme";
+// Tabs: the colors and the text size.
+constexpr const char *kTabColors = "Colors";
+constexpr const char *kTabTextSize = "Text size";
+constexpr const char *kTextSizeHint = "Drag to change the size of all text";
+constexpr const char *kTextSizeTicks[kTextSizes] = {"XS", "S", "Normal", "L", "XL"};
+constexpr const char *kSmallA = "A";
+constexpr const char *kPreviewCaption = "PREVIEW";
+// The preview: a meeting and two tasks, drawn with the fonts Home uses for them.
+constexpr const char *kPreviewTime = "10:30 - 11:15";
+constexpr const char *kPreviewMeeting = "Team stand-up";
+constexpr const char *kPreviewMeta = "Meet \xC2\xB7 Work calendar";
+constexpr const char *kPreviewTask1 = "Order desk cable tray";
+constexpr const char *kPreviewTask1Due = "Due today";
+constexpr const char *kPreviewTask2 = "Call the bank";
+constexpr int kSliderW = 240;
+constexpr int kPreviewW = 330;
 constexpr const char *kDone = "Done";
 constexpr const char *kCalendarsTitle = "Calendars: %s";  // account name
 constexpr const char *kSyncFirst = "Sync this account first.";
@@ -45,6 +61,15 @@ OtaState otaShownState = OtaState::Idle;
 int otaShownProgress = -1;
 
 lv_obj_t *themeLayer = nullptr;
+uint8_t themeTab = 0;  // 0 Colors, 1 Text size
+// Preview labels and the font role each one uses, refreshed while the slider moves.
+struct PreviewLabel {
+  lv_obj_t *label;
+  FontRole role;
+};
+PreviewLabel previewLabels[6];
+uint8_t previewCount = 0;
+lv_obj_t *tickLabels[kTextSizes];
 lv_obj_t *calLayer = nullptr;
 uint8_t calAccount;  // account whose calendars are being chosen
 
@@ -90,22 +115,22 @@ void reminder_show(const Event &ev) {
   set_flex(top, LV_FLEX_FLOW_ROW, 14);
   lv_obj_t *bell = mk_box(top, t.warnBg, 26);
   lv_obj_set_size(bell, 52, 52);
-  lv_obj_center(mk_label(bell, &font_20b, t.accent, ICON_BELL));
+  lv_obj_center(mk_label(bell, F_20B, t.accent, ICON_BELL));
   lv_obj_t *col = mk_box(top, 0, 0);
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   const long mins = (long)((ev.start / 1000 - ui_now() + 30) / 60);
   String when = mins <= 0 ? String(kStartingNow) : strf(mins == 1 ? kStartsInMinute : kStartsInMinutes, (int)mins);
-  lv_obj_t *w = mk_label(col, &font_14b, t.accent, when.c_str());
+  lv_obj_t *w = mk_label(col, F_14B, t.accent, when.c_str());
   lv_obj_set_style_text_letter_space(w, 1, 0);
-  mk_label(col, &font_14, t.muted, ev.calendar.c_str());
+  mk_label(col, F_14, t.muted, ev.calendar.c_str());
 
-  lv_obj_t *title = mk_label(card, &font_34b, t.text, ev.title.c_str());
+  lv_obj_t *title = mk_label(card, F_34B, t.text, ev.title.c_str());
   lv_obj_set_width(title, 500);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
   String meta = fmt_time(ev.start / 1000) + " - " + fmt_time(ev.end / 1000);
   if (ev.location.length()) meta += "    " + ev.location;
-  lv_obj_t *m = mk_label(card, &font_16, t.muted, meta.c_str());
+  lv_obj_t *m = mk_label(card, F_16, t.muted, meta.c_str());
   lv_label_set_long_mode(m, LV_LABEL_LONG_DOT);
   lv_obj_set_width(m, 500);
 
@@ -146,8 +171,8 @@ void ota_dialog_show() {
   const Theme &t = theme();
   otaLayer = mk_layer();
   lv_obj_t *card = mk_dialog(otaLayer, 520);
-  otaTitle = mk_label(card, &font_20b, t.text, kOtaTitle);
-  otaText = mk_label(card, &font_16, t.muted, "");
+  otaTitle = mk_label(card, F_20B, t.text, kOtaTitle);
+  otaText = mk_label(card, F_16, t.muted, "");
   lv_obj_set_width(otaText, 464);
   lv_label_set_long_mode(otaText, LV_LABEL_LONG_WRAP);
   otaBar = lv_bar_create(card);
@@ -211,19 +236,46 @@ void ota_dialog_tick() {
 
 // ---- Theme picker ----------------------------------------------------------------
 
-void theme_picker_show() {
-  const Theme &t = theme();
-  themeLayer = mk_layer();
-  lv_obj_t *card = mk_dialog(themeLayer, 720);
-  lv_obj_t *head = mk_box(card, 0, 0);
-  lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
-  lv_obj_set_width(head, 664);
-  set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
-  mk_label(head, &font_20b, t.text, kThemeTitle);
-  on_click(mk_text_button(head, kDone, false, 100), [](lv_event_t *) { closeLayer(&themeLayer); });
+namespace {
 
-  lv_obj_t *grid = mk_box(card, 0, 0);
-  lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
+// Saves a new theme or text size; every screen is rebuilt, then the picker reopens.
+void applyLook(int theme, int textSize) {
+  closeLayer(&themeLayer);
+  Settings s = g_settings;
+  if (theme >= 0) s.theme = (uint8_t)theme;
+  if (textSize >= 0) s.textSize = (uint8_t)textSize;
+  ui_save_settings(s);  // rebuilds every screen in the new colors and fonts
+  theme_picker_show();
+}
+
+lv_obj_t *clearBox(lv_obj_t *parent) {
+  lv_obj_t *o = mk_box(parent, 0, 0);
+  lv_obj_set_style_bg_opa(o, LV_OPA_TRANSP, 0);
+  return o;
+}
+
+lv_obj_t *previewLabel(lv_obj_t *parent, FontRole role, uint32_t color, const char *text) {
+  lv_obj_t *l = mk_label(parent, font_at(role, g_settings.textSize), color, text);
+  if (previewCount < sizeof(previewLabels) / sizeof(previewLabels[0])) previewLabels[previewCount++] = {l, role};
+  return l;
+}
+
+// Shows a text size in the preview and the tick labels, without saving it.
+void showTextSize(uint8_t size) {
+  const Theme &t = theme();
+  for (uint8_t i = 0; i < previewCount; i++) {
+    lv_obj_set_style_text_font(previewLabels[i].label, font_at(previewLabels[i].role, size), 0);
+  }
+  for (uint8_t i = 0; i < kTextSizes; i++) {
+    lv_obj_set_style_text_color(tickLabels[i], c(i == size ? t.accent : t.muted), 0);
+    lv_obj_set_style_text_font(tickLabels[i], i == size ? &font_14b : &font_12, 0);
+    lv_obj_align(tickLabels[i], LV_ALIGN_TOP_MID, (int)i * kSliderW / (kTextSizes - 1) - kSliderW / 2, 0);
+  }
+}
+
+void colorsTab(lv_obj_t *card) {
+  const Theme &t = theme();
+  lv_obj_t *grid = clearBox(card);
   lv_obj_set_width(grid, 664);
   lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_style_pad_row(grid, 12, 0);
@@ -251,6 +303,7 @@ void theme_picker_show() {
       lv_obj_set_pos(line2, 6, 20);
       lv_obj_set_size(line2, 44, 5);
     }
+    // Fixed fonts: the picker must stay usable at every text size.
     lv_obj_t *name = mk_label(tile, &font_14b, th.text, th.name);
     lv_obj_align(name, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     if (on) {
@@ -258,16 +311,109 @@ void theme_picker_show() {
       lv_obj_align(check, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     }
     on_click(tile, [](lv_event_t *e) {
-      const uint8_t idx = (uint8_t)(intptr_t)lv_event_get_user_data(e);
-      lv_async_call([](void *p) {
-        closeLayer(&themeLayer);
-        Settings s = g_settings;
-        s.theme = (uint8_t)(intptr_t)p;
-        ui_save_settings(s);  // rebuilds every screen in the new colors
-        theme_picker_show();
-      }, (void *)(intptr_t)idx);
+      lv_async_call([](void *p) { applyLook((int)(intptr_t)p, -1); }, lv_event_get_user_data(e));
     }, (void *)(intptr_t)i);
   }
+}
+
+void textSizeTab(lv_obj_t *card) {
+  const Theme &t = theme();
+  lv_obj_t *body = clearBox(card);
+  lv_obj_set_width(body, 664);
+  set_flex(body, LV_FLEX_FLOW_ROW, 22, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+
+  // Left: the slider, with a small and a big "A" at its ends and the size names under it.
+  lv_obj_t *left = clearBox(body);
+  lv_obj_set_flex_grow(left, 1);
+  set_flex(left, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_t *hint = mk_label(left, &font_14, t.muted, kTextSizeHint);
+  lv_obj_set_width(hint, 664 - kPreviewW - 22);
+  lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
+  lv_obj_t *row = clearBox(left);
+  set_flex(row, LV_FLEX_FLOW_ROW, 16, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  mk_label(row, &font_14b, t.text, kSmallA);
+  lv_obj_t *s = lv_slider_create(row);
+  lv_obj_set_size(s, kSliderW, 8);
+  lv_slider_set_range(s, 0, kTextSizes - 1);
+  lv_slider_set_value(s, g_settings.textSize, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(s, c(t.muted), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(s, LV_OPA_40, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(s, c(t.accent), LV_PART_KNOB);
+  lv_obj_set_style_pad_all(s, 8, LV_PART_KNOB);
+  lv_obj_set_ext_click_area(s, 20);
+  mk_label(row, &font_26b, t.text, kSmallA);
+  lv_obj_t *ticks = clearBox(left);
+  lv_obj_set_size(ticks, kSliderW + 60, 20);
+  for (uint8_t i = 0; i < kTextSizes; i++) tickLabels[i] = mk_label(ticks, &font_12, t.muted, kTextSizeTicks[i]);
+  // Moving shows the size in the preview; letting go saves it and rebuilds the screens.
+  lv_obj_add_event_cb(s, [](lv_event_t *e) {
+    showTextSize((uint8_t)lv_slider_get_value(lv_event_get_target(e)));
+  }, LV_EVENT_VALUE_CHANGED, nullptr);
+  lv_obj_add_event_cb(s, [](lv_event_t *e) {
+    const int v = lv_slider_get_value(lv_event_get_target(e));
+    if (v != g_settings.textSize) lv_async_call([](void *p) { applyLook(-1, (int)(intptr_t)p); }, (void *)(intptr_t)v);
+  }, LV_EVENT_RELEASED, nullptr);
+
+  // Right: a meeting and two tasks in the chosen size.
+  previewCount = 0;
+  lv_obj_t *prev = mk_box(body, t.bg, 16);
+  lv_obj_set_size(prev, kPreviewW, LV_SIZE_CONTENT);  // taller at the bigger sizes
+  lv_obj_set_style_pad_all(prev, 12, 0);
+  lv_obj_clear_flag(prev, LV_OBJ_FLAG_SCROLLABLE);
+  set_flex(prev, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  lv_obj_t *cap = mk_label(prev, &font_12, t.muted, kPreviewCaption);
+  lv_obj_set_style_text_letter_space(cap, 1, 0);
+  lv_obj_t *ev = mk_box(prev, t.card, 12);
+  lv_obj_set_size(ev, kPreviewW - 24, LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_all(ev, 10, 0);
+  set_flex(ev, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  previewLabel(ev, kF20b, t.accent, kPreviewTime);
+  previewLabel(ev, kF16s, t.text, kPreviewMeeting);
+  previewLabel(ev, kF12, t.muted, kPreviewMeta);
+  const char *const tasks[2][2] = {{kPreviewTask1, kPreviewTask1Due}, {kPreviewTask2, nullptr}};
+  for (const auto &task : tasks) {
+    lv_obj_t *tk = mk_box(prev, t.card, 12);
+    lv_obj_set_size(tk, kPreviewW - 24, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(tk, 10, 0);
+    set_flex(tk, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    lv_obj_t *box = mk_box(tk, t.card, 11);
+    lv_obj_set_size(box, 22, 22);
+    lv_obj_set_style_border_color(box, c(t.muted), 0);
+    lv_obj_set_style_border_width(box, 2, 0);
+    lv_obj_t *col = clearBox(tk);
+    set_flex(col, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    previewLabel(col, kF14b, t.text, task[0]);
+    if (task[1]) previewLabel(col, kF12, t.warnFg, task[1]);
+  }
+  showTextSize(g_settings.textSize);
+}
+
+}  // namespace
+
+void theme_picker_show() {
+  const Theme &t = theme();
+  themeLayer = mk_layer();
+  lv_obj_t *card = mk_dialog(themeLayer, 720);
+  lv_obj_t *head = clearBox(card);
+  lv_obj_set_width(head, 664);
+  set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
+  mk_label(head, &font_20b, t.text, kThemeTitle);
+  static const char *const kTabs[] = {kTabColors, kTabTextSize};
+  mk_segmented(head, kTabs, 2, themeTab, 120, [](int i, void *) {
+    themeTab = (uint8_t)i;
+    lv_async_call([](void *) {
+      closeLayer(&themeLayer);
+      theme_picker_show();
+    }, nullptr);
+  });
+  on_click(mk_text_button(head, kDone, false, 100), [](lv_event_t *) {
+    themeTab = 0;
+    closeLayer(&themeLayer);
+  });
+  if (themeTab == 0) colorsTab(card);
+  else textSizeTab(card);
+  lv_obj_set_style_min_height(card, 380, 0);  // about the same size on both tabs
 }
 
 // ---- Calendar chooser ---------------------------------------------------------
@@ -283,7 +429,7 @@ void calendars_dialog_show(uint8_t account) {
   lv_obj_set_width(head, 504);
   set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
   const String name = account < g_settings.accounts.size() ? g_settings.accounts[account].label : String("");
-  mk_label(head, &font_20b, t.text, strf(kCalendarsTitle, name.c_str()).c_str());
+  mk_label(head, F_20B, t.text, strf(kCalendarsTitle, name.c_str()).c_str());
   on_click(mk_text_button(head, kDone, true, 100), [](lv_event_t *) {
     closeLayer(&calLayer);
     sync_refresh();
@@ -293,7 +439,7 @@ void calendars_dialog_show(uint8_t account) {
   lv_obj_set_width(list, 504);
   lv_obj_set_flex_grow(list, 1);
   if (account >= g_snap.accounts.size() || g_snap.accounts[account].calendars.empty()) {
-    mk_label(list, &font_16, t.muted, kSyncFirst);
+    mk_label(list, F_16, t.muted, kSyncFirst);
     return;
   }
   for (const CalendarInfo &cal : g_snap.accounts[account].calendars) {
@@ -302,7 +448,7 @@ void calendars_dialog_show(uint8_t account) {
     lv_obj_set_size(row, 496, 52);
     set_flex(row, LV_FLEX_FLOW_ROW, 12);
     mk_dot(row, cal.color, 12);
-    lv_obj_t *l = mk_label(row, &font_16, t.text, cal.name.c_str());
+    lv_obj_t *l = mk_label(row, F_16, t.text, cal.name.c_str());
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(l, 1);
     // The id lives on the row, which outlives its switch.

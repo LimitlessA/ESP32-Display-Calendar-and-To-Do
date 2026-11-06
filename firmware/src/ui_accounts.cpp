@@ -158,7 +158,7 @@ void select(lv_event_t *e) {
 }
 
 void group(const char *text) {
-  lv_obj_t *l = mk_label(list, &font_12, theme().muted, text);
+  lv_obj_t *l = mk_label(list, F_12, theme().muted, text);
   lv_obj_set_style_text_letter_space(l, 1, 0);
   lv_obj_set_style_pad_left(l, 8, 0);
   lv_obj_set_style_pad_top(l, 8, 0);
@@ -177,10 +177,10 @@ void item(Kind kind, uint8_t index, uint32_t color, const String &name, const St
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(col, 1);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-  lv_obj_t *n = mk_label(col, &font_16, t.text, name.c_str());
+  lv_obj_t *n = mk_label(col, F_16, t.text, name.c_str());
   lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
   lv_obj_set_width(n, LIST_W - 70);
-  lv_obj_t *s = mk_label(col, &font_12, bad ? t.badFg : t.muted, sub.c_str());
+  lv_obj_t *s = mk_label(col, F_12, bad ? t.badFg : t.muted, sub.c_str());
   lv_label_set_long_mode(s, LV_LABEL_LONG_DOT);
   lv_obj_set_width(s, LIST_W - 70);
   on_click(b, select, (void *)(((uintptr_t)kind << 8) | index));
@@ -196,8 +196,8 @@ lv_obj_t *kv(const char *key, const String &value, uint32_t color) {
   lv_obj_set_style_border_color(row, c(t.card), 0);
   lv_obj_set_style_border_width(row, 1, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 16, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
-  mk_label(row, &font_16, t.muted, key);
-  lv_obj_t *v = mk_label(row, &font_16, color, value.c_str());
+  mk_label(row, F_16, t.muted, key);
+  lv_obj_t *v = mk_label(row, F_16, color, value.c_str());
   lv_label_set_long_mode(v, LV_LABEL_LONG_DOT);
   lv_obj_set_style_max_width(v, DETAIL_W - 170, 0);
   return row;
@@ -251,13 +251,13 @@ void showAdd(lv_event_t *) {
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
   lv_obj_set_width(col, 600 - 40 - QR_SIZE - 16 - 20);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  mk_label(col, &font_16s, t.text, kAddTitle);
-  mk_label(col, &font_16s, t.accent, url.c_str());
-  lv_obj_t *steps = mk_label(col, &font_12, t.muted, kAddSteps);
+  mk_label(col, F_16S, t.text, kAddTitle);
+  mk_label(col, F_16S, t.accent, url.c_str());
+  lv_obj_t *steps = mk_label(col, F_12, t.muted, kAddSteps);
   lv_obj_set_width(steps, lv_pct(100));
   lv_label_set_long_mode(steps, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_line_space(steps, 3, 0);
-  lv_obj_t *pin = mk_label(col, &font_26b, t.accent, web_pin().c_str());
+  lv_obj_t *pin = mk_label(col, F_26B, t.accent, web_pin().c_str());
   lv_obj_set_style_text_letter_space(pin, 4, 0);
   on_click(mk_text_button(col, kClose, false, 120), [](lv_event_t *) { close_overlay(&addLayer); });
 }
@@ -270,8 +270,8 @@ void confirm(const String &title, const char *text, const char *action) {
   lv_obj_set_style_pad_all(card, 24, 0);
   set_flex(card, LV_FLEX_FLOW_COLUMN, 14, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_center(card);
-  mk_label(card, &font_20b, t.text, title.c_str());
-  lv_obj_t *msg = mk_label(card, &font_14, t.muted, text);
+  mk_label(card, F_20B, t.text, title.c_str());
+  lv_obj_t *msg = mk_label(card, F_14, t.muted, text);
   lv_obj_set_width(msg, 432);
   lv_label_set_long_mode(msg, LV_LABEL_LONG_WRAP);
   lv_obj_t *row = mk_box(card, 0, 0);
@@ -331,10 +331,10 @@ void heading(const String &name, const char *kind) {
   lv_obj_set_width(row, DETAIL_W);
   lv_obj_set_style_pad_bottom(row, 6, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END);
-  lv_obj_t *n = mk_label(row, &font_26b, t.text, name.c_str());
+  lv_obj_t *n = mk_label(row, F_26B, t.text, name.c_str());
   lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
   lv_obj_set_style_max_width(n, DETAIL_W - 190, 0);
-  mk_label(row, &font_14, t.muted, kind);
+  mk_label(row, F_14, t.muted, kind);
 }
 
 void googleDetail(uint8_t i) {
@@ -446,9 +446,13 @@ void accounts_refresh() {
   lv_obj_set_style_bg_opa(add, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_color(add, c(t.line), 0);
   lv_obj_set_style_border_width(add, 2, 0);
-  lv_obj_set_size(add, LIST_W - 16, 48);
-  lv_obj_set_style_pad_top(add, 0, 0);
-  lv_obj_center(mk_label(add, &font_14b, t.accent, kAdd));
+  lv_obj_set_size(add, LIST_W - 16, LV_SIZE_CONTENT);
+  lv_obj_set_style_min_height(add, 48, 0);
+  lv_obj_set_style_pad_ver(add, 6, 0);
+  lv_obj_t *addLabel = mk_label(add, F_14B, t.accent, kAdd);
+  lv_obj_set_width(addLabel, LIST_W - 16 - 20);  // wraps at big text sizes
+  lv_obj_set_style_text_align(addLabel, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_center(addLabel);
   on_click(add, showAdd);
   lv_obj_update_layout(list);
   lv_obj_scroll_to_y(list, scroll, LV_ANIM_OFF);  // keep the place across the minute refresh
@@ -458,7 +462,7 @@ void accounts_refresh() {
   else if (sel.kind == Kind::Ics) icsDetail(sel.index);
   else deskDetail();
   if (g_settings.accounts.empty() && g_settings.ics.empty() && !g_settings.desk) {
-    lv_obj_t *hint = mk_label(detail, &font_14, t.muted, kEmpty);
+    lv_obj_t *hint = mk_label(detail, F_14, t.muted, kEmpty);
     lv_obj_set_width(hint, DETAIL_W);
     lv_obj_set_style_pad_top(hint, 18, 0);
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);

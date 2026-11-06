@@ -101,6 +101,8 @@ bool wifi_scan_results(std::vector<WifiNetwork> &out) {
   return true;
 }
 void wifi_connect(const String &, const String &) {}
+String wifi_log() { return ""; }
+bool wifi_problem(String &, String &) { return false; }
 
 void ota_begin() {}
 OtaStatus g_sim_ota;
@@ -133,6 +135,7 @@ long g_sim_seen_ago = 20;
 void presence_apply(bool) {}
 const char *presence_error() { return nullptr; }
 bool presence_ready() { return true; }
+bool presence_paused() { return false; }
 PhoneState presence_state(uint8_t) { return g_sim_phone; }
 long presence_seen_ago() { return g_sim_seen_ago; }
 void presence_pair(bool) {}

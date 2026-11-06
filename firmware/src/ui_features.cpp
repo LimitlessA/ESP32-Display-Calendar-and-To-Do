@@ -294,8 +294,8 @@ lv_obj_t *optionRow(lv_obj_t *card, const char *label) {
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_width(row, INNER_W);
   set_flex(row, LV_FLEX_FLOW_ROW, 10);
-  lv_obj_t *l = mk_label(row, &font_14b, theme().muted, label);
-  lv_obj_set_width(l, 70);
+  lv_obj_t *l = mk_label(row, F_14B, theme().muted, label);
+  lv_obj_set_width(l, tw(70));
   return row;
 }
 
@@ -313,8 +313,8 @@ lv_obj_t *textColumn(lv_obj_t *parent, int i, int w) {
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
   lv_obj_set_width(col, w);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-  mk_label(col, &font_14b, t.text, kFeatures[i].name);
-  lv_obj_t *sub = mk_label(col, &font_12, available(i) ? t.muted : t.warnFg, subText(i).c_str());
+  mk_label(col, F_14B, t.text, kFeatures[i].name);
+  lv_obj_t *sub = mk_label(col, F_12, available(i) ? t.muted : t.warnFg, subText(i).c_str());
   lv_label_set_long_mode(sub, LV_LABEL_LONG_DOT);
   lv_obj_set_width(sub, w);
   return col;
@@ -322,6 +322,7 @@ lv_obj_t *textColumn(lv_obj_t *parent, int i, int w) {
 
 // The grid: a tap toggles, holding opens the options (and the layout).
 void buildGrid() {
+  const FontCap cap(kTextLarge);  // all tiles fit one screen (no scrolling) up to Large text
   const Theme &t = theme();
   lv_obj_t *grid = mk_box(body, 0, 0);
   lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
@@ -336,14 +337,16 @@ void buildGrid() {
     lv_obj_set_style_border_color(tile, c(on ? t.accent : t.line), 0);
     lv_obj_set_style_pad_all(tile, 10, 0);
     set_flex(tile, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START);
-    lv_obj_t *state = mk_label(tile, &font_12, on ? t.accent : t.muted, on ? kOn : kOff);
+    lv_obj_t *state = mk_label(tile, F_12, on ? t.accent : t.muted, on ? kOn : kOff);
     lv_obj_set_style_text_letter_space(state, 1, 0);
-    lv_obj_t *name = mk_label(tile, &font_14b, on ? t.text : t.muted, kFeatures[i].name);
-    lv_obj_set_width(name, TILE_W - 20);  // two lines at most
+    lv_obj_t *name = mk_label(tile, F_14B, on ? t.text : t.muted, kFeatures[i].name);
+    lv_obj_set_width(name, TILE_W - 20);
+    lv_obj_set_style_max_height(name, 2 * lv_font_get_line_height(F_14B), 0);  // two lines at most
+    lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
     const Opt o = kFeatures[i].opt;
-    lv_obj_t *sub = mk_label(tile, &font_12, available(i) ? t.muted : t.warnFg,
+    lv_obj_t *sub = mk_label(tile, F_12, available(i) ? t.muted : t.warnFg,
                              (o != Opt::None && available(i) ? optionValue(o) : subText(i)).c_str());
-    lv_obj_set_size(sub, TILE_W - 20, lv_font_get_line_height(&font_12));  // one line, ends in "..."
+    lv_obj_set_size(sub, TILE_W - 20, lv_font_get_line_height(F_12));  // one line, ends in "..."
     lv_label_set_long_mode(sub, LV_LABEL_LONG_DOT);
     // LVGL sends SHORT_CLICKED only when the press was not a long press.
     lv_obj_add_event_cb(tile, [](lv_event_t *e) {
@@ -357,6 +360,7 @@ void buildGrid() {
 
 // Options for one feature: on/off, its setting and its layout.
 void showDialog(int i) {
+  const FontCap cap(kTextLarge);  // the options rows and layout buttons fit up to Large text
   close_overlay(&dialog);
   dialogSub = nullptr;
   dialogFeature = i;
@@ -375,7 +379,7 @@ void showDialog(int i) {
   lv_obj_set_width(head, INNER_W);
   set_flex(head, LV_FLEX_FLOW_ROW, 0, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
   lv_obj_t *col = textColumn(head, i, INNER_W - 80);
-  lv_obj_set_style_text_font(lv_obj_get_child(col, 0), &font_20b, 0);
+  lv_obj_set_style_text_font(lv_obj_get_child(col, 0), F_20B, 0);
   dialogSub = lv_obj_get_child(col, 1);
   featureSwitch(head, i);
 
@@ -384,8 +388,8 @@ void showDialog(int i) {
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
     lv_obj_set_width(row, INNER_W);
     set_flex(row, LV_FLEX_FLOW_ROW, 10);
-    lv_obj_t *l = mk_label(row, &font_14b, t.muted, optionLabel(f.opt));
-    lv_obj_set_width(l, 70);
+    lv_obj_t *l = mk_label(row, F_14B, t.muted, optionLabel(f.opt));
+    lv_obj_set_width(l, tw(70));
     const OptRange r = optRange(f.opt);
     mk_stepper(row, optionNumber(f.opt, cur()), r.min, r.max, r.step, r.fmt, stepped, (void *)(intptr_t)i, 96);
   }
@@ -396,7 +400,7 @@ void showDialog(int i) {
                (void *)(intptr_t)(i | (int)Opt::NightEnd << 8), 96);
     // Dimming when nobody touches the screen (not only at night).
     row = optionRow(card, "Idle dim");
-    lv_obj_t *dl = mk_label(row, &font_14, t.text, "Dim the screen when idle");
+    lv_obj_t *dl = mk_label(row, F_14, t.text, "Dim the screen when idle");
     lv_obj_set_flex_grow(dl, 1);
     mk_switch(row, cur().dimIdle, [](lv_event_t *e) {
       const bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
@@ -435,7 +439,7 @@ void showDialog(int i) {
       }, (void *)(intptr_t)idx);
     });
     row = optionRow(card, "");
-    lv_obj_t *l = mk_label(row, &font_14, t.text, kWeekendsRow);
+    lv_obj_t *l = mk_label(row, F_14, t.text, kWeekendsRow);
     lv_obj_set_flex_grow(l, 1);
     mk_switch(row, cur().sleepWeekends, [](lv_event_t *e) {
       const bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
@@ -447,7 +451,7 @@ void showDialog(int i) {
         if (dialog) showDialog(dialogFeature);
       }, (void *)(intptr_t)on);
     });
-    lv_obj_t *hint = mk_label(card, &font_12, t.muted, kSleepHint);
+    lv_obj_t *hint = mk_label(card, F_12, t.muted, kSleepHint);
     lv_obj_set_width(hint, INNER_W);
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
   }
@@ -456,11 +460,11 @@ void showDialog(int i) {
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
     lv_obj_set_width(row, INNER_W);
     set_flex(row, LV_FLEX_FLOW_ROW, 8);
-    lv_obj_t *l = mk_label(row, &font_14b, t.muted, kDeskRow);
-    lv_obj_set_width(l, 70);
+    lv_obj_t *l = mk_label(row, F_14B, t.muted, kDeskRow);
+    lv_obj_set_width(l, tw(70));
     const String st = g_settings.desk ? desk_status_text() : String(g_settings.deskHost);
-    lv_obj_t *status = mk_label(row, &font_14, t.text, st.c_str());
-    lv_obj_set_width(status, INNER_W - 80);
+    lv_obj_t *status = mk_label(row, F_14, t.text, st.c_str());
+    lv_obj_set_width(status, INNER_W - tw(70) - 10);
     lv_label_set_long_mode(status, LV_LABEL_LONG_DOT);
     // Which memory buttons mean sitting and standing: each one is tapped directly.
     static const char *const kSlotNames[] = {"M1", "M2", "M3", "M4"};
@@ -469,8 +473,8 @@ void showDialog(int i) {
       lv_obj_set_style_bg_opa(slots, LV_OPA_TRANSP, 0);
       lv_obj_set_width(slots, INNER_W);
       set_flex(slots, LV_FLEX_FLOW_ROW, 10);
-      lv_obj_t *sl = mk_label(slots, &font_14b, t.muted, stand ? kStandRow : kSitRow);
-      lv_obj_set_width(sl, 70);
+      lv_obj_t *sl = mk_label(slots, F_14B, t.muted, stand ? kStandRow : kSitRow);
+      lv_obj_set_width(sl, tw(70));
       const uint8_t v = stand ? g_settings.deskStandSlot : g_settings.deskSitSlot;
       mk_segmented(slots, kSlotNames, 4, v - 1, 64, [](int idx, void *user) {
         lv_async_call([](void *p) {
@@ -496,9 +500,9 @@ void showDialog(int i) {
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
     lv_obj_set_width(row, INNER_W);
     set_flex(row, LV_FLEX_FLOW_ROW, 8);
-    lv_obj_t *l = mk_label(row, &font_14b, t.muted, kPhoneRow);
-    lv_obj_set_width(l, 70);
-    lv_obj_t *status = mk_label(row, &font_14, t.text, presence_status().c_str());
+    lv_obj_t *l = mk_label(row, F_14B, t.muted, kPhoneRow);
+    lv_obj_set_width(l, tw(70));
+    lv_obj_t *status = mk_label(row, F_14, t.text, presence_status().c_str());
     lv_obj_set_flex_grow(status, 1);
     on_click(mk_chip(row, kPair, false), [](lv_event_t *) {
       lv_async_call([](void *) {
@@ -521,8 +525,8 @@ void showDialog(int i) {
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
     lv_obj_set_width(row, INNER_W);
     set_flex(row, LV_FLEX_FLOW_ROW, 10);
-    lv_obj_t *l = mk_label(row, &font_14b, t.muted, kLayoutRow);
-    lv_obj_set_width(l, 70);
+    lv_obj_t *l = mk_label(row, F_14B, t.muted, kLayoutRow);
+    lv_obj_set_width(l, tw(70));
     const int n = kVariants[f.layout][3] ? 4 : 3;
     String names[kMaxVariants];
     const char *labels[kMaxVariants];
@@ -564,8 +568,8 @@ lv_obj_t *features_create() {
   const Theme &t = theme();
   lv_obj_t *scr = mk_screen();
   lv_obj_t *h = mk_back_header(scr, kTitle, Screen::Settings);
-  mk_label(h, &font_12, t.muted, kHint);
-  countLabel = mk_label(h, &font_14b, t.accent, "");
+  mk_label(h, F_12, t.muted, kHint);
+  countLabel = mk_label(h, F_14B, t.accent, "");
 
   body = mk_box(scr, 0, 0);
   lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);

@@ -73,7 +73,7 @@ void buildList(const std::vector<WifiNetwork> &nets) {
   const Theme &t = theme();
   if (&nets != &lastScan) lastScan = nets;
   lv_obj_clean(list);
-  lv_obj_t *h = mk_label(list, &font_12, t.muted, kNearby);
+  lv_obj_t *h = mk_label(list, F_12, t.muted, kNearby);
   lv_obj_set_style_text_letter_space(h, 1, 0);
   lv_obj_set_style_pad_left(h, 10, 0);
   lv_obj_set_style_pad_ver(h, 6, 0);
@@ -85,16 +85,16 @@ void buildList(const std::vector<WifiNetwork> &nets) {
     lv_obj_set_style_pad_hor(b, 12, 0);
     set_flex(b, LV_FLEX_FLOW_ROW, 10);
     // Signal strength: icon brightness steps with RSSI.
-    mk_label(b, &font_16, n.rssi > -60 ? t.text : n.rssi > -72 ? t.muted : t.line, ICON_WIFI);
+    mk_label(b, F_16, n.rssi > -60 ? t.text : n.rssi > -72 ? t.muted : t.line, ICON_WIFI);
     lv_obj_t *col = mk_box(b, 0, 0);
     lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
     lv_obj_set_flex_grow(col, 1);
     set_flex(col, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_t *name = mk_label(col, &font_14b, t.text, n.ssid.c_str());
+    lv_obj_t *name = mk_label(col, F_14B, t.text, n.ssid.c_str());
     lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
     lv_obj_set_width(name, LIST_W - 110);
-    if (n.ssid == current && wifi_state() == WifiState::Connected) mk_label(col, &font_12, t.good, kConnected);
-    if (n.locked) mk_label(b, &font_14, t.muted, ICON_LOCK);
+    if (n.ssid == current && wifi_state() == WifiState::Connected) mk_label(col, F_12, t.good, kConnected);
+    if (n.locked) mk_label(b, F_14, t.muted, ICON_LOCK);
     on_click(b, [](lv_event_t *e) {
       const Net *n = static_cast<Net *>(lv_event_get_user_data(e));
       selectNetwork(n->ssid, n->locked);
@@ -102,14 +102,14 @@ void buildList(const std::vector<WifiNetwork> &nets) {
       lv_async_call([](void *) { buildList(lastScan); }, nullptr);
     }, attach(b, Net{n.ssid, n.locked}));
   }
-  if (nets.empty()) mk_label(list, &font_14, t.muted, kNoNetworks);
+  if (nets.empty()) mk_label(list, F_14, t.muted, kNoNetworks);
 }
 
 void startScan() {
   scanning = true;
   wifi_scan_start();
   lv_obj_clean(list);
-  lv_obj_t *l = mk_label(list, &font_14, theme().muted, kScanning);
+  lv_obj_t *l = mk_label(list, F_14, theme().muted, kScanning);
   lv_obj_set_style_pad_all(l, 10, 0);
 }
 
@@ -123,8 +123,8 @@ lv_obj_t *wifi_create() {
   lv_obj_set_size(scan, LV_SIZE_CONTENT, TOUCH);
   lv_obj_set_style_pad_hor(scan, 16, 0);
   set_flex(scan, LV_FLEX_FLOW_ROW, 8);
-  mk_label(scan, &font_14, t.text, ICON_REFRESH);
-  mk_label(scan, &font_14b, t.text, kScanAgain);
+  mk_label(scan, F_14, t.text, ICON_REFRESH);
+  mk_label(scan, F_14B, t.text, kScanAgain);
   on_click(scan, [](lv_event_t *) { startScan(); });
 
   list = mk_scroll_column(scr, 2);
@@ -141,7 +141,7 @@ lv_obj_t *wifi_create() {
   lv_obj_set_style_pad_hor(form, 16, 0);
   lv_obj_set_style_pad_ver(form, 14, 0);
   set_flex(form, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  formTitle = mk_label(form, &font_16s, t.text, kPickNetwork);
+  formTitle = mk_label(form, F_16S, t.text, kPickNetwork);
   lv_obj_t *row = mk_box(form, 0, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_width(row, RIGHT_W - 32);
@@ -151,14 +151,14 @@ lv_obj_t *wifi_create() {
   lv_obj_set_flex_grow(password, 1);
   eye = mk_button(row, t.raised, 12);
   lv_obj_set_size(eye, 48, 48);
-  lv_obj_center(mk_label(eye, &font_16, t.text, ICON_EYE));
+  lv_obj_center(mk_label(eye, F_16, t.text, ICON_EYE));
   on_click(eye, [](lv_event_t *) {
     lv_textarea_set_password_mode(password, !lv_textarea_get_password_mode(password));
   });
   connectOpen = mk_text_button(form, kConnect, true, 140);
   lv_obj_add_flag(connectOpen, LV_OBJ_FLAG_HIDDEN);
   on_click(connectOpen, [](lv_event_t *) { connect(); });
-  status = mk_label(form, &font_14, t.muted, "");
+  status = mk_label(form, F_14, t.muted, "");
 
   keyboard = mk_keyboard(scr, password);
   lv_obj_set_pos(keyboard, RIGHT_X, BODY_Y + 148);
@@ -229,11 +229,11 @@ void wifi_problem_open() {
   set_flex(card, LV_FLEX_FLOW_COLUMN, 12, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);  // taps on the card keep it open
   lv_obj_center(card);
-  mk_label(card, &font_20b, t.badFg, (String(ICON_WIFI "  ") + (brief.length() ? brief : String(kTitle))).c_str());
-  lv_obj_t *msg = mk_label(card, &font_14, t.text, detail.c_str());
+  mk_label(card, F_20B, t.badFg, (String(ICON_WIFI "  ") + (brief.length() ? brief : String(kTitle))).c_str());
+  lv_obj_t *msg = mk_label(card, F_14, t.text, detail.c_str());
   lv_obj_set_width(msg, 576);
   lv_label_set_long_mode(msg, LV_LABEL_LONG_WRAP);
-  lv_obj_t *log = mk_label(card, &font_12, t.muted, wifi_log().c_str());
+  lv_obj_t *log = mk_label(card, F_12, t.muted, wifi_log().c_str());
   lv_obj_set_width(log, 576);
   lv_label_set_long_mode(log, LV_LABEL_LONG_WRAP);
   lv_obj_t *row = mk_box(card, 0, 0);

@@ -238,7 +238,7 @@ String radar_mark(lv_obj_t *card, const Task &t) {
   lv_obj_t *badge = mk_box(card, th.accent, 10);
   lv_obj_set_style_pad_hor(badge, 8, 0);
   lv_obj_set_style_pad_ver(badge, 2, 0);
-  mk_label(badge, &font_12, th.onAccent, strf(kBadge, (int)e->moves).c_str());
+  mk_label(badge, F_12, th.onAccent, strf(kBadge, (int)e->moves).c_str());
   return strf(kMovedSince, (int)e->moves, since(*e).c_str());
 }
 
@@ -258,12 +258,12 @@ void radar_nudge_show(const Task &t) {
   lv_obj_set_style_border_width(card, 2, 0);
   set_flex(card, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_center(card);
-  lv_obj_t *head = mk_label(card, &font_12, th.accent, kNudgeHead);
+  lv_obj_t *head = mk_label(card, F_12, th.accent, kNudgeHead);
   lv_obj_set_style_text_letter_space(head, 1, 0);
-  lv_obj_t *title = mk_label(card, &font_26b, th.text, t.title.c_str());
+  lv_obj_t *title = mk_label(card, F_26B, th.text, t.title.c_str());
   lv_obj_set_width(title, 492);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
-  mk_label(card, &font_14, th.muted, strf(kNudgeBody, (int)e->moves, since(*e).c_str()).c_str());
+  mk_label(card, F_14, th.muted, strf(kNudgeBody, (int)e->moves, since(*e).c_str()).c_str());
 
   lv_obj_t *buttons = mk_box(card, 0, 0);
   lv_obj_set_style_bg_opa(buttons, LV_OPA_TRANSP, 0);
@@ -347,7 +347,7 @@ void radar_view_show() {
     lv_obj_set_size(ring, d, d);
     lv_obj_center(ring);
   }
-  lv_obj_t *mid = mk_label(radar, &font_12, th.accent, kStuck);
+  lv_obj_t *mid = mk_label(radar, F_12, th.accent, kStuck);
   lv_obj_set_style_text_letter_space(mid, 1, 0);
   lv_obj_center(mid);
 
@@ -367,7 +367,7 @@ void radar_view_show() {
     lv_obj_t *b = mk_button(radar, kBubbleColors[i % 6], size / 2);
     lv_obj_set_size(b, size, size);
     lv_obj_align(b, LV_ALIGN_CENTER, (lv_coord_t)(dist * cosf(angle)), (lv_coord_t)(dist * sinf(angle)));
-    lv_obj_t *n = mk_label(b, &font_12, 0x101317, String(moves).c_str());
+    lv_obj_t *n = mk_label(b, F_12, 0x101317, String(moves).c_str());
     lv_obj_center(n);
     on_click(b, [](lv_event_t *e) { radar_nudge_show(*static_cast<Task *>(lv_event_get_user_data(e))); },
              attach(b, *list[i]));
@@ -379,8 +379,8 @@ void radar_view_show() {
   lv_obj_set_pos(side, x, 24);
   lv_obj_set_size(side, w, SCREEN_H - 48);
   set_flex(side, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  mk_label(side, &font_20b, th.text, kRadarTitle);
-  lv_obj_t *hint = mk_label(side, &font_12, th.muted, list.empty() ? kRadarEmpty : kRadarHint);
+  mk_label(side, F_20B, th.text, kRadarTitle);
+  lv_obj_t *hint = mk_label(side, F_12, th.muted, list.empty() ? kRadarEmpty : kRadarHint);
   lv_obj_set_width(hint, w);
   lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
   lv_obj_t *rows = mk_scroll_column(side, 6);
@@ -393,10 +393,10 @@ void radar_view_show() {
     lv_obj_set_style_pad_hor(row, 10, 0);
     set_flex(row, LV_FLEX_FLOW_ROW, 8);
     mk_dot(row, kBubbleColors[i % 6], 10);
-    lv_obj_t *l = mk_label(row, &font_14b, th.text, t.title.c_str());
+    lv_obj_t *l = mk_label(row, F_14B, th.text, t.title.c_str());
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
     lv_obj_set_flex_grow(l, 1);
-    mk_label(row, &font_14b, radar_stuck(t) ? th.accent : th.muted, strf(kBadge, radar_moves(t)).c_str());
+    mk_label(row, F_14B, radar_stuck(t) ? th.accent : th.muted, strf(kBadge, radar_moves(t)).c_str());
     on_click(row, [](lv_event_t *e) { radar_nudge_show(*static_cast<Task *>(lv_event_get_user_data(e))); },
              attach(row, t));
   }

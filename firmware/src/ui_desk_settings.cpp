@@ -92,7 +92,7 @@ lv_obj_t *fieldRow(lv_obj_t *col, const char *label, const char *placeholder, co
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_size(row, FORM_W, ROW_H);
   set_flex(row, LV_FLEX_FLOW_ROW, 8);
-  lv_obj_t *l = mk_label(row, &font_14b, t.muted, label);
+  lv_obj_t *l = mk_label(row, F_14B, t.muted, label);
   lv_obj_set_width(l, LABEL_W);
   lv_obj_t *ta = mk_textarea(row, placeholder);
   lv_obj_set_size(ta, taW, ROW_H);
@@ -124,7 +124,7 @@ void desk_settings_show() {
   lv_obj_set_size(head, FORM_W, HEADER_H);
   lv_obj_set_pos(head, PAD, 0);
   set_flex(head, LV_FLEX_FLOW_ROW, 10);
-  lv_obj_t *title = mk_label(head, &font_20b, t.text, kTitle);
+  lv_obj_t *title = mk_label(head, F_20B, t.text, kTitle);
   lv_obj_set_flex_grow(title, 1);
   on_click(mk_text_button(head, kCancel, false, 110), [](lv_event_t *) {
     lv_async_call([](void *) { close_overlay(&layer); }, nullptr);
@@ -154,7 +154,7 @@ void desk_settings_show() {
   lv_obj_set_size(test, FORM_W, ROW_H);
   set_flex(test, LV_FLEX_FLOW_ROW, 12);
   on_click(mk_text_button(test, kTest, false, LABEL_W + 60), [](lv_event_t *) { startTest(); });
-  result = mk_label(test, &font_12, t.muted, kHint);
+  result = mk_label(test, F_12, t.muted, kHint);
   lv_obj_set_width(result, FORM_W - LABEL_W - 72);
   lv_label_set_long_mode(result, LV_LABEL_LONG_WRAP);
 
@@ -211,7 +211,7 @@ void desk_label_edit(uint8_t slot) {
   lv_obj_set_size(head, FORM_W, HEADER_H);
   lv_obj_set_pos(head, PAD, 0);
   set_flex(head, LV_FLEX_FLOW_ROW, 10);
-  lv_obj_t *title = mk_label(head, &font_20b, t.text, strf(kLabelTitle, slot).c_str());
+  lv_obj_t *title = mk_label(head, F_20B, t.text, strf(kLabelTitle, slot).c_str());
   lv_obj_set_flex_grow(title, 1);
   on_click(mk_text_button(head, kCancel, false, 110), [](lv_event_t *) {
     lv_async_call([](void *) { close_overlay(&labelLayer); }, nullptr);

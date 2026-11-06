@@ -20,8 +20,47 @@ LV_FONT_DECLARE(font_16s);
 LV_FONT_DECLARE(font_20b);
 LV_FONT_DECLARE(font_26b);
 LV_FONT_DECLARE(font_34b);
+LV_FONT_DECLARE(font_18);
+LV_FONT_DECLARE(font_20);
 LV_FONT_DECLARE(font_72);
 LV_FONT_DECLARE(font_150);
+
+// Text size (Theme screen, Text size tab: XS, S, Normal, L, XL). Screens never
+// name a font file: they ask for a role, F_12 ... F_34B, named after its size
+// at Normal, and the table maps each role to a bigger or smaller font. The big
+// clock and timer digits (font_72, font_150) do not change.
+enum FontRole : uint8_t { kF12, kF14, kF14b, kF16, kF16s, kF20b, kF26b, kF34b, kFontRoles };
+constexpr uint8_t kTextSizes = 5;  // XS, S, Normal, L, XL
+constexpr uint8_t kTextNormal = 2;
+constexpr uint8_t kTextLarge = 3;
+extern const lv_font_t *g_fonts[kFontRoles];
+void fonts_select(uint8_t textSize);  // before the screens are built
+#define F_12 (g_fonts[kF12])
+#define F_14 (g_fonts[kF14])
+#define F_14B (g_fonts[kF14b])
+#define F_16 (g_fonts[kF16])
+#define F_16S (g_fonts[kF16s])
+#define F_20B (g_fonts[kF20b])
+#define F_26B (g_fonts[kF26b])
+#define F_34B (g_fonts[kF34b])
+// A width in pixels that holds text, grown with the text size (as at Normal: px).
+int tw(int px);
+// Width of a text in a font, e.g. to size a column of times.
+int text_w(const lv_font_t *font, const char *text);
+// Keeps a label on one line w pixels wide, ending in "..." when it does not fit.
+void one_line(lv_obj_t *label, int w);
+// The font for a role at the current text size, but no bigger than at maxSize;
+// for grids that must fit one screen, like the Features page.
+const lv_font_t *font_upto(FontRole role, uint8_t maxSize);
+// The font for a role at any text size (the Text size preview).
+const lv_font_t *font_at(FontRole role, uint8_t textSize);
+// While one lives, F_12 ... F_34B are no bigger than at maxSize: for whole screens
+// that must fit one page (Settings, Features). { FontCap cap(kTextLarge); ... }
+struct FontCap {
+  explicit FontCap(uint8_t maxSize);
+  ~FontCap();
+  uint8_t saved;
+};
 
 constexpr int SCREEN_W = 800;
 constexpr int SCREEN_H = 480;
@@ -227,7 +266,7 @@ lv_obj_t *mk_box(lv_obj_t *parent, uint32_t bg, int radius = 12);
 lv_obj_t *mk_label(lv_obj_t *parent, const lv_font_t *font, uint32_t color, const char *text);
 lv_obj_t *mk_button(lv_obj_t *parent, uint32_t bg, int radius = 22);
 lv_obj_t *mk_text_button(lv_obj_t *parent, const char *text, bool primary, int w = LV_SIZE_CONTENT);
-lv_obj_t *mk_icon_button(lv_obj_t *parent, const char *icon, uint32_t color, const lv_font_t *font = &font_16);
+lv_obj_t *mk_icon_button(lv_obj_t *parent, const char *icon, uint32_t color, const lv_font_t *font = F_16);
 lv_obj_t *mk_dot(lv_obj_t *parent, uint32_t color, int size = 8);
 lv_obj_t *mk_screen();
 lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active);

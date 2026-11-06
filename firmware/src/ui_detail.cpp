@@ -33,10 +33,10 @@ lv_obj_t *infoRow(lv_obj_t *parent, const char *icon, lv_obj_t **label) {
   lv_obj_t *row = mk_box(parent, 0, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 12);
-  lv_obj_t *i = mk_label(row, &font_16, t.muted, icon);
+  lv_obj_t *i = mk_label(row, F_16, t.muted, icon);
   lv_obj_set_width(i, 20);
   lv_obj_set_style_text_align(i, LV_TEXT_ALIGN_CENTER, 0);
-  *label = mk_label(row, &font_16, t.text, "");
+  *label = mk_label(row, F_16, t.text, "");
   lv_label_set_long_mode(*label, LV_LABEL_LONG_DOT);
   lv_obj_set_width(*label, 460);
   return row;
@@ -90,11 +90,11 @@ lv_obj_t *detail_create() {
   lv_obj_set_width(top, lv_pct(100));
   set_flex(top, LV_FLEX_FLOW_ROW, 10);
   dot = mk_dot(top, t.accent, 10);
-  calLabel = mk_label(top, &font_14, t.muted, "");
+  calLabel = mk_label(top, F_14, t.muted, "");
   lv_obj_set_flex_grow(calLabel, 1);
-  untilLabel = mk_label(top, &font_14b, t.accent, "");
+  untilLabel = mk_label(top, F_14B, t.accent, "");
 
-  title = mk_label(card, &font_34b, t.text, "");
+  title = mk_label(card, F_34B, t.text, "");
   lv_obj_set_width(title, lv_pct(100));
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
 
@@ -103,7 +103,7 @@ lv_obj_t *detail_create() {
   travelRow = infoRow(card, ICON_CAR, &travelLabel);
   peopleRow = infoRow(card, ICON_USERS, &peopleLabel);
 
-  descLabel = mk_label(card, &font_14, t.muted, "");
+  descLabel = mk_label(card, F_14, t.muted, "");
   lv_obj_set_width(descLabel, lv_pct(100));
   lv_label_set_long_mode(descLabel, LV_LABEL_LONG_DOT);
   lv_obj_set_flex_grow(descLabel, 1);
@@ -116,11 +116,13 @@ lv_obj_t *detail_create() {
   set_flex(side, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
   remindBtn = mk_button(side, t.raised, 14);
-  lv_obj_set_size(remindBtn, 220, 64);
+  lv_obj_set_size(remindBtn, 220, LV_SIZE_CONTENT);  // grows with the text size
+  lv_obj_set_style_min_height(remindBtn, 64, 0);
+  lv_obj_set_style_pad_ver(remindBtn, 8, 0);
   lv_obj_set_style_pad_hor(remindBtn, 14, 0);
   set_flex(remindBtn, LV_FLEX_FLOW_ROW, 10);
-  mk_label(remindBtn, &font_16, t.text, ICON_BELL);
-  remindLabel = mk_label(remindBtn, &font_14b, t.text, "");
+  mk_label(remindBtn, F_16, t.text, ICON_BELL);
+  remindLabel = mk_label(remindBtn, F_14B, t.text, "");
   lv_obj_set_flex_grow(remindLabel, 1);
   lv_label_set_long_mode(remindLabel, LV_LABEL_LONG_WRAP);
   on_click(remindBtn, [](lv_event_t *) {
@@ -131,30 +133,40 @@ lv_obj_t *detail_create() {
   });
 
   starBtn = mk_button(side, t.raised, 14);
-  lv_obj_set_size(starBtn, 220, 56);
+  lv_obj_set_size(starBtn, 220, LV_SIZE_CONTENT);
+  lv_obj_set_style_min_height(starBtn, 56, 0);
+  lv_obj_set_style_pad_ver(starBtn, 8, 0);
   lv_obj_set_style_pad_hor(starBtn, 14, 0);
   set_flex(starBtn, LV_FLEX_FLOW_ROW, 10);
-  mk_label(starBtn, &font_16, t.text, ICON_STAR);
-  starLabel = mk_label(starBtn, &font_14b, t.text, "");
+  mk_label(starBtn, F_16, t.text, ICON_STAR);
+  starLabel = mk_label(starBtn, F_14B, t.text, "");
+  lv_obj_set_flex_grow(starLabel, 1);
+  lv_label_set_long_mode(starLabel, LV_LABEL_LONG_WRAP);
   on_click(starBtn, [](lv_event_t *) {
     sync_star_event(shown, !starred(), day_key(shown.start / 1000));
     updateStar();
   });
 
   lv_obj_t *dismiss = mk_button(side, t.bg, 14);
-  lv_obj_set_size(dismiss, 220, 56);
+  lv_obj_set_size(dismiss, 220, LV_SIZE_CONTENT);
+  lv_obj_set_style_min_height(dismiss, 56, 0);
+  lv_obj_set_style_pad_ver(dismiss, 8, 0);
+  lv_obj_set_style_pad_hor(dismiss, 14, 0);
   lv_obj_set_style_border_color(dismiss, c(t.line), 0);
   lv_obj_set_style_border_width(dismiss, 2, 0);
   set_flex(dismiss, LV_FLEX_FLOW_ROW, 10, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  mk_label(dismiss, &font_14, t.text, ICON_CLOSE);
-  mk_label(dismiss, &font_14b, t.text, kDismiss);
+  mk_label(dismiss, F_14, t.text, ICON_CLOSE);
+  lv_obj_t *dl = mk_label(dismiss, F_14B, t.text, kDismiss);
+  // One line at Normal; wraps at the bigger text sizes.
+  lv_obj_set_width(dl, LV_MIN(text_w(F_14B, kDismiss), 220 - 28 - 30));
+  lv_label_set_long_mode(dl, LV_LABEL_LONG_WRAP);
   on_click(dismiss, [](lv_event_t *) {
     sync_dismiss_event(shown);
     ui_show(Screen::Home);
     toast(kDismissed);
   });
 
-  lv_obj_t *note = mk_label(side, &font_12, t.muted, kDismissNote);
+  lv_obj_t *note = mk_label(side, F_12, t.muted, kDismissNote);
   lv_obj_set_width(note, 212);
   lv_obj_set_style_pad_left(note, 4, 0);
   lv_label_set_long_mode(note, LV_LABEL_LONG_WRAP);

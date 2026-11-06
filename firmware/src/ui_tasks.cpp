@@ -74,10 +74,10 @@ void navButton(const char *label, int count, uint32_t dot, const Selection &s) {
   lv_obj_set_style_pad_hor(b, 12, 0);
   set_flex(b, LV_FLEX_FLOW_ROW, 8);
   mk_dot(b, dot);
-  lv_obj_t *l = mk_label(b, &font_14b, on ? t.text : t.muted, label);
+  lv_obj_t *l = mk_label(b, F_14B, on ? t.text : t.muted, label);
   lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
   lv_obj_set_flex_grow(l, 1);
-  lv_obj_t *n = mk_label(b, &font_14, t.muted, "");
+  lv_obj_t *n = mk_label(b, F_14, t.muted, "");
   lv_label_set_text_fmt(n, "%d", count);
   on_click(b, [](lv_event_t *e) {
     sel = static_cast<NavItem *>(lv_event_get_user_data(e))->sel;
@@ -86,7 +86,7 @@ void navButton(const char *label, int count, uint32_t dot, const Selection &s) {
 }
 
 void heading(const String &text) {
-  lv_obj_t *h = mk_label(nav, &font_12, theme().muted, text.c_str());
+  lv_obj_t *h = mk_label(nav, F_12, theme().muted, text.c_str());
   lv_obj_set_style_text_letter_space(h, 1, 0);
   lv_obj_set_style_pad_left(h, 12, 0);
   lv_obj_set_style_pad_top(h, 8, 0);
@@ -107,7 +107,7 @@ void taskRow(const Task &task, bool sub) {
   lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(text, 1);
   set_flex(text, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *title = mk_label(text, &font_16, t.text, task.title.c_str());
+  lv_obj_t *title = mk_label(text, F_16, t.text, task.title.c_str());
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   lv_obj_set_width(title, PANEL_W - 24 - 56 - 110 - (sub ? 28 : 0));
   const String moved = radar_mark(row, task);
@@ -119,7 +119,7 @@ void taskRow(const Task &task, bool sub) {
   lv_obj_set_size(line, PANEL_W - 24 - 56 - (sub ? 28 : 0), LV_SIZE_CONTENT);
   set_flex(line, LV_FLEX_FLOW_ROW, 12);
   mk_due(line, task.dueKey);
-  lv_obj_t *m = mk_label(line, &font_12, t.muted, meta.c_str());
+  lv_obj_t *m = mk_label(line, F_12, t.muted, meta.c_str());
   lv_label_set_long_mode(m, LV_LABEL_LONG_DOT);
   lv_obj_set_flex_grow(m, 1);
 }
@@ -138,17 +138,17 @@ void doneRow(const Task &task) {
   set_flex(row, LV_FLEX_FLOW_ROW, 8);
   lv_obj_t *box = mk_box(row, t.good, 13);
   lv_obj_set_size(box, 26, 26);
-  lv_obj_center(mk_label(box, &font_14b, t.bg, ICON_CHECK));
+  lv_obj_center(mk_label(box, F_14B, t.bg, ICON_CHECK));
 
   lv_obj_t *text = mk_box(row, 0, 0);
   lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(text, 1);
   set_flex(text, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *title = mk_label(text, &font_16, t.muted, task.title.c_str());
+  lv_obj_t *title = mk_label(text, F_16, t.muted, task.title.c_str());
   lv_obj_set_style_text_decor(title, LV_TEXT_DECOR_STRIKETHROUGH, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
   lv_obj_set_width(title, PANEL_W - 24 - 40 - 130);
-  mk_label(text, &font_14, t.muted, (String(kCompleted) + when).c_str());
+  mk_label(text, F_14, t.muted, (String(kCompleted) + when).c_str());
 
   lv_obj_t *b = mk_button(row, t.raised, 20);
   lv_obj_set_size(b, LV_SIZE_CONTENT, 40);
@@ -156,8 +156,8 @@ void doneRow(const Task &task) {
   lv_obj_set_style_border_width(b, 2, 0);
   lv_obj_set_style_border_color(b, c(t.accent), 0);
   set_flex(b, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_CENTER);
-  mk_label(b, &font_14b, t.accent, ICON_REFRESH);
-  mk_label(b, &font_14b, t.accent, kRestore);
+  mk_label(b, F_14B, t.accent, ICON_REFRESH);
+  mk_label(b, F_14B, t.accent, kRestore);
   on_click(b, [](lv_event_t *e) {
     sync_uncomplete_task(*static_cast<Task *>(lv_event_get_user_data(e)));
   }, attach(b, task));
@@ -200,8 +200,8 @@ void tasks_refresh() {
     lv_obj_t *add = mk_button(nav, t.accent, 12);
     lv_obj_set_size(add, NAV_W, TOUCH);
     set_flex(add, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_CENTER);
-    mk_label(add, &font_14b, t.onAccent, ICON_PLUS);
-    mk_label(add, &font_14b, t.onAccent, kAddTask);
+    mk_label(add, F_14B, t.onAccent, ICON_PLUS);
+    mk_label(add, F_14B, t.onAccent, kAddTask);
     on_click(add, [](lv_event_t *) { quick_add_show(); });
   }
   if (g_settings.roulette || radar_view_on()) {
@@ -213,14 +213,14 @@ void tasks_refresh() {
       lv_obj_t *b = mk_button(row, t.raised, 12);
       lv_obj_set_height(b, TOUCH);
       lv_obj_set_flex_grow(b, 1);
-      lv_obj_center(mk_label(b, &font_14b, t.text, kPickForMe));
+      lv_obj_center(mk_label(b, F_14B, t.text, kPickForMe));
       on_click(b, [](lv_event_t *) { roulette_show(); });
     }
     if (radar_view_on()) {
       lv_obj_t *b = mk_button(row, t.raised, 12);
       lv_obj_set_height(b, TOUCH);
       lv_obj_set_flex_grow(b, 1);
-      lv_obj_center(mk_label(b, &font_14b, t.accent, kRadar));
+      lv_obj_center(mk_label(b, F_14B, t.accent, kRadar));
       on_click(b, [](lv_event_t *) { radar_view_show(); });
     }
   }
@@ -246,7 +246,7 @@ void tasks_refresh() {
 
   if (sel.filter == Filter::Done) {
     for (const Task &task : g_snap.done) doneRow(task);
-    if (g_snap.done.empty()) lv_obj_set_style_pad_all(mk_label(panel, &font_16, t.muted, kNoneDone), 16, 0);
+    if (g_snap.done.empty()) lv_obj_set_style_pad_all(mk_label(panel, F_16, t.muted, kNoneDone), 16, 0);
     return;
   }
   // Parents in due order, each followed by its subtasks.
@@ -273,11 +273,11 @@ void tasks_refresh() {
     }
   }
   if (shown && g_settings.focus) {
-    lv_obj_t *hint = mk_label(panel, &font_12, t.muted, kHoldHint);
+    lv_obj_t *hint = mk_label(panel, F_12, t.muted, kHoldHint);
     lv_obj_set_style_pad_all(hint, 10, 0);
   }
   if (!shown) {
-    lv_obj_t *l = mk_label(panel, &font_16, t.muted, sel.filter == Filter::All ? kAllDone : kNothingHere);
+    lv_obj_t *l = mk_label(panel, F_16, t.muted, sel.filter == Filter::All ? kAllDone : kNothingHere);
     lv_obj_set_style_pad_all(l, 16, 0);
   }
 }

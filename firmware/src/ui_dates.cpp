@@ -72,20 +72,20 @@ lv_obj_t *countCard(lv_obj_t *parent, const DateItem &d, int w, bool large) {
   lv_obj_set_width(num, large ? 64 : 46);
   set_flex(num, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   if (days == 0) {
-    mk_label(num, large ? &font_20b : &font_16s, colorOf(d.kind), iconOf(d.kind));
+    mk_label(num, large ? F_20B : F_16S, colorOf(d.kind), iconOf(d.kind));
   } else {
-    mk_label(num, large ? &font_34b : &font_20b, colorOf(d.kind), String(days).c_str());
-    mk_label(num, &font_12, t.muted, days == 1 ? kDay : kDays);
+    mk_label(num, large ? F_34B : F_20B, colorOf(d.kind), String(days).c_str());
+    mk_label(num, F_12, t.muted, days == 1 ? kDay : kDays);
   }
   lv_obj_t *col = transparent(card);
   lv_obj_set_flex_grow(col, 1);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 2, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-  lv_obj_t *title = mk_label(col, large ? &font_16s : &font_14b, t.text, d.title.c_str());
+  lv_obj_t *title = mk_label(col, large ? F_16S : F_14B, t.text, d.title.c_str());
   lv_obj_set_width(title, w - (large ? 28 + 64 + 14 : 20 + 46 + 10));
   lv_label_set_long_mode(title, large ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
   const time_t day = ui_now() + days * 86400L;
   String sub = String(iconOf(d.kind)) + "  " + (days < 2 ? whenText(days) : fmt_date_short(day));
-  mk_label(col, &font_12, t.muted, sub.c_str());
+  mk_label(col, F_12, t.muted, sub.c_str());
   return card;
 }
 
@@ -97,8 +97,8 @@ void section(lv_obj_t *parent, const char *title, DateKind kind, const std::vect
   lv_obj_t *head = transparent(parent);
   lv_obj_set_width(head, SCREEN_W - 2 * PAD);
   set_flex(head, LV_FLEX_FLOW_ROW, 8);
-  mk_label(head, &font_14, colorOf(kind), iconOf(kind));
-  lv_obj_t *h = mk_label(head, &font_12, t.muted, title);
+  mk_label(head, F_14, colorOf(kind), iconOf(kind));
+  lv_obj_t *h = mk_label(head, F_12, t.muted, title);
   lv_obj_set_style_text_letter_space(h, 1, 0);
   lv_obj_t *grid = transparent(parent);
   lv_obj_set_width(grid, SCREEN_W - 2 * PAD);
@@ -119,7 +119,7 @@ void mk_dates_column(lv_obj_t *parent, int w) {
   lv_obj_t *head = transparent(parent);
   lv_obj_set_size(head, w, 30);
   lv_obj_set_style_pad_hor(head, 2, 0);
-  mk_label(head, &font_14b, t.text, kColDates);
+  mk_label(head, F_14B, t.text, kColDates);
   int n = 0;
   for (const DateItem &d : visible()) {
     if (n++ >= kColumnItems) break;
@@ -129,7 +129,7 @@ void mk_dates_column(lv_obj_t *parent, int w) {
     lv_obj_t *empty = mk_box(parent, t.card, 12);
     lv_obj_set_width(empty, w);
     lv_obj_set_style_pad_all(empty, 12, 0);
-    lv_obj_t *l = mk_label(empty, &font_12, t.muted, kNothingShort);
+    lv_obj_t *l = mk_label(empty, F_12, t.muted, kNothingShort);
     lv_obj_set_width(l, w - 24);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
   }
@@ -151,11 +151,12 @@ lv_obj_t *mk_dates_ribbon(lv_obj_t *parent, int w) {
     lv_obj_set_size(chip, LV_SIZE_CONTENT, RIBBON_H);
     lv_obj_set_style_pad_hor(chip, 14, 0);
     set_flex(chip, LV_FLEX_FLOW_ROW, 8);
-    mk_label(chip, &font_14, colorOf(d.kind), iconOf(d.kind));
-    lv_obj_t *title = mk_label(chip, &font_14b, t.text, d.title.c_str());
+    mk_label(chip, F_14, colorOf(d.kind), iconOf(d.kind));
+    lv_obj_t *title = mk_label(chip, F_14B, t.text, d.title.c_str());
     lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_max_width(title, 150, 0);
-    mk_label(chip, &font_14, t.muted, whenText(days_until(d.day)).c_str());
+    lv_obj_set_style_max_width(title, tw(150), 0);
+    lv_obj_set_height(title, lv_font_get_line_height(F_14B));  // one line, "..." at the end
+    mk_label(chip, F_14, t.muted, whenText(days_until(d.day)).c_str());
   }
   return ribbon;
 }
@@ -176,7 +177,7 @@ void dates_refresh() {
   lv_obj_clean(datesBody);
   const std::vector<DateItem> all = visible();
   if (all.empty()) {
-    lv_obj_t *l = mk_label(datesBody, &font_16, t.muted, kNothing);
+    lv_obj_t *l = mk_label(datesBody, F_16, t.muted, kNothing);
     lv_obj_set_width(l, SCREEN_W - 2 * PAD);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     return;
@@ -186,6 +187,6 @@ void dates_refresh() {
     section(datesBody, kBirthdays, DateKind::Birthday, all);
     section(datesBody, kHolidays, DateKind::Holiday, all);
   }
-  lv_obj_t *hint = mk_label(datesBody, &font_12, t.muted, kStarHint);
+  lv_obj_t *hint = mk_label(datesBody, F_12, t.muted, kStarHint);
   lv_obj_set_style_pad_top(hint, 4, 0);
 }

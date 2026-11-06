@@ -10,6 +10,59 @@ const char *const kToday = "Today";
 const char *const kTomorrow = "Tomorrow";
 const char *const kAllDay = "All day";
 
+// Font for each role (columns: F_12 F_14 F_14B F_16 F_16S F_20B F_26B F_34B) at
+// each text size. 12 px is the floor: S makes body text smaller, XS headings too;
+// L grows body text by about 2 px, XL by about 4 px; their headings stay, since
+// they are big already.
+// F_20B and smaller carry the icons, so they never map to 26 or 34 px, which have none.
+// (Only 18 and 20 px were added for this; the rest reuse the Normal fonts.)
+static const lv_font_t *const kFontTable[kTextSizes][kFontRoles] = {
+    {&font_12, &font_12, &font_14b, &font_14, &font_14b, &font_16s, &font_20b, &font_26b},  // XS
+    {&font_12, &font_12, &font_14b, &font_14, &font_16s, &font_20b, &font_26b, &font_34b},  // S
+    {&font_12, &font_14, &font_14b, &font_16, &font_16s, &font_20b, &font_26b, &font_34b},  // Normal
+    {&font_14, &font_16, &font_16s, &font_18, &font_20b, &font_20b, &font_26b, &font_34b},  // Large
+    {&font_16, &font_18, &font_20b, &font_20, &font_20b, &font_20b, &font_26b, &font_34b},  // Extra large
+};
+const lv_font_t *g_fonts[kFontRoles] = {&font_12, &font_14, &font_14b, &font_16,
+                                        &font_16s, &font_20b, &font_26b, &font_34b};
+
+static uint8_t textSizeNow = kTextNormal;
+
+void fonts_select(uint8_t textSize) {
+  if (textSize >= kTextSizes) textSize = kTextNormal;
+  textSizeNow = textSize;
+  memcpy(g_fonts, kFontTable[textSize], sizeof(g_fonts));
+}
+
+int tw(int px) {
+  return px * lv_font_get_line_height(F_16) / lv_font_get_line_height(&font_16);
+}
+
+int text_w(const lv_font_t *font, const char *text) {
+  return lv_txt_get_width(text, strlen(text), font, 0, LV_TEXT_FLAG_NONE);
+}
+
+void one_line(lv_obj_t *label, int w) {
+  lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(label, w);
+  lv_obj_set_height(label, lv_font_get_line_height(lv_obj_get_style_text_font(label, LV_PART_MAIN)));
+}
+
+FontCap::FontCap(uint8_t maxSize) : saved(textSizeNow) {
+  if (saved > maxSize) fonts_select(maxSize);
+  textSizeNow = saved;  // font_upto and nested caps still see the chosen size
+}
+
+FontCap::~FontCap() { fonts_select(saved); }
+
+const lv_font_t *font_at(FontRole role, uint8_t textSize) {
+  return kFontTable[textSize < kTextSizes ? textSize : kTextNormal][role];
+}
+
+const lv_font_t *font_upto(FontRole role, uint8_t maxSize) {
+  return kFontTable[textSizeNow < maxSize ? textSizeNow : maxSize][role];
+}
+
 namespace {
 
 const char *kDays[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
@@ -147,7 +200,7 @@ lv_obj_t *mk_text_button(lv_obj_t *parent, const char *text, bool primary, int w
   lv_obj_t *b = mk_button(parent, primary ? t.accent : t.raised);
   lv_obj_set_size(b, w, TOUCH);
   lv_obj_set_style_pad_hor(b, 16, 0);
-  lv_obj_t *l = mk_label(b, &font_14b, primary ? t.onAccent : t.text, text);
+  lv_obj_t *l = mk_label(b, F_14B, primary ? t.onAccent : t.text, text);
   lv_obj_center(l);
   return b;
 }
@@ -175,7 +228,7 @@ lv_obj_t *mk_screen() {
   lv_obj_set_style_bg_color(s, c(theme().bg), 0);
   lv_obj_set_style_bg_opa(s, LV_OPA_COVER, 0);
   lv_obj_set_style_text_color(s, c(theme().text), 0);
-  lv_obj_set_style_text_font(s, &font_16, 0);
+  lv_obj_set_style_text_font(s, F_16, 0);
   lv_obj_clear_flag(s, LV_OBJ_FLAG_SCROLLABLE);
   return s;
 }
@@ -211,7 +264,7 @@ lv_obj_t *mk_textarea(lv_obj_t *parent, const char *placeholder) {
   lv_textarea_set_one_line(ta, true);
   lv_textarea_set_placeholder_text(ta, placeholder);
   lv_obj_set_height(ta, 48);
-  lv_obj_set_style_text_font(ta, &font_16, 0);
+  lv_obj_set_style_text_font(ta, F_16, 0);
   lv_obj_set_style_bg_color(ta, c(t.bg), 0);
   lv_obj_set_style_text_color(ta, c(t.text), 0);
   lv_obj_set_style_border_color(ta, c(t.accent), 0);
@@ -239,7 +292,7 @@ lv_obj_t *mk_keyboard(lv_obj_t *parent, lv_obj_t *textarea) {
   lv_obj_set_style_bg_color(kb, c(t.line), LV_PART_ITEMS | LV_STATE_PRESSED);
   lv_obj_set_style_bg_color(kb, c(t.raised), LV_PART_ITEMS | LV_STATE_CHECKED);
   lv_obj_set_style_text_color(kb, c(t.text), LV_PART_ITEMS);
-  lv_obj_set_style_text_font(kb, &font_16, LV_PART_ITEMS);
+  lv_obj_set_style_text_font(kb, F_16, LV_PART_ITEMS);
   lv_obj_set_style_radius(kb, 8, LV_PART_ITEMS);
   lv_obj_set_style_border_width(kb, 0, LV_PART_ITEMS);
   lv_obj_set_style_shadow_width(kb, 0, LV_PART_ITEMS);
@@ -251,7 +304,7 @@ lv_obj_t *mk_chip(lv_obj_t *parent, const char *text, bool selected, int h) {
   lv_obj_set_size(b, LV_SIZE_CONTENT, h);
   lv_obj_set_style_min_height(b, h, 0);
   lv_obj_set_style_pad_hor(b, 14, 0);
-  lv_obj_t *l = mk_label(b, &font_14b, theme().text, text);
+  lv_obj_t *l = mk_label(b, F_14B, theme().text, text);
   lv_obj_center(l);
   set_chip(b, selected);
   return b;
@@ -314,13 +367,13 @@ lv_obj_t *mk_stepper(lv_obj_t *parent, int value, int min, int max, int step, St
   set_flex(row, LV_FLEX_FLOW_ROW, 6, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
   lv_obj_t *minus = mk_button(row, t.raised, TOUCH / 2);
   lv_obj_set_size(minus, TOUCH, TOUCH);
-  lv_obj_center(mk_label(minus, &font_20b, t.text, "-"));
-  lv_obj_t *label = mk_label(row, &font_16, t.text, "");
+  lv_obj_center(mk_label(minus, F_20B, t.text, "-"));
+  lv_obj_t *label = mk_label(row, F_16, t.text, "");
   lv_obj_set_width(label, valueW);
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_t *plus = mk_button(row, t.raised, TOUCH / 2);
   lv_obj_set_size(plus, TOUCH, TOUCH);
-  lv_obj_center(mk_label(plus, &font_20b, t.text, "+"));
+  lv_obj_center(mk_label(plus, F_20B, t.text, "+"));
   StepState *st = attach(row, StepState{label, minus, plus, value, min, max, step, fmt, cb, user});
   stepShow(st);
   // A tap steps once; holding repeats (LVGL sends no click after a long press).
@@ -368,8 +421,8 @@ lv_obj_t *mk_slider(lv_obj_t *parent, const char *title, int value, int min, int
   lv_obj_set_style_bg_opa(head, LV_OPA_TRANSP, 0);
   lv_obj_set_size(head, lv_pct(100), 18);
   set_flex(head, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
-  mk_label(head, &font_14b, t.text, title);
-  lv_obj_t *val = mk_label(head, &font_14b, t.accent, strf("%d%s", value, unit).c_str());
+  mk_label(head, F_14B, t.text, title);
+  lv_obj_t *val = mk_label(head, F_14B, t.accent, strf("%d%s", value, unit).c_str());
   // The track with a small bar at each end, no min/max text.
   lv_obj_t *scale = mk_box(wrap, 0, 0);
   lv_obj_set_style_bg_opa(scale, LV_OPA_TRANSP, 0);
@@ -462,13 +515,13 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   lv_obj_set_style_pad_right(h, 10, 0);
   set_flex(h, LV_FLEX_FLOW_ROW, 12, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
 
-  lv_obj_t *clock = mk_label(h, &font_26b, t.text, "");
-  lv_obj_t *date = mk_label(h, &font_16, t.muted, "");
+  lv_obj_t *clock = mk_label(h, F_26B, t.text, "");
+  lv_obj_t *date = mk_label(h, F_16, t.muted, "");
   register_clock(clock, date);
   // "Saved copy" badge while the data shown comes from the SD card (before
   // the first sync, or when every account fails). An SD card, not a cloud,
   // so it is not taken for the weather. Tap it for the reason.
-  lv_obj_t *offline = mk_label(h, &font_16, t.warnFg, ICON_SD);
+  lv_obj_t *offline = mk_label(h, F_16, t.warnFg, ICON_SD);
   lv_obj_set_ext_click_area(offline, 14);
   on_click(offline, [](lv_event_t *) { toast(g_snap.error.length() ? g_snap.error : String(kSavedCopyHint)); });
   lv_obj_add_flag(offline, LV_OBJ_FLAG_HIDDEN);
@@ -479,8 +532,8 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   lv_obj_set_size(wifiBadge, LV_SIZE_CONTENT, 32);
   lv_obj_set_style_pad_hor(wifiBadge, 10, 0);
   set_flex(wifiBadge, LV_FLEX_FLOW_ROW, 6);
-  mk_label(wifiBadge, &font_14, t.badFg, ICON_WIFI);
-  mk_label(wifiBadge, &font_14b, t.badFg, "");
+  mk_label(wifiBadge, F_14, t.badFg, ICON_WIFI);
+  mk_label(wifiBadge, F_14B, t.badFg, "");
   lv_obj_add_flag(wifiBadge, LV_OBJ_FLAG_HIDDEN);
   on_click(wifiBadge, [](lv_event_t *) { wifi_problem_open(); });
 
@@ -495,9 +548,9 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   lv_obj_set_style_max_width(pill, kPillMaxW, 0);
   lv_obj_set_style_pad_hor(pill, 12, 0);
   set_flex(pill, LV_FLEX_FLOW_ROW, 8);
-  mk_label(pill, &font_14, t.accent, ICON_TIMER);
-  mk_label(pill, &font_14b, t.accent, "");
-  lv_obj_t *pt = mk_label(pill, &font_14, t.text, "");
+  mk_label(pill, F_14, t.accent, ICON_TIMER);
+  mk_label(pill, F_14B, t.accent, "");
+  lv_obj_t *pt = mk_label(pill, F_14, t.text, "");
   lv_label_set_long_mode(pt, LV_LABEL_LONG_DOT);
   lv_obj_set_style_max_width(pt, kPillMaxW - 110, 0);
   lv_obj_t *bar = mk_box(pill, t.accent, 1);
@@ -513,8 +566,8 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
   lv_obj_set_style_min_height(leave, 40, 0);
   lv_obj_set_style_pad_hor(leave, 14, 0);
   set_flex(leave, LV_FLEX_FLOW_ROW, 8);
-  mk_label(leave, &font_14, t.onAccent, ICON_CAR);
-  mk_label(leave, &font_14b, t.onAccent, "");
+  mk_label(leave, F_14, t.onAccent, ICON_CAR);
+  mk_label(leave, F_14B, t.onAccent, "");
   lv_obj_add_flag(leave, LV_OBJ_FLAG_HIDDEN);
   on_click(leave, [](lv_event_t *) {
     time_t at;
@@ -534,8 +587,8 @@ lv_obj_t *mk_nav_header(lv_obj_t *scr, Screen active) {
     lv_obj_set_height(b, TOUCH);
     lv_obj_set_style_pad_hor(b, tab.label ? 14 : 12, 0);
     set_flex(b, LV_FLEX_FLOW_ROW, 8);
-    mk_label(b, &font_16, on ? t.text : t.muted, tab.icon);
-    if (tab.label) mk_label(b, &font_14b, on ? t.text : t.muted, tab.label);
+    mk_label(b, F_16, on ? t.text : t.muted, tab.icon);
+    if (tab.label) mk_label(b, F_14B, on ? t.text : t.muted, tab.label);
     // A tap opens the screen; holding a feature's tab opens that feature's options instead
     // (SHORT_CLICKED: CLICKED would also fire when a long press is let go).
     lv_obj_add_event_cb(b, go, LV_EVENT_SHORT_CLICKED, (void *)(intptr_t)tab.screen);
@@ -564,8 +617,8 @@ lv_obj_t *mk_back_header(lv_obj_t *scr, const char *title, Screen back) {
   lv_obj_set_style_pad_left(b, 10, 0);
   lv_obj_set_style_pad_right(b, 14, 0);
   set_flex(b, LV_FLEX_FLOW_ROW, 10);
-  mk_label(b, &font_16, t.text, ICON_LEFT);
-  mk_label(b, &font_20b, t.text, title);
+  mk_label(b, F_16, t.text, ICON_LEFT);
+  mk_label(b, F_20B, t.text, title);
   on_click(b, go, (void *)(intptr_t)back);
 
   lv_obj_t *spacer = mk_box(h, 0, 0);
@@ -683,13 +736,13 @@ lv_obj_t *mk_due(lv_obj_t *parent, const String &due_key) {
   lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   set_flex(row, LV_FLEX_FLOW_ROW, 6);
   if (!text.length()) {
-    mk_label(row, &font_14, t.muted, kNoDate);
+    mk_label(row, F_14, t.muted, kNoDate);
     return row;
   }
   const uint32_t color = tone == Tone::Bad ? t.badFg : tone == Tone::Warn ? t.warnFg
                          : text.startsWith(kTomorrow) ? t.text : t.muted;
-  mk_label(row, &font_14, color, tone == Tone::Bad ? ICON_WARNING : tone == Tone::Warn ? ICON_CLOCK : ICON_CALENDAR);
-  mk_label(row, &font_14, color, text.c_str());
+  mk_label(row, F_14, color, tone == Tone::Bad ? ICON_WARNING : tone == Tone::Warn ? ICON_CLOCK : ICON_CALENDAR);
+  mk_label(row, F_14, color, text.c_str());
   return row;
 }
 

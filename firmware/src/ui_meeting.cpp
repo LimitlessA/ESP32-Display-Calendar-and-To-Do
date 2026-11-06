@@ -92,10 +92,10 @@ void showFull(const Event &ev) {
   lv_obj_set_style_bg_opa(full, LV_OPA_COVER, 0);
   lv_obj_add_flag(full, LV_OBJ_FLAG_CLICKABLE);
 
-  lv_obj_t *head = mk_label(full, &font_14b, t.accent, kInMeeting);
+  lv_obj_t *head = mk_label(full, F_14B, t.accent, kInMeeting);
   lv_obj_set_style_text_letter_space(head, 2, 0);
   lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 26);
-  lv_obj_t *title = mk_label(full, &font_26b, t.text, ev.title.c_str());
+  lv_obj_t *title = mk_label(full, F_26B, t.text, ev.title.c_str());
   lv_obj_set_width(title, SCREEN_W - 120);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
@@ -113,21 +113,21 @@ void showFull(const Event &ev) {
     lv_bar_set_range(fullBar, 0, 1000);
     lv_obj_set_style_bg_color(fullBar, c(t.raised), LV_PART_MAIN);
     lv_obj_set_style_bg_color(fullBar, c(t.accent), LV_PART_INDICATOR);
-    fullLeft = mk_label(full, &font_14, t.muted, "");
+    fullLeft = mk_label(full, F_14, t.muted, "");
     lv_obj_align(fullLeft, LV_ALIGN_TOP_MID, 0, y + 20);
     y += 50;
   }
   if (costOn(1)) {
     if (!timer) {
-      lv_obj_t *l = mk_label(full, &font_14b, t.muted, kCostLabel);
+      lv_obj_t *l = mk_label(full, F_14B, t.muted, kCostLabel);
       lv_obj_set_style_text_letter_space(l, 2, 0);
       lv_obj_align(l, LV_ALIGN_TOP_MID, 0, y + 10);
       y += 40;
     }
-    fullCost = mk_label(full, timer ? &font_34b : &font_72, timer ? t.warnFg : t.text, "");
+    fullCost = mk_label(full, timer ? F_34B : &font_72, timer ? t.warnFg : t.text, "");
     lv_obj_align(fullCost, LV_ALIGN_TOP_MID, 0, y);
     y += timer ? 44 : 90;
-    lv_obj_t *rate = mk_label(full, &font_14, t.muted,
+    lv_obj_t *rate = mk_label(full, F_14, t.muted,
                               strf(kCostPeople, people(ev), money(g_settings.costRate).c_str()).c_str());
     lv_obj_align(rate, LV_ALIGN_TOP_MID, 0, y);
   }
@@ -183,7 +183,7 @@ void showEdge() {
   lv_obj_set_style_pad_ver(edgePill, 2, 0);
   lv_obj_align(edgePill, LV_ALIGN_TOP_MID, 0, EDGE_H);
   lv_obj_clear_flag(edgePill, LV_OBJ_FLAG_CLICKABLE);
-  mk_label(edgePill, &font_12, t.onAccent, "");
+  mk_label(edgePill, F_12, t.onAccent, "");
 }
 
 void hideEdge() {
@@ -247,19 +247,19 @@ void mk_meeting_extras(lv_obj_t *card, const Event &ev, int w) {
     lv_bar_set_value(bar, (int32_t)(1000 - left * 1000 / total), LV_ANIM_OFF);
     lv_obj_set_style_bg_color(bar, c(t.line), LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar, c(late ? t.warnFg : t.accent), LV_PART_INDICATOR);
-    lv_obj_t *l = mk_label(card, &font_12, late ? t.warnFg : t.accent,
+    lv_obj_t *l = mk_label(card, F_12, late ? t.warnFg : t.accent,
                            left >= 60 ? strf(kMinLeft, (int)(left / 60)).c_str() : strf(kSecLeft, (int)left).c_str());
     lv_obj_set_style_text_letter_space(l, 1, 0);
     if (g_settings.sound && left > kChimeBeforeEnd) {
-      mk_label(card, &font_12, t.muted, strf(kChimeAt, fmt_time(ev.end / 1000 - kChimeBeforeEnd).c_str()).c_str());
+      mk_label(card, F_12, t.muted, strf(kChimeAt, fmt_time(ev.end / 1000 - kChimeBeforeEnd).c_str()).c_str());
     }
   }
   if (costOn(0)) {
-    lv_obj_t *l = mk_label(card, &font_14b, t.warnFg,
+    lv_obj_t *l = mk_label(card, F_14B, t.warnFg,
                            strf(kCostSoFar, money(meeting_cost(ev, now)).c_str(), money(g_settings.costRate).c_str()).c_str());
     lv_obj_set_width(l, w);
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
-    lv_obj_t *m = mk_label(card, &font_12, t.muted,
+    lv_obj_t *m = mk_label(card, F_12, t.muted,
                            strf(kCostIfRuns, money(meeting_cost(ev, ev.end / 1000)).c_str(),
                                 fmt_time(ev.end / 1000).c_str()).c_str());
     lv_obj_set_width(m, w);
@@ -281,9 +281,9 @@ void meeting_receipt_show() {
   set_flex(card, LV_FLEX_FLOW_COLUMN, 8, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_center(card);
   const int w = 476;
-  mk_label(card, &font_20b, t.text, kReceiptTitle);
+  mk_label(card, F_20B, t.text, kReceiptTitle);
   const time_t weekStart = g_snap.weekStart ? g_snap.weekStart : day_start(ui_now());
-  mk_label(card, &font_12, t.muted,
+  mk_label(card, F_12, t.muted,
            (fmt_date_short(weekStart) + " - " + fmt_date_short(weekStart + 6 * 86400)).c_str());
 
   lv_obj_t *list = mk_scroll_column(card, 6);
@@ -302,17 +302,17 @@ void meeting_receipt_show() {
     sum += cost;
     secs += (long)((ev.end - ev.start) / 1000);
     n++;
-    line(list, w - 4, &font_14b, t.text, ev.title, money(cost));
-    lv_obj_t *sub = mk_label(list, &font_12, t.muted,
+    line(list, w - 4, F_14B, t.text, ev.title, money(cost));
+    lv_obj_t *sub = mk_label(list, F_12, t.muted,
                              (fmt_date_short(ev.start / 1000) + "  " +
                               strf(kReceiptLine, people(ev), duration((long)((ev.end - ev.start) / 1000)).c_str()))
                                  .c_str());
     lv_obj_set_style_pad_bottom(sub, 4, 0);
   }
-  if (!n) mk_label(list, &font_14, t.muted, kReceiptEmpty);
-  line(card, w, &font_20b, t.warnFg, kReceiptTotal, money(sum));
-  mk_label(card, &font_12, t.muted, strf(kReceiptHours, n, duration(secs).c_str()).c_str());
-  lv_obj_t *note = mk_label(card, &font_12, t.muted, kReceiptNote);
+  if (!n) mk_label(list, F_14, t.muted, kReceiptEmpty);
+  line(card, w, F_20B, t.warnFg, kReceiptTotal, money(sum));
+  mk_label(card, F_12, t.muted, strf(kReceiptHours, n, duration(secs).c_str()).c_str());
+  lv_obj_t *note = mk_label(card, F_12, t.muted, kReceiptNote);
   lv_obj_set_width(note, w);
   lv_label_set_long_mode(note, LV_LABEL_LONG_WRAP);
   lv_obj_t *close = mk_text_button(card, kClose, true, w);

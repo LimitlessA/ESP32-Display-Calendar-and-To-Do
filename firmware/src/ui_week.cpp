@@ -53,7 +53,7 @@ void openEvent(lv_event_t *e) {
 lv_obj_t *roundButton(lv_obj_t *parent, const char *icon) {
   lv_obj_t *b = mk_button(parent, theme().card, TOUCH / 2);
   lv_obj_set_size(b, TOUCH, TOUCH);
-  lv_obj_t *l = mk_label(b, &font_16, theme().text, icon);
+  lv_obj_t *l = mk_label(b, F_16, theme().text, icon);
   lv_obj_center(l);
   return b;
 }
@@ -70,20 +70,20 @@ lv_obj_t *week_create() {
   lv_obj_set_pos(bar, 18, BAR_Y);
   lv_obj_set_size(bar, SCREEN_W - 18 - 10, TOUCH);
   set_flex(bar, LV_FLEX_FLOW_ROW, 4);
-  rangeLabel = mk_label(bar, &font_20b, t.text, "");
+  rangeLabel = mk_label(bar, F_20B, t.text, "");
   lv_obj_set_flex_grow(rangeLabel, 1);
   if (meeting_receipt_on()) {
     lv_obj_t *receipt = mk_button(bar, t.card, TOUCH / 2);
     lv_obj_set_size(receipt, LV_SIZE_CONTENT, TOUCH);
     lv_obj_set_style_pad_hor(receipt, 16, 0);
-    lv_obj_center(mk_label(receipt, &font_14b, t.warnFg, kReceipt));
+    lv_obj_center(mk_label(receipt, F_14B, t.warnFg, kReceipt));
     on_click(receipt, [](lv_event_t *) { meeting_receipt_show(); });
   }
   on_click(roundButton(bar, ICON_LEFT), [](lv_event_t *) { request(addDays(viewWeek, -7)); });
   lv_obj_t *thisWeek = mk_button(bar, t.card, TOUCH / 2);
   lv_obj_set_size(thisWeek, LV_SIZE_CONTENT, TOUCH);
   lv_obj_set_style_pad_hor(thisWeek, 16, 0);
-  lv_obj_center(mk_label(thisWeek, &font_14b, t.text, kThisWeek));
+  lv_obj_center(mk_label(thisWeek, F_14B, t.text, kThisWeek));
   on_click(thisWeek, [](lv_event_t *) { request(mondayOf(ui_now())); });
   on_click(roundButton(bar, ICON_RIGHT), [](lv_event_t *) { request(addDays(viewWeek, 7)); });
 
@@ -93,7 +93,7 @@ lv_obj_t *week_create() {
   lv_obj_set_size(cols, SCREEN_W - 2 * PAD, COLS_H);
   set_flex(cols, LV_FLEX_FLOW_ROW, DAY_GAP, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-  loading = mk_label(scr, &font_16, t.muted, kLoading);
+  loading = mk_label(scr, F_16, t.muted, kLoading);
   lv_obj_align(loading, LV_ALIGN_CENTER, 0, 60);
   return scr;
 }
@@ -141,7 +141,7 @@ void week_refresh() {
     set_flex(head, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
     bool clashDay = false;
     for (const Conflict &cf : conflicts) clashDay |= day_number(cf.from) == dn;
-    lv_obj_t *name = mk_label(head, &font_12, isToday ? t.accent : t.muted, kDayNames[d]);
+    lv_obj_t *name = mk_label(head, F_12, isToday ? t.accent : t.muted, kDayNames[d]);
     if (clashDay) {
       lv_label_set_text_fmt(name, "%s  " ICON_WARNING, kDayNames[d]);
       lv_obj_set_style_text_color(name, c(t.badFg), 0);
@@ -149,7 +149,7 @@ void week_refresh() {
     lv_obj_set_style_text_letter_space(name, 1, 0);
     struct tm tm;
     localtime_r(&day, &tm);
-    lv_obj_t *num = mk_label(head, &font_20b, past ? t.muted : t.text, "");
+    lv_obj_t *num = mk_label(head, F_20B, past ? t.muted : t.text, "");
     lv_label_set_text_fmt(num, "%d", tm.tm_mday);
     if (!ready) continue;
 
@@ -170,20 +170,20 @@ void week_refresh() {
       set_flex(top, LV_FLEX_FLOW_ROW, 5);
       mk_dot(top, ev.color, 7);
       const bool clash = has_conflict(ev, conflicts);
-      mk_label(top, &font_12, clash ? t.badFg : t.muted,
+      mk_label(top, F_12, clash ? t.badFg : t.muted,
                ev.allDay || s != dn ? kAllDay : fmt_time(ev.start / 1000).c_str());
       if (clash) {
-        mk_label(top, &font_12, t.badFg, ICON_WARNING);
+        mk_label(top, F_12, t.badFg, ICON_WARNING);
         lv_obj_set_style_border_color(b, c(t.badFg), 0);
         lv_obj_set_style_border_width(b, 2, 0);
       }
-      lv_obj_t *title = mk_label(b, &font_12, t.text, event_title(ev).c_str());
+      lv_obj_t *title = mk_label(b, F_12, t.text, event_title(ev).c_str());
       lv_obj_set_width(title, DAY_W - 24);
       lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
       on_click(b, openEvent, attach(b, ev));
     }
     if (!n) {
-      lv_obj_t *none = mk_label(list, &font_12, t.muted, kFree);
+      lv_obj_t *none = mk_label(list, F_12, t.muted, kFree);
       lv_obj_set_width(none, DAY_W - 12);
       lv_obj_set_style_text_align(none, LV_TEXT_ALIGN_CENTER, 0);
     }
