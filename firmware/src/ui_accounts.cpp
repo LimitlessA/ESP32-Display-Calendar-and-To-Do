@@ -74,11 +74,11 @@ constexpr const char *kForgetText = "The display stops controlling the desk and 
 constexpr const char *kCancel = "Cancel";
 
 constexpr int LIST_W = 300;
-constexpr int BODY_Y = HEADER_H;
-constexpr int BODY_H = SCREEN_H - BODY_Y;
+#define BODY_Y (HEADER_H)
+#define BODY_H (SCREEN_H - BODY_Y)
 constexpr int DETAIL_X = LIST_W + 24;
 constexpr int DETAIL_W = SCREEN_W - DETAIL_X - 24;
-constexpr int ITEM_H = 56;
+#define ITEM_H sz(56)
 constexpr int QR_SIZE = 150;
 
 // ---- State -------------------------------------------------------------------

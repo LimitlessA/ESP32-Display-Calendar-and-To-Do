@@ -21,8 +21,8 @@ constexpr const char *kNothingShort = "Star a meeting to count down to it";
 constexpr const char *kStarHint = "Starred events, birthdays from Contacts and public holidays for the next 60 days.";
 constexpr int kColumnItems = 5;    // A
 constexpr int kRibbonItems = 3;    // B, as many as fit the width
-constexpr int RIBBON_H = 36;
-constexpr int CARD_W = (SCREEN_W - 2 * PAD - 2 * GAP) / 3;
+#define RIBBON_H sz(36)
+#define CARD_W ((SCREEN_W - 2 * PAD - 2 * GAP) / 3)
 
 // ---- State -------------------------------------------------------------------
 

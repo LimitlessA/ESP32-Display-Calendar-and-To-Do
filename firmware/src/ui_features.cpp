@@ -90,13 +90,13 @@ constexpr const char *kNeedsLightSensor = "Needs a BH1750 light sensor on I2C";
 constexpr const char *kMinutes = "%d min";
 constexpr const char *kMoney = "\u20AC%d";
 
-constexpr int BODY_Y = HEADER_H + GAP;
-constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
+#define BODY_Y (HEADER_H + GAP)
+#define BODY_H (SCREEN_H - BODY_Y - PAD)
 constexpr int COLS = 5;
 constexpr int TILE_GAP = 8;
-constexpr int TILE_W = (SCREEN_W - 2 * PAD - (COLS - 1) * TILE_GAP) / COLS;
+#define TILE_W ((SCREEN_W - 2 * PAD - (COLS - 1) * TILE_GAP) / COLS)
 constexpr int ROWS = (kFeatureCount + COLS - 1) / COLS;
-constexpr int TILE_H = (BODY_H - (ROWS - 1) * TILE_GAP) / ROWS;  // every tile on one screen, no scrolling
+#define TILE_H ((BODY_H - (ROWS - 1) * TILE_GAP) / ROWS)  // every tile on one screen, no scrolling
 constexpr int DIALOG_W = 640;
 constexpr int INNER_W = DIALOG_W - 56;
 

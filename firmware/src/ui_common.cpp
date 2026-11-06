@@ -11,16 +11,16 @@ const char *const kTomorrow = "Tomorrow";
 const char *const kAllDay = "All day";
 
 // Font for each role (columns: F_12 F_14 F_14B F_16 F_16S F_20B F_26B F_34B) at
-// each text size. S makes body text smaller, XS headings too, XXS body text
-// smaller still (10 px, added for it; bold and headings stay as at XS);
-// L grows body text by about 2 px, XL by about 4 px; their headings stay, since
-// they are big already.
+// each text size. The small sizes exist to fit more on the screen, so every role
+// shrinks: bold and headings one step per size down their own ladder
+// (12b 14b 16s 20b 26b 34b), regular text down 10 12 14 16. L grows body text by
+// about 2 px, XL by about 4 px; their headings stay, since they are big already.
 // F_20B and smaller carry the icons, so they never map to 26 or 34 px, which have none.
-// (Only 10, 18 and 20 px were added for this; the rest reuse the Normal fonts.)
+// (10, 12 bold, 18 and 20 px were added for this; the rest are the Normal fonts.)
 static const lv_font_t *const kFontTable[kTextSizes][kFontRoles] = {
-    {&font_10, &font_10, &font_14b, &font_12, &font_14b, &font_16s, &font_20b, &font_26b},  // XXS
-    {&font_12, &font_12, &font_14b, &font_14, &font_14b, &font_16s, &font_20b, &font_26b},  // XS
-    {&font_12, &font_12, &font_14b, &font_14, &font_16s, &font_20b, &font_26b, &font_34b},  // S
+    {&font_10, &font_10, &font_12b, &font_10, &font_12b, &font_12b, &font_14b, &font_16s},  // XXS
+    {&font_10, &font_12, &font_12b, &font_12, &font_12b, &font_14b, &font_16s, &font_20b},  // XS
+    {&font_12, &font_12, &font_12b, &font_14, &font_14b, &font_16s, &font_20b, &font_26b},  // S
     {&font_12, &font_14, &font_14b, &font_16, &font_16s, &font_20b, &font_26b, &font_34b},  // Normal
     {&font_14, &font_16, &font_16s, &font_18, &font_20b, &font_20b, &font_26b, &font_34b},  // Large
     {&font_16, &font_18, &font_20b, &font_20, &font_20b, &font_20b, &font_26b, &font_34b},  // Extra large
@@ -30,10 +30,17 @@ const lv_font_t *g_fonts[kFontRoles] = {&font_12, &font_14, &font_14b, &font_16,
 
 static uint8_t textSizeNow = kTextNormal;
 
+// Layout scale for each text size, in percent: at the small sizes the header,
+// rows, cards and spacing shrink with the text, so more fits on a screen. L and
+// XL keep the Normal layout; their rows grow with the text where they can.
+static const uint8_t kLayoutScale[kTextSizes] = {72, 80, 90, 100, 100, 100};
+int g_ui_scale = 100;
+
 void fonts_select(uint8_t textSize) {
   if (textSize >= kTextSizes) textSize = kTextNormal;
   textSizeNow = textSize;
   memcpy(g_fonts, kFontTable[textSize], sizeof(g_fonts));
+  g_ui_scale = kLayoutScale[textSize];
 }
 
 int tw(int px) {
@@ -294,7 +301,7 @@ lv_obj_t *mk_keyboard(lv_obj_t *parent, lv_obj_t *textarea) {
   lv_obj_set_style_bg_color(kb, c(t.line), LV_PART_ITEMS | LV_STATE_PRESSED);
   lv_obj_set_style_bg_color(kb, c(t.raised), LV_PART_ITEMS | LV_STATE_CHECKED);
   lv_obj_set_style_text_color(kb, c(t.text), LV_PART_ITEMS);
-  lv_obj_set_style_text_font(kb, F_16, LV_PART_ITEMS);
+  lv_obj_set_style_text_font(kb, &font_16, LV_PART_ITEMS);  // fixed: the keys keep their size at every text size
   lv_obj_set_style_radius(kb, 8, LV_PART_ITEMS);
   lv_obj_set_style_border_width(kb, 0, LV_PART_ITEMS);
   lv_obj_set_style_shadow_width(kb, 0, LV_PART_ITEMS);

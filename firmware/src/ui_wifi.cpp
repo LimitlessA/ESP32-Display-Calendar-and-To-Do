@@ -23,10 +23,10 @@ constexpr const char *kConnectedTo = ICON_CHECK "  Connected to %s  %s";  // net
 constexpr const char *kFailed = "Could not connect. Check the password and try again.";
 
 constexpr int LIST_W = 290;
-constexpr int BODY_Y = HEADER_H + GAP;
-constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
-constexpr int RIGHT_X = PAD + LIST_W + GAP;
-constexpr int RIGHT_W = SCREEN_W - RIGHT_X - PAD;
+#define BODY_Y (HEADER_H + GAP)
+#define BODY_H (SCREEN_H - BODY_Y - PAD)
+#define RIGHT_X (PAD + LIST_W + GAP)
+#define RIGHT_W (SCREEN_W - RIGHT_X - PAD)
 
 // ---- State -------------------------------------------------------------------
 

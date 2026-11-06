@@ -59,9 +59,9 @@ constexpr int kStandingMm = 1000;     // the desk calls 1000 mm and up standing
 constexpr int kMeetingMinMinutes = 15;
 constexpr long kPromptBefore = 60;    // seconds before the meeting: "standing up" popup
 constexpr int kDayFrom = 7, kDayTo = 19;  // C: timeline hours
-constexpr int DOCK_H = 64;
-constexpr int BODY_Y = HEADER_H + GAP;
-constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
+#define DOCK_H LV_MAX(TOUCH + 10, sz(64))  // shrinks with the text size
+#define BODY_Y (HEADER_H + GAP)
+#define BODY_H (SCREEN_H - BODY_Y - PAD)
 
 // ---- State -------------------------------------------------------------------
 
@@ -553,15 +553,15 @@ void buildScreenB(const DeskStatus &st) {
   lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_style_pad_row(grid, 10, 0);
   lv_obj_set_style_pad_column(grid, 10, 0);
-  for (uint8_t i = 1; i <= 4; i++) memButton(grid, i, live, (rw - 10) / 2, 56);
+  for (uint8_t i = 1; i <= 4; i++) memButton(grid, i, live, (rw - 10) / 2, LV_MAX(TOUCH, sz(56)));
 
   lv_obj_t *row = transparent(right);
-  lv_obj_set_size(row, rw, 56);
+  lv_obj_set_size(row, rw, LV_MAX(TOUCH, sz(56)));
   set_flex(row, LV_FLEX_FLOW_ROW, 10);
   if (st.hasLogin) {
     for (int dir : {1, -1}) {
       lv_obj_t *b = mk_button(row, t.raised, 14);
-      lv_obj_set_size(b, (rw - 120) / 2, 56);
+      lv_obj_set_size(b, (rw - 120) / 2, LV_MAX(TOUCH, sz(56)));
       set_flex(b, LV_FLEX_FLOW_ROW, 8, LV_FLEX_ALIGN_CENTER);
       mk_label(b, F_16, t.text, dir > 0 ? ICON_CARET_UP : ICON_CARET_DN);
       mk_label(b, F_14B, t.text, dir > 0 ? kRaise : kLower);
@@ -573,7 +573,7 @@ void buildScreenB(const DeskStatus &st) {
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
   }
   lv_obj_t *stop = mk_button(row, t.badBg, 14);
-  lv_obj_set_size(stop, 100, 56);
+  lv_obj_set_size(stop, 100, LV_MAX(TOUCH, sz(56)));
   lv_obj_center(mk_label(stop, F_14B, t.badFg, kStop));
   on_click(stop, [](lv_event_t *) { desk_stop(); });
 
@@ -916,7 +916,7 @@ lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w) {
   one_line(live.state, 110);
   // Timer: tap to start or stop it (needs the desk login).
   lv_obj_t *tc = mk_button(dock, t.card, 8);
-  lv_obj_set_size(tc, 124, 48);
+  lv_obj_set_size(tc, 124, DOCK_H - 16);
   set_flex(tc, LV_FLEX_FLOW_COLUMN, 4, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
   live.timer = mk_label(tc, font_upto(kF12, kTextNormal), t.accent, "");
   live.timerBar = lv_bar_create(tc);
@@ -929,15 +929,15 @@ lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w) {
   const int memW = (w - 16 - 8 - 110 - 124 - buttons * 58 - 10 * (3 + buttons) - 3 * 6) / 4;
   lv_obj_t *mems = transparent(dock);
   set_flex(mems, LV_FLEX_FLOW_ROW, 6);
-  for (uint8_t i = 1; i <= 4; i++) memButton(mems, i, live, memW, 52);
+  for (uint8_t i = 1; i <= 4; i++) memButton(mems, i, live, memW, DOCK_H - 12);
   if (st.hasLogin) {
-    holdButton(roundButton(dock, ICON_CARET_UP, 52), 1);
-    holdButton(roundButton(dock, ICON_CARET_DN, 52), -1);
+    holdButton(roundButton(dock, ICON_CARET_UP, DOCK_H - 12), 1);
+    holdButton(roundButton(dock, ICON_CARET_DN, DOCK_H - 12), -1);
   }
   // Stop sits on top of the memory buttons while the desk moves.
   live.stop = mk_button(dock, t.badBg, 14);
   lv_obj_add_flag(live.stop, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  lv_obj_set_size(live.stop, 4 * memW + 18, 52);
+  lv_obj_set_size(live.stop, 4 * memW + 18, DOCK_H - 12);
   lv_obj_align(live.stop, LV_ALIGN_LEFT_MID, 110 + 124 + 20, 0);
   lv_obj_center(mk_label(live.stop, F_14B, t.badFg, kStop));
   on_click(live.stop, [](lv_event_t *) { desk_stop(); });

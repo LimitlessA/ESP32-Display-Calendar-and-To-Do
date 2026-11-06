@@ -13,10 +13,10 @@ constexpr const char *kFree = "Free";  // day without meetings
 constexpr const char *kReceipt = "\xE2\x82\xAC Meeting cost";
 
 constexpr int DAY_GAP = 6;
-constexpr int DAY_W = (SCREEN_W - 2 * PAD - 6 * DAY_GAP) / 7;
-constexpr int BAR_Y = HEADER_H + 8;
-constexpr int COLS_Y = BAR_Y + TOUCH + 8;
-constexpr int COLS_H = SCREEN_H - COLS_Y - PAD;
+#define DAY_W ((SCREEN_W - 2 * PAD - 6 * DAY_GAP) / 7)
+#define BAR_Y (HEADER_H + 8)
+#define COLS_Y (BAR_Y + TOUCH + 8)
+#define COLS_H (SCREEN_H - COLS_Y - PAD)
 
 // ---- State -------------------------------------------------------------------
 

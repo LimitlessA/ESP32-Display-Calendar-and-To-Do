@@ -27,9 +27,9 @@ constexpr const char *kPickForMe = "Pick for me";
 constexpr const char *kRadar = "Radar";
 
 constexpr int NAV_W = 200;
-constexpr int BODY_Y = HEADER_H + GAP;
-constexpr int BODY_H = SCREEN_H - BODY_Y - PAD;
-constexpr int PANEL_W = SCREEN_W - 2 * PAD - NAV_W - GAP;
+#define BODY_Y (HEADER_H + GAP)
+#define BODY_H (SCREEN_H - BODY_Y - PAD)
+#define PANEL_W (SCREEN_W - 2 * PAD - NAV_W - GAP)
 
 enum class Filter { All, Overdue, Today, Done, List };
 
@@ -97,11 +97,11 @@ void taskRow(const Task &task, bool sub) {
   lv_obj_t *row = mk_box(panel, 0, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_width(row, PANEL_W - 24);
-  lv_obj_set_style_min_height(row, 54, 0);
+  lv_obj_set_style_min_height(row, sz(54), 0);
   lv_obj_set_style_pad_left(row, sub ? 28 : 0, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 4);
   focus_hold(row, task);
-  mk_check(row, task, 52);
+  mk_check(row, task, TOUCH + 8);
 
   lv_obj_t *text = mk_box(row, 0, 0);
   lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0);
@@ -133,11 +133,11 @@ void doneRow(const Task &task) {
   lv_obj_t *row = mk_box(panel, 0, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_width(row, PANEL_W - 24);
-  lv_obj_set_style_min_height(row, 54, 0);
+  lv_obj_set_style_min_height(row, sz(54), 0);
   lv_obj_set_style_pad_left(row, 4, 0);
   set_flex(row, LV_FLEX_FLOW_ROW, 8);
   lv_obj_t *box = mk_box(row, t.good, 13);
-  lv_obj_set_size(box, 26, 26);
+  lv_obj_set_size(box, sz(26), sz(26));
   lv_obj_center(mk_label(box, F_14B, t.bg, ICON_CHECK));
 
   lv_obj_t *text = mk_box(row, 0, 0);
@@ -151,7 +151,7 @@ void doneRow(const Task &task) {
   mk_label(text, F_14, t.muted, (String(kCompleted) + when).c_str());
 
   lv_obj_t *b = mk_button(row, t.raised, 20);
-  lv_obj_set_size(b, LV_SIZE_CONTENT, 40);
+  lv_obj_set_size(b, LV_SIZE_CONTENT, sz(40));
   lv_obj_set_style_pad_hor(b, 14, 0);
   lv_obj_set_style_border_width(b, 2, 0);
   lv_obj_set_style_border_color(b, c(t.accent), 0);

@@ -13,6 +13,7 @@
 #include "ui.h"
 
 LV_FONT_DECLARE(font_12);
+LV_FONT_DECLARE(font_12b);
 LV_FONT_DECLARE(font_14);
 LV_FONT_DECLARE(font_14b);
 LV_FONT_DECLARE(font_16);
@@ -65,10 +66,14 @@ struct FontCap {
 
 constexpr int SCREEN_W = 800;
 constexpr int SCREEN_H = 480;
-constexpr int HEADER_H = 56;
-constexpr int PAD = 14;
-constexpr int GAP = 12;
-constexpr int TOUCH = 44;  // smallest touch target
+// Layout sizes shrink with the small text sizes (see kLayoutScale): sz(px) is a
+// size given as at Normal. The header, spacing and touch targets follow it.
+extern int g_ui_scale;  // percent
+inline int sz(int px) { return (px * g_ui_scale + 50) / 100; }
+#define HEADER_H sz(56)
+#define PAD sz(14)
+#define GAP sz(12)
+#define TOUCH LV_MAX(34, sz(44))  // smallest touch target
 
 enum class Screen { Home, Detail, Week, Tasks, Night, Wifi, Accounts, Settings, Features, Dates, Desk, Count };
 
