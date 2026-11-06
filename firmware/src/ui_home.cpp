@@ -23,9 +23,9 @@ constexpr uint32_t kCompleteDelayMs = 450;  // show the tick before the task lea
 
 constexpr const char *kAddTask = "Add a task";
 constexpr int DATES_W = 170;  // countdown column, layout A
-constexpr int BODY_W = SCREEN_W - 2 * PAD;
-constexpr int BODY_H = SCREEN_H - HEADER_H - GAP - PAD;
-constexpr int TITLE_H = 30;
+#define BODY_W (SCREEN_W - 2 * PAD)
+#define BODY_H (SCREEN_H - HEADER_H - GAP - PAD)
+#define TITLE_H sz(30)
 
 // ---- State -------------------------------------------------------------------
 
@@ -115,7 +115,7 @@ lv_obj_t *mk_check(lv_obj_t *parent, const Task &task, int size) {
   lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(box, 2, 0);
   lv_obj_set_style_border_color(box, c(t.muted), 0);
-  lv_obj_set_size(box, 26, 26);
+  lv_obj_set_size(box, sz(26), sz(26));
   lv_obj_center(box);
   Task *copy = attach(hit, task);
   lv_obj_add_event_cb(hit, [](lv_event_t *e) {
@@ -286,12 +286,12 @@ void home_refresh() {
     if (task.parent.length()) continue;  // subtasks only on the Tasks screen
     lv_obj_t *card = mk_box(taskList, t.card, 12);
     lv_obj_set_width(card, colW);
-    lv_obj_set_style_min_height(card, 54, 0);
+    lv_obj_set_style_min_height(card, sz(54), 0);
     lv_obj_set_style_pad_right(card, 10, 0);
     lv_obj_set_style_pad_ver(card, 3, 0);
     set_flex(card, LV_FLEX_FLOW_ROW, 2);
     focus_hold(card, task);
-    mk_check(card, task, 48);
+    mk_check(card, task, TOUCH + 4);
     lv_obj_t *text = mk_box(card, 0, 0);
     lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0);
     lv_obj_set_flex_grow(text, 1);

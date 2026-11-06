@@ -61,8 +61,8 @@ constexpr const char *kTheme = "Theme";
 constexpr const char *kFeatures = "Features";
 constexpr const char *kFeaturesOn = "%d on";
 
-constexpr int BODY_Y = HEADER_H + GAP;
-constexpr int BODY_W = SCREEN_W - 2 * PAD;
+#define BODY_Y (HEADER_H + GAP)
+#define BODY_W (SCREEN_W - 2 * PAD)
 constexpr int ROW_GAP = 12;
 constexpr int TILE_H = 102;
 constexpr int CHIP_H = 60;

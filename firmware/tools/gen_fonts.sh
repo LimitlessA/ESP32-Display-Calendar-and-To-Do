@@ -36,6 +36,7 @@ gen() {  # name size weight [icons] [big]
 
 gen font_10 10 500 icons big
 gen font_12 12 500 icons
+gen font_12b 12 700 icons big
 gen font_14 14 500 icons
 gen font_14b 14 700 icons
 gen font_16 16 500 icons

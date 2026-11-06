@@ -23,9 +23,9 @@ constexpr const char *kSave = "Save";
 constexpr const char *kCancel = "Cancel";
 constexpr const char *kSaved = "Desk settings saved";
 constexpr int kMaxLen = 63;
-constexpr int ROW_H = 44;
+#define ROW_H sz(44)
 constexpr int LABEL_W = 110;
-constexpr int FORM_W = SCREEN_W - 2 * PAD;
+#define FORM_W (SCREEN_W - 2 * PAD)
 
 // ---- State -------------------------------------------------------------------
 

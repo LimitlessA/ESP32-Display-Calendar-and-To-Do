@@ -203,6 +203,14 @@ from `ui_internal.h` (named after their size at Normal), and `kFontTable` in
   `one_line()` keeps a label on one line ending in "...", `font_upto()` caps one
   label, and `FontCap cap(kTextLarge);` caps a whole screen (Settings, the Features grid and
   its options window cap at Large, since they must fit one screen).
+- Below Normal the layout shrinks too, so more fits on screen: `fonts_select()` sets
+  `g_ui_scale` (72, 80, 90 % for XXS, XS, S; 100 % from Normal up) and `sz(px)` scales
+  a size given at Normal. `HEADER_H`, `PAD`, `GAP` and `TOUCH` (never below 34 px) are
+  `sz()` macros, so anything built from them must be a `#define` or computed at build
+  time, not a `constexpr`. Give new rows, cards and gaps as `sz(n)`.
+- Every role shrinks below Normal, headings and bold text included (`font_12b` is a
+  12 px Bold, compressed, for that). The on-screen keyboards use `font_16` directly,
+  so their keys keep one size.
 - Check new screens at every size: `SIM_TEXT_SIZE=5 .sim/sim out/` renders them all
   at Extra large after `sim/build.sh` has built the simulator.
 
