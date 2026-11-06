@@ -11,12 +11,14 @@ const char *const kTomorrow = "Tomorrow";
 const char *const kAllDay = "All day";
 
 // Font for each role (columns: F_12 F_14 F_14B F_16 F_16S F_20B F_26B F_34B) at
-// each text size. Small keeps 12 px as the floor; Large grows body text by about
-// 2 px, Extra large by about 4 px; headings stay, since they are big already.
+// each text size. 12 px is the floor: S makes body text smaller, XS headings too;
+// L grows body text by about 2 px, XL by about 4 px; their headings stay, since
+// they are big already.
 // F_20B and smaller carry the icons, so they never map to 26 or 34 px, which have none.
 // (Only 18 and 20 px were added for this; the rest reuse the Normal fonts.)
 static const lv_font_t *const kFontTable[kTextSizes][kFontRoles] = {
-    {&font_12, &font_12, &font_14b, &font_14, &font_14b, &font_16s, &font_20b, &font_26b},  // Small
+    {&font_12, &font_12, &font_14b, &font_14, &font_14b, &font_16s, &font_20b, &font_26b},  // XS
+    {&font_12, &font_12, &font_14b, &font_14, &font_16s, &font_20b, &font_26b, &font_34b},  // S
     {&font_12, &font_14, &font_14b, &font_16, &font_16s, &font_20b, &font_26b, &font_34b},  // Normal
     {&font_14, &font_16, &font_16s, &font_18, &font_20b, &font_20b, &font_26b, &font_34b},  // Large
     {&font_16, &font_18, &font_20b, &font_20, &font_20b, &font_20b, &font_26b, &font_34b},  // Extra large
@@ -24,10 +26,10 @@ static const lv_font_t *const kFontTable[kTextSizes][kFontRoles] = {
 const lv_font_t *g_fonts[kFontRoles] = {&font_12, &font_14, &font_14b, &font_16,
                                         &font_16s, &font_20b, &font_26b, &font_34b};
 
-static uint8_t textSizeNow = 1;
+static uint8_t textSizeNow = kTextNormal;
 
 void fonts_select(uint8_t textSize) {
-  if (textSize >= kTextSizes) textSize = 1;
+  if (textSize >= kTextSizes) textSize = kTextNormal;
   textSizeNow = textSize;
   memcpy(g_fonts, kFontTable[textSize], sizeof(g_fonts));
 }
@@ -52,6 +54,10 @@ FontCap::FontCap(uint8_t maxSize) : saved(textSizeNow) {
 }
 
 FontCap::~FontCap() { fonts_select(saved); }
+
+const lv_font_t *font_at(FontRole role, uint8_t textSize) {
+  return kFontTable[textSize < kTextSizes ? textSize : kTextNormal][role];
+}
 
 const lv_font_t *font_upto(FontRole role, uint8_t maxSize) {
   return kFontTable[textSizeNow < maxSize ? textSizeNow : maxSize][role];

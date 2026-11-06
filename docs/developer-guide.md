@@ -188,8 +188,8 @@ feature: add the setting, add a row, and add the screens.
 
 ### Text size
 
-`Settings::textSize` (0 Small, 1 Normal, 2 Large, 3 Extra large) is chosen in the
-Theme picker. Screens never name a font file: they use the roles `F_12` ... `F_34B`
+`Settings::textSize` (0 XS, 1 S, 2 Normal, 3 L, 4 XL) is chosen on the Text size
+tab of the Theme picker (a slider with a live preview, `font_at()`). Screens never name a font file: they use the roles `F_12` ... `F_34B`
 from `ui_internal.h` (named after their size at Normal), and `kFontTable` in
 `ui_common.cpp` maps each role to a font for each size. `buildAll()` calls
 `fonts_select()` and rebuilds every screen, like a theme change.
@@ -201,9 +201,9 @@ from `ui_internal.h` (named after their size at Normal), and `kFontTable` in
   maps an icon role to them.
 - Helpers: `tw(px)` grows a text width with the size, `text_w()` measures a text,
   `one_line()` keeps a label on one line ending in "...", `font_upto()` caps one
-  label, and `FontCap cap(2);` caps a whole screen (Settings, the Features grid and
+  label, and `FontCap cap(kTextLarge);` caps a whole screen (Settings, the Features grid and
   its options window cap at Large, since they must fit one screen).
-- Check new screens at every size: `SIM_TEXT_SIZE=3 .sim/sim out/` renders them all
+- Check new screens at every size: `SIM_TEXT_SIZE=4 .sim/sim out/` renders them all
   at Extra large after `sim/build.sh` has built the simulator.
 
 ## The code convention

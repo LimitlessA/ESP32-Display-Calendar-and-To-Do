@@ -138,7 +138,7 @@ lv_obj_t *titled(lv_obj_t *parent, const char *title, const char *sub) {
   lv_obj_set_flex_grow(col, 1);
   set_flex(col, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
   // The chips are narrow: their title stays at the Normal size so it is not cut short.
-  for (lv_obj_t *l : {mk_label(col, font_upto(kF14b, 1), t.text, title), mk_label(col, F_12, t.muted, sub)}) {
+  for (lv_obj_t *l : {mk_label(col, font_upto(kF14b, kTextNormal), t.text, title), mk_label(col, F_12, t.muted, sub)}) {
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);  // one line each, "..." when too long
     lv_obj_set_size(l, lv_pct(100), lv_font_get_line_height(lv_obj_get_style_text_font(l, LV_PART_MAIN)));
   }
@@ -181,7 +181,7 @@ void intervalStepped(int i, void *) {
 }  // namespace
 
 lv_obj_t *settings_create() {
-  const FontCap cap(2);  // the tiles fit one screen up to Large text
+  const FontCap cap(kTextLarge);  // the tiles fit one screen up to Large text
   const Theme &t = theme();
   lv_obj_t *scr = mk_screen();
   mk_nav_header(scr, Screen::Settings);

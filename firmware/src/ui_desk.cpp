@@ -294,10 +294,10 @@ lv_obj_t *memButton(lv_obj_t *parent, uint8_t slot, Live &live, int w, int h) {
   set_flex(b, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   // Narrow buttons (the Home dock) keep the Normal text size: the dock has a fixed height.
   const bool narrow = w < 120;
-  lv_obj_t *name = mk_label(b, narrow ? font_upto(kF14b, 1) : F_14B, t.text, slotName(slot).c_str());
+  lv_obj_t *name = mk_label(b, narrow ? font_upto(kF14b, kTextNormal) : F_14B, t.text, slotName(slot).c_str());
   one_line(name, w - 12);
   lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
-  mk_label(b, narrow ? font_upto(kF12, 1) : F_12, t.muted, "");
+  mk_label(b, narrow ? font_upto(kF12, kTextNormal) : F_12, t.muted, "");
   // A short tap moves the desk; a long press only names the button. LV_EVENT_CLICKED also fires when
   // a long press is released, which moved the desk as well, so use SHORT_CLICKED.
   lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
@@ -911,14 +911,14 @@ lv_obj_t *mk_desk_dock(lv_obj_t *parent, int w) {
   lv_obj_set_width(hc, 110);
   set_flex(hc, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
   // The dock has a fixed height: only the height number grows, up to Large.
-  live.height = mk_label(hc, font_upto(kF20b, 2), t.text, "");
-  live.state = mk_label(hc, font_upto(kF12, 1), t.muted, "");
+  live.height = mk_label(hc, font_upto(kF20b, kTextLarge), t.text, "");
+  live.state = mk_label(hc, font_upto(kF12, kTextNormal), t.muted, "");
   one_line(live.state, 110);
   // Timer: tap to start or stop it (needs the desk login).
   lv_obj_t *tc = mk_button(dock, t.card, 8);
   lv_obj_set_size(tc, 124, 48);
   set_flex(tc, LV_FLEX_FLOW_COLUMN, 4, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-  live.timer = mk_label(tc, font_upto(kF12, 1), t.accent, "");
+  live.timer = mk_label(tc, font_upto(kF12, kTextNormal), t.accent, "");
   live.timerBar = lv_bar_create(tc);
   lv_obj_set_size(live.timerBar, 116, 5);
   lv_bar_set_range(live.timerBar, 0, 1000);

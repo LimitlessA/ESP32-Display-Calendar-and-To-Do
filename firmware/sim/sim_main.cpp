@@ -493,7 +493,7 @@ int main(int argc, char **argv) {
   s.ics = {{"Work (Outlook)", "https://outlook.office365.com/owa/calendar/abc/calendar.ics", 0xF5A524},
            {"Family (iCloud)", "webcal://p23-caldav.icloud.com/published/2/xyz", 0xE57CD8}};
   s.wifiSsid = "Popescu-5G";
-  if (getenv("SIM_TEXT_SIZE")) s.textSize = atoi(getenv("SIM_TEXT_SIZE"));  // 0-3, see Settings::textSize
+  if (getenv("SIM_TEXT_SIZE")) s.textSize = atoi(getenv("SIM_TEXT_SIZE"));  // 0-4, see Settings::textSize
   sim_set_settings(s);
   sampleData();
 
@@ -556,6 +556,11 @@ int main(int argc, char **argv) {
 
   theme_picker_show();
   render(dir, "10-theme-picker");
+  clickLabel(lv_layer_top(), "Text size");
+  lv_timer_handler();
+  render(dir, "10b-text-size");
+  clickLabel(lv_layer_top(), "Done");  // back to the Colors tab next time
+  lv_timer_handler();
   clearTop();
 
   g_sim_ota.state = OtaState::Available;
