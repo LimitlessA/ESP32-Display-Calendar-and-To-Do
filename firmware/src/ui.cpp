@@ -140,7 +140,7 @@ bool inNightWindow() {
 }
 
 void checkReminders() {
-  if (!clock_valid() || reminder_visible()) return;
+  if (!clock_valid() || reminder_visible() || presence_private()) return;  // shown when you are back
   const time_t now = ui_now();
   for (const Event &ev : g_snap.events) {
     if (ev.allDay) continue;
@@ -170,6 +170,26 @@ void checkNightAndDim() {
   if (g_settings.motion && motion_seen() && current != Screen::Night) lv_disp_trig_activity(nullptr);
 
   const uint32_t idle = lv_disp_get_inactive_time(nullptr);
+
+  // Privacy mode: nothing readable while the phone is away. Dialogs and
+  // alerts stay open but hidden, and the dim night clock shows no meetings or
+  // tasks; tapping it opens nothing until the phone is back.
+  static bool locked = false;
+  if (presence_private() != locked) {
+    locked = !locked;
+    if (locked) lv_obj_add_flag(lv_layer_top(), LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_clear_flag(lv_layer_top(), LV_OBJ_FLAG_HIDDEN);
+    dimmed = false;
+    if (!locked && current == Screen::Night) {
+      ui_show(Screen::Home);
+      lv_disp_trig_activity(nullptr);
+    }
+  }
+  if (locked) {
+    if (current != Screen::Night) ui_show(Screen::Night);
+    return;
+  }
+
   const bool night = inNightWindow() || presence_away_screen();
 
   if (night && current != Screen::Night && idle > kNightIdleMs && !overlay_visible()) {

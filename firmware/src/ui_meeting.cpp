@@ -95,7 +95,7 @@ void showFull(const Event &ev) {
   lv_obj_t *head = mk_label(full, F_14B, t.accent, kInMeeting);
   lv_obj_set_style_text_letter_space(head, 2, 0);
   lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 26);
-  lv_obj_t *title = mk_label(full, F_26B, t.text, ev.title.c_str());
+  lv_obj_t *title = mk_label(full, F_26B, t.text, event_title(ev).c_str());
   lv_obj_set_width(title, SCREEN_W - 120);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
@@ -302,7 +302,7 @@ void meeting_receipt_show() {
     sum += cost;
     secs += (long)((ev.end - ev.start) / 1000);
     n++;
-    line(list, w - 4, F_14B, t.text, ev.title, money(cost));
+    line(list, w - 4, F_14B, t.text, event_title(ev), money(cost));
     lv_obj_t *sub = mk_label(list, F_12, t.muted,
                              (fmt_date_short(ev.start / 1000) + "  " +
                               strf(kReceiptLine, people(ev), duration((long)((ev.end - ev.start) / 1000)).c_str()))

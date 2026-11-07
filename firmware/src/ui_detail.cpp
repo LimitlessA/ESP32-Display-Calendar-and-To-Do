@@ -183,7 +183,7 @@ void detail_show(const Event &ev) {
   String cal = ev.calendar;
   if (accountName.length()) cal += kSeparator + accountName;
   lv_label_set_text(calLabel, cal.c_str());
-  lv_label_set_text(title, ev.title.c_str());
+  lv_label_set_text(title, event_title(ev).c_str());
   lv_label_set_text(whenLabel, event_when(ev).c_str());
 
   if (ev.location.length()) {

@@ -156,7 +156,7 @@ void summaryTiles(const Day &d) {
     mk_dot(r, e.color);
     lv_obj_t *tl = mk_label(r, F_14B, t.muted, e.allDay ? kAllDay : fmt_time(e.start / 1000).c_str());
     lv_obj_set_width(tl, 64);
-    lv_obj_t *ti = mk_label(r, F_16, t.text, e.title.c_str());
+    lv_obj_t *ti = mk_label(r, F_16, t.text, event_title(e).c_str());
     lv_label_set_long_mode(ti, LV_LABEL_LONG_DOT);
     lv_obj_set_width(ti, SCREEN_W - 80 - 240 - 100);
   }
@@ -194,7 +194,7 @@ void summaryTimeline(const Day &d) {
     lv_obj_set_size(b, bw > 6 ? bw - 4 : 4, h - 16);
     lv_obj_set_style_pad_all(b, 6, 0);
     if (bw > 70) {
-      lv_obj_t *l = mk_label(b, F_12, 0x111111, e.title.c_str());
+      lv_obj_t *l = mk_label(b, F_12, 0x111111, event_title(e).c_str());
       lv_obj_set_width(l, bw - 16);
       lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     }
@@ -251,11 +251,11 @@ void summaryBriefing(const Day &d) {
   if (g_settings.conflicts) {
     const time_t now = ui_now();
     const std::vector<Conflict> cf = find_conflicts(d.events, now, day_start(now) + 86400);
-    if (!cf.empty()) lines.push_back(strf(kBriefConflict, cf[0].a.title.c_str(), cf[0].b.title.c_str()));
+    if (!cf.empty()) lines.push_back(strf(kBriefConflict, event_title(cf[0].a).c_str(), event_title(cf[0].b).c_str()));
   }
   for (const Event &e : d.events) {
     if (g_settings.leaveBy && e.travelMin) {
-      lines.push_back(strf(kBriefLeave, fmt_time(e.start / 1000 - e.travelMin * 60).c_str(), e.title.c_str()));
+      lines.push_back(strf(kBriefLeave, fmt_time(e.start / 1000 - e.travelMin * 60).c_str(), event_title(e).c_str()));
       break;
     }
   }

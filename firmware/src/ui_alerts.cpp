@@ -171,7 +171,7 @@ std::vector<Conflict> find_conflicts(const std::vector<Event> &events, time_t fr
 bool has_conflict(const Event &ev, const std::vector<Conflict> &all, String *other) {
   for (const Conflict &cf : all) {
     if (cf.a.key == ev.key || cf.b.key == ev.key) {
-      if (other) *other = cf.a.key == ev.key ? cf.b.title : cf.a.title;
+      if (other) *other = event_title(cf.a.key == ev.key ? cf.b : cf.a);
       return true;
     }
   }
@@ -220,9 +220,9 @@ lv_obj_t *mk_conflict_banner(lv_obj_t *parent, int w) {
   set_flex(b, LV_FLEX_FLOW_ROW, 10);
   mk_label(b, F_16, t.badFg, ICON_WARNING);
   String text = all.size() == 1
-                    ? strf(kOverlapOne, cf.a.title.c_str(), cf.b.title.c_str(), fmt_time(cf.from).c_str(),
+                    ? strf(kOverlapOne, event_title(cf.a).c_str(), event_title(cf.b).c_str(), fmt_time(cf.from).c_str(),
                            fmt_time(cf.to).c_str())
-                    : strf(kOverlapMore, cf.a.title.c_str(), cf.b.title.c_str(), (int)all.size() - 1);
+                    : strf(kOverlapMore, event_title(cf.a).c_str(), event_title(cf.b).c_str(), (int)all.size() - 1);
   if (day_number(cf.from) != day_number(ui_now())) text = fmt_date_short(cf.from) + ": " + text;
   lv_obj_t *l = mk_label(b, F_14B, t.badFg, text.c_str());
   lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);

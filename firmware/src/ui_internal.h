@@ -236,7 +236,8 @@ void radar_tick();
 void roulette_show();
 
 // Phone presence (ui_presence.cpp, Bluetooth in presence.cpp)
-bool presence_private();        // layout B, phone away: meeting titles hidden
+bool presence_private();        // layout B, phone away: bare night clock only
+void presence_unlock();         // privacy mode opened by hand (5 taps), until left alone
 bool presence_away_screen();    // layout C, phone away: show the night clock
 String event_title(const Event &ev);  // "Busy" in privacy mode
 String presence_status();       // "1 paired · here now"

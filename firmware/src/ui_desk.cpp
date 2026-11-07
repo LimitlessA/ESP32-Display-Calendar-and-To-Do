@@ -786,7 +786,7 @@ void showPrompt(const Event &ev) {
   lv_obj_set_style_border_width(card, 2, 0);
   set_flex(card, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_center(card);
-  String title = ev.title;
+  String title = event_title(ev);
   title.toUpperCase();
   lv_obj_t *hd = mk_label(card, F_12, t.accent, strf(kInMin, 1L, title.c_str()).c_str());
   lv_obj_set_width(hd, 432);

@@ -12,10 +12,15 @@ constexpr const char *kTasksToday = ICON_TASKS "  %d tasks due today";
 constexpr const char *kTaskTomorrow = ICON_TASKS "  %d task due tomorrow";
 constexpr const char *kTasksTomorrow = ICON_TASKS "  %d tasks due tomorrow";
 constexpr const char *kFooter = "Night mode until %02d:%02d \xC2\xB7 tap to wake";
+constexpr const char *kPrivateFooter = "Away \xC2\xB7 tap 5 times to unlock";
+constexpr uint8_t kUnlockTaps = 5;
+constexpr uint32_t kUnlockWithinMs = 3000;  // all taps within this time
 
 // ---- State -------------------------------------------------------------------
 
 lv_obj_t *clockLabel, *dateLabel, *nextLabel, *tasksLabel, *footLabel;
+uint8_t taps = 0;
+uint32_t firstTap = 0;
 
 }  // namespace
 
@@ -24,7 +29,21 @@ lv_obj_t *night_create() {
   lv_obj_t *scr = mk_screen();
   lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
   lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(scr, [](lv_event_t *) { ui_show(Screen::Home); }, LV_EVENT_CLICKED, nullptr);
+  lv_obj_add_event_cb(scr, [](lv_event_t *) {
+    if (!presence_private()) {
+      ui_show(Screen::Home);
+      return;
+    }
+    // Privacy mode: your phone unlocks it, or 5 quick taps.
+    if (!taps || millis() - firstTap > kUnlockWithinMs) {
+      taps = 0;
+      firstTap = millis();
+    }
+    if (++taps >= kUnlockTaps) {
+      taps = 0;
+      presence_unlock();
+    }
+  }, LV_EVENT_CLICKED, nullptr);
 
   lv_obj_t *col = mk_box(scr, 0, 0);
   lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
@@ -52,6 +71,12 @@ void night_refresh() {
   if (clock.indexOf(' ') > 0) clock = clock.substring(0, clock.indexOf(' '));
   lv_label_set_text(clockLabel, clock.c_str());
   lv_label_set_text(dateLabel, clock_valid() ? fmt_date_long(now).c_str() : "");
+  if (presence_private()) {  // nothing about your day while you are away
+    lv_label_set_text(nextLabel, "");
+    lv_label_set_text(tasksLabel, "");
+    lv_label_set_text(footLabel, kPrivateFooter);
+    return;
+  }
 
   const Event *next = nullptr;
   for (const Event &ev : g_snap.events) {
