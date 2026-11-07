@@ -49,6 +49,9 @@ constexpr const char *kStatusNever = "%d paired \xC2\xB7 not seen yet";
 constexpr long kWelcomeAfter = 15 * 60;  // A: only after a real absence
 constexpr uint32_t kCheckMs = 1000;
 constexpr uint32_t kPairWindowMs = 120000;
+// Privacy mode: 5 quick taps on the clock unlock it without the phone, until
+// the screen is left alone this long.
+constexpr uint32_t kUnlockIdleMs = 2 * 60000;
 
 // ---- State -------------------------------------------------------------------
 
@@ -61,7 +64,8 @@ lv_obj_t *welcome = nullptr;
 lv_obj_t *pairLayer = nullptr, *pairStatus = nullptr;
 uint32_t pairStarted = 0;
 int bondsBefore = 0;
-bool errorShown = false;  // the Bluetooth error toast, once per attempt
+bool errorShown = false;
+bool privacyUnlocked = false;  // opened with 5 taps while the phone is away  // the Bluetooth error toast, once per attempt
 
 // ---- Code --------------------------------------------------------------------
 
@@ -185,7 +189,13 @@ void updatePair() {
 }  // namespace
 
 bool presence_private() {
-  return g_settings.presence && g_settings.layout(Layout::Presence) == 1 && state == PhoneState::Away;
+  return g_settings.presence && g_settings.layout(Layout::Presence) == 1 && state == PhoneState::Away &&
+         !privacyUnlocked;
+}
+
+void presence_unlock() {
+  privacyUnlocked = true;
+  ui_refresh_all();
 }
 
 bool presence_away() { return g_settings.presence && state == PhoneState::Away; }
@@ -256,6 +266,11 @@ void presence_tick() {
   updatePair();
   const PhoneState was = state;
   state = presence_state(g_settings.awayMinutes);
+  // Lock again once the phone is back (nothing to unlock) or nobody touched it for a while.
+  if (privacyUnlocked && (state != PhoneState::Away || lv_disp_get_inactive_time(nullptr) > kUnlockIdleMs)) {
+    privacyUnlocked = false;
+    if (state == was) ui_refresh_all();
+  }
   if (state == was) return;
 
   if (state == PhoneState::Away && was == PhoneState::Near) {

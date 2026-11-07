@@ -12,11 +12,15 @@ constexpr const char *kTasksToday = ICON_TASKS "  %d tasks due today";
 constexpr const char *kTaskTomorrow = ICON_TASKS "  %d task due tomorrow";
 constexpr const char *kTasksTomorrow = ICON_TASKS "  %d tasks due tomorrow";
 constexpr const char *kFooter = "Night mode until %02d:%02d \xC2\xB7 tap to wake";
-constexpr const char *kPrivateFooter = "Away \xC2\xB7 back when your phone is";
+constexpr const char *kPrivateFooter = "Away \xC2\xB7 tap 5 times to unlock";
+constexpr uint8_t kUnlockTaps = 5;
+constexpr uint32_t kUnlockWithinMs = 3000;  // all taps within this time
 
 // ---- State -------------------------------------------------------------------
 
 lv_obj_t *clockLabel, *dateLabel, *nextLabel, *tasksLabel, *footLabel;
+uint8_t taps = 0;
+uint32_t firstTap = 0;
 
 }  // namespace
 
@@ -26,7 +30,19 @@ lv_obj_t *night_create() {
   lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
   lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(scr, [](lv_event_t *) {
-    if (!presence_private()) ui_show(Screen::Home);  // privacy mode: only your phone unlocks it
+    if (!presence_private()) {
+      ui_show(Screen::Home);
+      return;
+    }
+    // Privacy mode: your phone unlocks it, or 5 quick taps.
+    if (!taps || millis() - firstTap > kUnlockWithinMs) {
+      taps = 0;
+      firstTap = millis();
+    }
+    if (++taps >= kUnlockTaps) {
+      taps = 0;
+      presence_unlock();
+    }
   }, LV_EVENT_CLICKED, nullptr);
 
   lv_obj_t *col = mk_box(scr, 0, 0);

@@ -289,9 +289,10 @@ Nothing is sent to the phone.
 - A: "Welcome back" summary of what changed (only after you were away for 15
   minutes or more), with **Show my day**.
 - B: Privacy mode. While you are away, only the dim clock and date show: no
-  meetings, tasks, reminders or pop-ups, and tapping opens nothing. Everything
-  comes back as soon as your phone does (reminders you missed show then if
-  the meeting has not started yet).
+  meetings, tasks, reminders or pop-ups. Everything comes back as soon as your
+  phone does (reminders you missed show then if the meeting has not started
+  yet). No phone with you? Tap the clock 5 times quickly (within 3 seconds) to
+  unlock it; it locks again after 2 minutes without a touch.
 - C: Away screen. The dim night clock shows until you are back.
 - If there is not enough free memory, the display says "Bluetooth could not
   start: only N KB of internal memory free".
