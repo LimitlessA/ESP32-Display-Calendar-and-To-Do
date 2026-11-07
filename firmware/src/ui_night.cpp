@@ -12,7 +12,7 @@ constexpr const char *kTasksToday = ICON_TASKS "  %d tasks due today";
 constexpr const char *kTaskTomorrow = ICON_TASKS "  %d task due tomorrow";
 constexpr const char *kTasksTomorrow = ICON_TASKS "  %d tasks due tomorrow";
 constexpr const char *kFooter = "Night mode until %02d:%02d \xC2\xB7 tap to wake";
-constexpr const char *kPrivateFooter = "Away \xC2\xB7 tap 5 times to unlock";
+constexpr const char *kPrivateFooter = "";  // no hint: how to unlock is yours to know
 constexpr uint8_t kUnlockTaps = 5;
 constexpr uint32_t kUnlockWithinMs = 3000;  // all taps within this time
 
