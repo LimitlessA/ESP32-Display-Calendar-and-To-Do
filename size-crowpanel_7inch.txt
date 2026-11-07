@@ -1,0 +1,431 @@
+== Bytes per library / app file (flash sections) ==
+   152997    8.2%  libnet80211.a
+   123329    6.6%  lvgl (objects)
+    98966    5.3%  SPI.cpp.o
+    77077    4.1%  libc.a
+    72962    3.9%  libmbedcrypto.a
+    70675    3.8%  libbtdm_app.a
+    62677    3.4%  app: sync.cpp.o
+    61735    3.3%  liblwip.a
+    60072    3.2%  libFrameworkArduino.a
+    50535    2.7%  libwpa_supplicant.a
+    43541    2.3%  libpp.a
+    34319    1.8%  libespressif__mdns.a
+    31999    1.7%  libesp_hw_support.a
+    31289    1.7%  libphy.a
+    24188    1.3%  app: desk.cpp.o
+    23647    1.3%  app: web.cpp.o
+    20629    1.1%  libhal.a
+    20484    1.1%  libmbedtls_2.a
+    19977    1.1%  app: font_20b.c.o
+    18985    1.0%  app: settings.cpp.o
+    18528    1.0%  libfatfs.a
+    15285    0.8%  app: font_34b.c.o
+    15178    0.8%  libesp_driver_rmt.a
+    15005    0.8%  libesp_driver_uart.a
+    14734    0.8%  app: ota.cpp.o
+    14701    0.8%  libfreertos.a
+    14593    0.8%  libnvs_flash.a
+    13857    0.7%  app: ui_desk.cpp.o
+    13304    0.7%  libesp_driver_i2c.a
+    13301    0.7%  app: font_16s.c.o
+    13143    0.7%  libspi_flash.a
+    13143    0.7%  HTTPClient.cpp.o
+    13099    0.7%  app: font_16.c.o
+    13062    0.7%  app: font_20.c.o
+    12687    0.7%  app: ui.cpp.o
+    12596    0.7%  libesp_system.a
+    11682    0.6%  app: font_18.c.o
+    11046    0.6%  app: font_14b.c.o
+    11031    0.6%  app: ui_features.cpp.o
+    10792    0.6%  app: font_14.c.o
+    10792    0.6%  app: font_26b.c.o
+    10499    0.6%  app: font_150.c.o
+    10041    0.5%  app: ui_common.cpp.o
+     9584    0.5%  libesp_lcd.a
+     9527    0.5%  app: ui_radar.cpp.o
+     9160    0.5%  app: ui_daily.cpp.o
+     8981    0.5%  app: ui_accounts.cpp.o
+     8543    0.5%  app: font_12.c.o
+     8376    0.4%  WebServer.cpp.o
+     8357    0.4%  libdriver.a
+     8221    0.4%  libheap.a
+     8184    0.4%  Parsing.cpp.o
+     8067    0.4%  libmbedx509.a
+     8043    0.4%  libesp_netif.a
+     7524    0.4%  app: ui_roulette.cpp.o
+     7510    0.4%  app: font_12b.c.o
+     7473    0.4%  libesp_mm.a
+     7112    0.4%  app: ui_alerts.cpp.o
+     7088    0.4%  app: ble_sm.c.o
+     7020    0.4%  lgfx_v1_platforms.cpp.o
+     6912    0.4%  app: wifi_mgr.cpp.o
+     6834    0.4%  app: font_72.c.o
+     6612    0.4%  libesp_wifi.a
+     6607    0.4%  libstdc++.a
+     6587    0.4%  app: ble_gap.c.o
+     6584    0.4%  app: ui_overlays.cpp.o
+     6377    0.3%  libvfs.a
+     6230    0.3%  app: ui_meeting.cpp.o
+     6096    0.3%  NetworkInterface.cpp.o
+     5765    0.3%  HTTPUpdate.cpp.o
+  1866037  total
+
+== By area ==
+   291866   15.6%  ESP-IDF and Arduino core (system, drivers)
+   285722   15.3%  Wi-Fi (driver, radio, WPA)
+   211683   11.3%  text constants (messages, log and error texts, UI words)
+   158078    8.5%  fonts
+   156704    8.4%  Bluetooth (NimBLE, controller, presence)
+   152597    8.2%  this firmware: the rest
+   147827    7.9%  TCP/IP, HTTP, mDNS, web server
+   132253    7.1%  this firmware: screens (ui_*)
+   123034    6.6%  LVGL (UI library)
+    97671    5.2%  TLS and certificates
+    92641    5.0%  C library (printf, scanf, maths)
+    15961    0.9%  display driver (LovyanGFX, LCD)
+
+== Biggest parts of the top 25 (input sections) ==
+libnet80211.a  (me/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libnet80211.a(ieee80211_output.o))
+       4218  .text.hostap_recv_mgmt
+       3416  .text.wifi_nvs_cfg_init
+       3320  .text.ieee80211_sta_new_state
+       3269  .text.scan_parse_beacon
+       2731  .text.sta_recv_mgmt
+       2546  .text.wifi_softap_set_config
+       2286  .text.ieee80211_parse_rsn
+       1908  .text.scan_profile_check
+lvgl (objects)  (.pio/build/crowpanel_7inch/libb87/lvgl/core/lv_obj_style.c.o)
+       3986  .text.lv_draw_sw_rect
+       2799  .text.lv_draw_sw_arc
+       2735  .text.lv_draw_sw_blend_basic
+       2534  .text.lv_theme_default_init
+       2184  .text.qrcodegen_encodeSegmentsAdvanced
+       1915  .text.lv_obj_get_scrollbar_area
+       1883  .text.flex_update
+       1870  .text.lv_draw_sw_line
+SPI.cpp.o  (.pio/build/crowpanel_7inch/lib30b/SPI/SPI.cpp.o)
+      97898  .rodata._ZN8SPIClassC2Eh.str1.1
+        302  .text._ZN8SPIClass5beginEaaaa
+        109  .rodata._ZN8SPIClass5beginEaaaa.str1.1
+        108  .text._ZN8SPIClassC2Eh
+         81  .text._ZN8SPIClass16beginTransactionE11SPISettings
+         71  .text._ZN8SPIClass7setHwCsEb
+         60  .text._ZN8SPIClass3endEv
+         53  .text._ZN8SPIClass10writeBytesEPKhm
+libc.a  (f/bin/../lib/gcc/xtensa-esp-elf/14.2.0/../../../../xtensa-esp-elf/lib/esp32s3/no-rtti/libc.a(libc_a-environ.o))
+      11413  .text._vfprintf_r
+      11222  .text._svfprintf_r
+       8765  .text.__ssvfscanf_r
+       7529  .text.__ssvfiscanf_r
+       3294  .text._strtod_l
+       3223  .text._dtoa_r
+       2462  .text.get_arg$isra$0
+       1687  .rodata._strerror_r.str1.1
+libmbedcrypto.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libmbedcrypto.a(platform.c.o))
+       3586  .rodata.str1.1
+       1245  .text.ecp_mul_restartable_internal$isra$0
+       1043  .text.esp_aes_process_dma
+       1039  .text.ecp_mod_p384
+       1029  .text.mbedtls_rsa_private
+        858  .text.mbedtls_mpi_div_mpi
+        803  .text.ecp_mod_p256
+        764  .text.pk_use_ecparams
+libbtdm_app.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libbtdm_app.a(arch_main.o))
+       2532  .rodata.r_ip_funcs_ro
+       1832  .text.lld_adv_end_ind_handler_hack
+       1697  .text.f_lld_adv_rep_ind_handler_hack
+       1654  .text.f_hci_le_set_ext_adv_en_cmd_handler
+       1536  .text.btdm_controller_init
+       1384  .text.r_emi_em_base_init
+       1236  .text.r_lld_core_init
+       1139  .text.r_llc_loc_phy_upd_proc_continue_hack
+app: sync.cpp.o  (.pio/build/crowpanel_7inch/src/sync.cpp.o)
+       9369  .text._ZN12_GLOBAL__N_110workerLoopEPv
+       4146  .rodata._ZL15GOOGLE_ROOT_CAS
+       3105  .text._ZN12_GLOBAL__N_18fetchAllERK8Settingsb
+       3057  .text._ZN12_GLOBAL__N_19applyFeedERK6StringRK8SettingshRSt6vectorI5EventSaIS7_EERS6_I4TaskSaISB_EERNS_6ExtrasE
+       1510  .text._ZN12_GLOBAL__N_19fetchWeekERK8Settingsx
+       1412  .text._ZN12_GLOBAL__N_17httpGetERK6StringRS0_S3_Pi
+       1411  .text._Z20sync_uncomplete_taskRK4Task
+       1410  .text._Z17sync_get_if_newermR8Snapshot
+liblwip.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/liblwip.a(tcp.c.o))
+       3330  .text.tcp_receive
+       2925  .text.tcp_input
+       1478  .text.handle_dhcp
+       1175  .text.dhcp_recv
+       1147  .text.tcp_output
+       1135  .text.lwip_setsockopt
+       1076  .text.ip_napt_forward
+        980  .text.dns_recv
+libFrameworkArduino.a  (.pio/build/crowpanel_7inch/libFrameworkArduino.a(WMath.cpp.o))
+       2464  .text.i2cSlaveInit
+       1825  .text.uartSetPins
+       1526  .rodata._Z20printBeforeSetupInfov.str1.1
+       1180  .text.rmtInit
+       1148  .text._Z20printBeforeSetupInfov
+       1115  .text.uartBegin
+        931  .text.ledcAttachChannel
+        927  .text._uartDetachPins
+libwpa_supplicant.a  (me/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libwpa_supplicant.a(esp_wpa3.c.o))
+       2345  .text.wpa_sm_rx_eapol
+       1461  .text.sswu
+       1303  .text.wpa_receive
+       1195  .text.sae_parse_commit
+       1024  .rodata.d_mult_table
+        970  .text.wpa_sm_step
+        950  .text.sae_derive_pwe_ecc
+        868  .text.sae_process_commit
+libpp.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libpp.a(pm.o))
+       1946  .text.ppTxFragmentProc
+       1879  .text.wdev_funcs_init
+        960  .data.TxRxCxt
+        685  .text.rcUpdatePhyMode
+        664  .text.pm_coex_separate_connectionless_window
+        614  .text.mac_txrx_init
+        570  .text.pm_tx_null_data_done_process
+        532  .text.pm_stop
+libespressif__mdns.a  (runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libespressif__mdns.a(mdns_netif.c.o))
+       4523  .text.mdns_parse_packet
+       1005  .text.append_answer$constprop$0
+        913  .text.mdns_priv_service_cache_to_result
+        833  .text.mdns_priv_create_answer_from_parsed_packet
+        577  .text.mdns_priv_query_send
+        563  .text.mdns_priv_cache_update_ptr
+        543  .text.mdns_service_add_for_host_base
+        500  .text.mdns_init
+libesp_hw_support.a  (e/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libesp_hw_support.a(clk_utils.c.o))
+       1745  .text.rtc_init
+       1238  .text.esp_sleep_start$constprop$0
+       1096  .text.gdma_new_ahb_channel
+        943  .text.esp_intr_alloc_intrstatus_bind
+        934  .text.rtc_sleep_init
+        790  .text.esp_light_sleep_start
+        705  .text.gdma_register_tx_event_callbacks
+        680  .text.gdma_link_mount_buffers
+libphy.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/ld/libphy.a(phy_init.o))
+       2070  .rodata.str1.1
+       1512  .text.freq_i2c_write_set
+        890  .text.pbus_rx_dco_cal_1step
+        852  .text.pbus_rx_dco_cal
+        787  .text.phy_rfcal_data_check_value
+        756  .text.set_rx_gain_table
+        740  .data.phy_param
+        730  .text.set_rx_gain_cal_iq
+app: desk.cpp.o  (.pio/build/crowpanel_7inch/src/desk.cpp.o)
+       9225  .text._ZN12_GLOBAL__N_14taskEPv
+        868  .text._ZN12_GLOBAL__N_16recallERK6StringRK8Settingsh
+        752  .rodata._ZN12_GLOBAL__N_14taskEPv.str1.1
+        688  .text._ZN11ArduinoJson8V721PB226detail16JsonDeserializerINS1_6ReaderI6StringvEEE12parseVariantINS1_14AllowAllF
+        662  .text._ZN11ArduinoJson8V721PB226detail11parseNumberEPKc
+        658  .text._ZN12_GLOBAL__N_15loginERK6StringRK8Settings
+        494  .text._ZN12_GLOBAL__N_17requestERK6StringPKcS2_RS0_bt
+        491  .text._ZN11ArduinoJson8V721PB226detail14decomposeFloatEda
+app: web.cpp.o  (.pio/build/crowpanel_7inch/src/web.cpp.o)
+       7277  .rodata._ZL8kWebPage
+       3965  .text._ZN12_GLOBAL__N_111handleStateEv
+       1494  .text._Z9web_beginv
+        900  .text._ZN12_GLOBAL__N_114handleLowPowerEv
+        896  .text._ZN12_GLOBAL__N_113handleEditIcsEv
+        798  .text._ZN12_GLOBAL__N_112handleAddIcsEv
+        706  .text._ZN12_GLOBAL__N_117handleEditAccountEv
+        573  .text._ZN12_GLOBAL__N_116handleAddAccountEv
+libhal.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libhal.a(cache_hal.c.o))
+        808  .text.spi_flash_hal_configure_host_io_mode
+        688  .text.i2s_hal_pdm_set_tx_slot
+        615  .text.spi_flash_hal_gpspi_configure_host_io_mode
+        509  .text.i2s_hal_tdm_set_tx_slot
+        500  .text.i2s_hal_std_set_tx_slot
+        479  .text.i2s_hal_tdm_set_rx_slot
+        476  .text.spi_flash_hal_common_command
+        466  .text.spi_flash_hal_gpspi_common_command
+libmbedtls_2.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libmbedtls_2.a(ssl_msg.c.o))
+       3076  .text.mbedtls_ssl_handshake_client_step
+       2339  .rodata.str1.1
+       1189  .text.mbedtls_ssl_write_client_hello
+       1136  .text.mbedtls_ssl_decrypt_buf
+       1104  .rodata.ciphersuite_definitions
+        843  .text.mbedtls_ssl_derive_keys
+        744  .rodata.ciphersuite_preference
+        732  .text.mbedtls_ssl_encrypt_buf
+app: font_20b.c.o  (.pio/build/crowpanel_7inch/src/fonts/font_20b.c.o)
+      18327  .rodata.glyph_bitmap
+       1400  .rodata.glyph_dsc
+        158  .rodata.unicode_list_1
+         40  .rodata.cmaps
+         28  .rodata.font_20b
+         24  .rodata.font_dsc
+app: settings.cpp.o  (.pio/build/crowpanel_7inch/src/settings.cpp.o)
+       4054  .text._ZN12_GLOBAL__N_18fromJsonERK6StringR8Settings$constprop$0
+       2972  .text._ZN12_GLOBAL__N_16toJsonERK8Settingsb
+       1299  .text._Z13settings_saveRK8Settings
+        680  .rodata._ZN12_GLOBAL__N_18fromJsonERK6StringR8Settings$constprop$0.str1.1
+        638  .text._ZN11ArduinoJson8V721PB226detail16JsonDeserializerINS1_6ReaderIK6StringvEEE12parseVariantINS1_14AllowAll
+        614  .text._ZN8SettingsC2ERKS_
+        569  .text._ZN12_GLOBAL__N_16unsealERK6String
+        534  .text._ZN12_GLOBAL__N_14sealERK6String
+libfatfs.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libfatfs.a(diskio.c.o))
+       1686  .text.f_mkfs
+        849  .text.follow_path
+        729  .text.mount_volume
+        604  .text.dir_register
+        543  .text.f_open
+        498  .rodata.cvt1$1
+        439  .text.f_write
+        383  .text.f_read
+app: font_34b.c.o  (.pio/build/crowpanel_7inch/src/fonts/font_34b.c.o)
+      14155  .rodata.glyph_bitmap
+        984  .rodata.glyph_dsc
+         54  .rodata.unicode_list_1
+         40  .rodata.cmaps
+         28  .rodata.font_34b
+         24  .rodata.font_dsc
+libesp_driver_rmt.a  (runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libesp_driver_rmt.a(rmt_encoder.c.o))
+       2063  .text.rmt_new_tx_channel
+       1575  .text.rmt_new_rx_channel
+       1132  .rodata.rmt_new_tx_channel.str1.1
+        860  .rodata.rmt_new_rx_channel.str1.1
+        791  .text.rmt_select_periph_clock
+        603  .text.rmt_tx_do_transaction
+        427  .text.rmt_isr_handle_tx_loop_end
+        426  .text.rmt_tx_disable
+libesp_driver_uart.a  (/home/runner/.platformio/packages/framework-arduinoespressif32-libs/esp32s3/lib/libesp_driver_uart.a(uart.c.o))
+       2040  .text.uart_rx_intr_handler_default
+        813  .text.uart_driver_install
+        797  .text.uart_tcgetattr
+        751  .text.uart_param_config
+        665  .text.uart_tcsetattr
+        426  .text.uart_wait_tx_done
+        387  .text.uart_flush_input
+        386  .text.uart_tx_all$part$0
+app: ota.cpp.o  (.pio/build/crowpanel_7inch/src/ota.cpp.o)
+       9093  .rodata._ZL12OTA_ROOT_CAS
+       1674  .text._ZN12_GLOBAL__N_15checkEv
+        692  .text._ZN11ArduinoJson8V721PB226detail16JsonDeserializerINS1_6ReaderI6StringvEEE12parseVariantINS1_14AllowAllF
+        667  .text._ZN12_GLOBAL__N_17installEv
+        408  .text._ZNK11ArduinoJson8V721PB226detail11VariantData6acceptINS1_14JsonSerializerINS1_6WriterI6StringvEEEEEENT_
+        400  .text._Z16ota_upload_writePKhj
+        325  .text._ZNK11ArduinoJson8V721PB226detail14VariantRefBaseINS1_11MemberProxyIRNS0_12JsonDocumentEPKcEEE2asI6Strin
+        218  .text._Z17ota_upload_finishv
+
+== Biggest symbols (text/rodata/data) ==
+    18327  d  glyph_bitmap
+    14155  d  glyph_bitmap
+    11651  d  glyph_bitmap
+    11449  d  glyph_bitmap
+    11413  T  _vfprintf_r
+    11412  d  glyph_bitmap
+    11222  T  _svfprintf_r
+    10291  d  glyph_bitmap
+    10032  d  glyph_bitmap
+     9662  d  glyph_bitmap
+     9396  d  glyph_bitmap
+     9369  t  (anonymous namespace)::workerLoop(void*)
+     9225  t  (anonymous namespace)::task(void*)
+     9142  d  glyph_bitmap
+     9093  d  OTA_ROOT_CAS
+     8765  T  __ssvfscanf_r
+     7529  T  __ssvfiscanf_r
+     7277  d  kWebPage
+     6893  d  glyph_bitmap
+     6554  d  glyph_bitmap
+     5860  d  glyph_bitmap
+     4523  t  mdns_parse_packet
+     4192  D  port_IntStack
+     4146  d  GOOGLE_ROOT_CAS
+     4098  T  hostap_recv_mgmt
+     4054  t  _ZN12_GLOBAL__N_18fromJsonERK6StringR8Settings$constprop$0
+     4006  d  glyph_bitmap
+     3986  T  lv_draw_sw_rect
+     3965  t  (anonymous namespace)::handleState()
+     3612  T  summary_show()
+     3330  t  tcp_receive
+     3294  T  _strtod_l
+     3223  T  _dtoa_r
+     3190  T  desk_refresh()
+     3189  T  scan_parse_beacon
+     3105  t  (anonymous namespace)::fetchAll(Settings const&, bool)
+     3096  T  ieee80211_sta_new_state
+     3090  T  esp_lcd_new_rgb_panel
+     3076  T  mbedtls_ssl_handshake_client_step
+     3057  t  (anonymous namespace)::applyFeed(String const&, Settings const&, unsigned char, std::vector<Event, std::allocator<Event> >&, std::vector<Tas
+     2986  T  tasks_refresh()
+     2972  t  (anonymous namespace)::toJson(Settings const&, bool)
+     2957  T  WebServer::_parseRequest(NetworkClient&)
+     2925  T  tcp_input
+     2910  T  WebServer::_parseForm(NetworkClient&, String const&, unsigned long)
+     2799  T  lv_draw_sw_arc
+     2736  T  wifi_nvs_cfg_init
+     2735  T  lv_draw_sw_blend_basic
+     2663  T  sta_recv_mgmt
+     2534  T  lv_theme_default_init
+     2532  D  r_ip_funcs_ro
+     2502  T  accounts_refresh()
+     2486  T  wifi_softap_set_config
+     2475  t  (anonymous namespace)::showDialog(int)
+     2464  T  i2cSlaveInit
+     2440  T  home_refresh()
+     2432  T  HTTPUpdate::handleUpdate(HTTPClient&, String const&, unsigned char, std::function<void (HTTPClient*)>)
+     2383  T  ui_update(Snapshot const&)
+     2345  T  wpa_sm_rx_eapol
+     2273  T  meeting_tick()
+     2245  t  rgb_panel_draw_bitmap
+     2184  T  qrcodegen_encodeSegmentsAdvanced
+     2173  t  mbedtls_x509_crt_parse_der_internal
+     2146  T  start_ssl_client(sslclient_context*, IPAddress const&, unsigned long, char const*, int, char const*, bool, char const*, char const*, char co
+     2071  T  ui_tick()
+     2063  T  rmt_new_tx_channel
+     2054  T  ieee80211_parse_rsn
+     2040  t  uart_rx_intr_handler_default
+     1994  T  NetworkInterface::config(IPAddress, IPAddress, IPAddress, IPAddress, IPAddress, IPAddress)
+     1926  T  ppTxFragmentProc
+     1919  T  HTTPClient::setCookie(String, String)
+     1915  T  lv_obj_get_scrollbar_area
+     1894  T  roulette_show()
+     1883  t  flex_update
+     1870  T  lv_draw_sw_line
+     1854  T  lv_indev_read_timer_cb
+     1828  t  lv_slider_event
+     1828  T  radar_update()
+     1825  T  uartSetPins
+     1816  T  hostap_input
+     1814  t  lv_arc_event
+     1808  T  lld_adv_end_ind_handler_hack
+     1803  T  lv_draw_sw_transform
+     1800  T  scan_profile_check
+     1773  T  i2s_driver_install
+     1754  T  week_refresh()
+     1745  T  rtc_init
+     1704  t  (anonymous namespace)::buildReview()
+     1686  T  f_mkfs
+     1681  T  f_lld_adv_rep_ind_handler_hack
+     1674  t  (anonymous namespace)::check()
+     1663  t  _vsnprintf
+     1655  t  lv_img_event
+     1654  T  f_hci_le_set_ext_adv_en_cmd_handler
+     1631  t  (anonymous namespace)::stepped(int, void*)
+     1622  t  (anonymous namespace)::build()
+     1613  T  strptime_l
+     1602  t  (anonymous namespace)::showWelcome(long)
+     1589  T  sta_recv_assoc
+     1575  T  rmt_new_rx_channel
+     1566  T  desk_tick()
+     1563  T  radar_view_show()
+     1542  T  _lv_disp_refr_timer
+     1535  t  refr_area_part
+     1510  t  (anonymous namespace)::updateLive((anonymous namespace)::Live&, DeskStatus const&)
+     1510  t  (anonymous namespace)::fetchWeek(Settings const&, long long)
+     1494  T  web_begin()
+     1478  t  handle_dhcp
+     1472  T  btdm_controller_init
+     1462  T  wifi_service()
+     1462  T  draw_border_generic
+     1461  t  sswu
+     1460  T  lv_draw_label
+     1449  T  alerts_tick()
+     1412  t  (anonymous namespace)::httpGet(String const&, String&, String&, int*)
+     1411  T  sync_uncomplete_task(Task const&)
+     1410  T  sync_get_if_newer(unsigned long, Snapshot&)
+     1404  T  freq_i2c_write_set
+     1400  t  draw_indic
+     1400  d  glyph_dsc
