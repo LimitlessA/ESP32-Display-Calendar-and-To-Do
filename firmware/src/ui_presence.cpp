@@ -1,6 +1,7 @@
 // Phone presence (mockup row "pp"): the display notices when your phone leaves.
 // A: a "welcome back" summary of what changed while you were away,
-// B: privacy mode, meeting titles read "Busy" while you are away,
+// B: privacy mode, while you are away only the dim night clock shows and a
+//    tap opens nothing (ui.cpp); titles read "Busy" anywhere they still show,
 // C: an away screen, the dim night clock until you are back.
 #include <map>
 #include <set>

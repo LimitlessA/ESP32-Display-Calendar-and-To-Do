@@ -78,8 +78,8 @@ Buttons:
   (needs the Countdowns feature).
 - **Dismiss from display**. Hides the meeting here only.
 
-If Phone presence is on in Privacy mode and your phone is away, meetings cannot
-be opened and their titles read "Busy".
+If Phone presence is on in Privacy mode and your phone is away, the display
+shows only the dim clock (see Phone presence below).
 
 ## Week
 
@@ -288,8 +288,10 @@ Nothing is sent to the phone.
   phone too.
 - A: "Welcome back" summary of what changed (only after you were away for 15
   minutes or more), with **Show my day**.
-- B: Privacy mode. While you are away, meeting titles read "Busy" and meetings
-  cannot be opened.
+- B: Privacy mode. While you are away, only the dim clock and date show: no
+  meetings, tasks, reminders or pop-ups, and tapping opens nothing. Everything
+  comes back as soon as your phone does (reminders you missed show then if
+  the meeting has not started yet).
 - C: Away screen. The dim night clock shows until you are back.
 - If there is not enough free memory, the display says "Bluetooth could not
   start: only N KB of internal memory free".
