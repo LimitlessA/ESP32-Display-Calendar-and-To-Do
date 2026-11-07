@@ -30,8 +30,8 @@ const lv_font_t *g_fonts[kFontRoles] = {&font_12, &font_14, &font_14b, &font_16,
 
 static uint8_t textSizeNow = kTextNormal;
 
-// Layout scale for each text size, in percent: at the small sizes the header,
-// rows, cards and spacing shrink with the text, so more fits on a screen. L and
+// Layout scale for each text size, in percent: at the small sizes list rows,
+// cards and their spacing shrink with the text, so more fits on a screen. L and
 // XL keep the Normal layout; their rows grow with the text where they can.
 static const uint8_t kLayoutScale[kTextSizes] = {72, 80, 90, 100, 100, 100};
 int g_ui_scale = 100;
@@ -57,19 +57,20 @@ void one_line(lv_obj_t *label, int w) {
   lv_obj_set_height(label, lv_font_get_line_height(lv_obj_get_style_text_font(label, LV_PART_MAIN)));
 }
 
-FontCap::FontCap(uint8_t maxSize) : saved(textSizeNow) {
-  if (saved > maxSize) fonts_select(maxSize);
-  textSizeNow = saved;  // font_upto and nested caps still see the chosen size
+static uint8_t listSize = kTextNormal;  // the chosen text size; fixed parts always use Normal
+
+void text_size_apply(uint8_t textSize) {
+  listSize = textSize < kTextSizes ? textSize : kTextNormal;
+  fonts_select(kTextNormal);
 }
 
-FontCap::~FontCap() { fonts_select(saved); }
+ListText::ListText() : saved(textSizeNow) { fonts_select(listSize); }
+ListText::~ListText() { fonts_select(saved); }
+FixedText::FixedText() : saved(textSizeNow) { fonts_select(kTextNormal); }
+FixedText::~FixedText() { fonts_select(saved); }
 
 const lv_font_t *font_at(FontRole role, uint8_t textSize) {
   return kFontTable[textSize < kTextSizes ? textSize : kTextNormal][role];
-}
-
-const lv_font_t *font_upto(FontRole role, uint8_t maxSize) {
-  return kFontTable[textSizeNow < maxSize ? textSizeNow : maxSize][role];
 }
 
 namespace {

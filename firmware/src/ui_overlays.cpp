@@ -33,7 +33,7 @@ constexpr const char *kThemeTitle = "Theme";
 // Tabs: the colors and the text size.
 constexpr const char *kTabColors = "Colors";
 constexpr const char *kTabTextSize = "Text size";
-constexpr const char *kTextSizeHint = "Drag to change the size of all text";
+constexpr const char *kTextSizeHint = "Changes the calendar, task and list text. Tiles, buttons and pop-ups keep their size.";
 constexpr const char *kTextSizeTicks[kTextSizes] = {"XXS", "XS", "S", "Normal", "L", "XL"};
 constexpr const char *kSmallA = "A";
 constexpr const char *kPreviewCaption = "PREVIEW";

@@ -70,6 +70,7 @@ struct Net {
 };
 
 void buildList(const std::vector<WifiNetwork> &nets) {
+  const ListText lists;
   const Theme &t = theme();
   if (&nets != &lastScan) lastScan = nets;
   lv_obj_clean(list);

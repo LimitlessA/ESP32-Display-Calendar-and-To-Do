@@ -94,7 +94,7 @@ void updateClocks() {
 void buildAll() {
   theme_select(g_settings.theme);
   appliedTheme = g_settings.theme;
-  fonts_select(g_settings.textSize);
+  text_size_apply(g_settings.textSize);
 
   lv_disp_t *disp = lv_disp_get_default();
   lv_theme_t *th = lv_theme_default_init(disp, c(theme().accent), c(theme().good), theme().dark, F_16);

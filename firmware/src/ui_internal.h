@@ -51,28 +51,35 @@ int tw(int px);
 int text_w(const lv_font_t *font, const char *text);
 // Keeps a label on one line w pixels wide, ending in "..." when it does not fit.
 void one_line(lv_obj_t *label, int w);
-// The font for a role at the current text size, but no bigger than at maxSize;
-// for grids that must fit one screen, like the Features page.
-const lv_font_t *font_upto(FontRole role, uint8_t maxSize);
 // The font for a role at any text size (the Text size preview).
 const lv_font_t *font_at(FontRole role, uint8_t textSize);
-// While one lives, F_12 ... F_34B are no bigger than at maxSize: for whole screens
-// that must fit one page (Settings, Features). { FontCap cap(kTextLarge); ... }
-struct FontCap {
-  explicit FontCap(uint8_t maxSize);
-  ~FontCap();
+// The text size setting changes only the lists (Home columns, Week, Tasks,
+// meeting details, the Accounts list). Everything else (header, tiles, cards, the
+// desk, pop-ups, keyboard) always uses Normal, so fixed boxes never look empty or
+// overflow. text_size_apply() sets Normal as the default; build list content
+// inside a ListText, and anything fixed inside it (the desk dock) in a FixedText.
+void text_size_apply(uint8_t textSize);
+struct ListText {
+  ListText();
+  ~ListText();
+  uint8_t saved;
+};
+struct FixedText {
+  FixedText();
+  ~FixedText();
   uint8_t saved;
 };
 
 constexpr int SCREEN_W = 800;
 constexpr int SCREEN_H = 480;
-// Layout sizes shrink with the small text sizes (see kLayoutScale): sz(px) is a
-// size given as at Normal. The header, spacing and touch targets follow it.
+// In a ListText, rows and cards shrink with the small text sizes (see
+// kLayoutScale): sz(px) is a size given as at Normal, and touch targets follow it.
+// The header and the screen margins never change.
 extern int g_ui_scale;  // percent
 inline int sz(int px) { return (px * g_ui_scale + 50) / 100; }
-#define HEADER_H sz(56)
-#define PAD sz(14)
-#define GAP sz(12)
+#define HEADER_H 56
+#define PAD 14
+#define GAP 12
 #define TOUCH LV_MAX(34, sz(44))  // smallest touch target
 
 enum class Screen { Home, Detail, Week, Tasks, Night, Wifi, Accounts, Settings, Features, Dates, Desk, Count };

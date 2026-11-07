@@ -378,10 +378,11 @@ Open it with the sliders icon. It is a dashboard.
 - **Theme**: opens the theme picker. Midnight, Ocean, Forest, Sunset, Paper (a
   light theme) and High contrast. The **Text size** tab has a slider with six
   sizes (XXS, XS, S, Normal, L, XL) and a preview of a meeting and two tasks that
-  changes as you drag; when you let go, every screen changes to that size. Below
-  Normal, rows, cards and spacing shrink too, so more meetings and tasks fit on a
-  screen. The keyboard, the big clocks and the timers keep their size, and the Settings and Features pages,
-  which must fit one screen, grow only up to L.
+  changes as you drag. When you let go, the lists change to that size: the Home
+  columns, Week, Tasks, the meeting details and the Accounts and Wi-Fi lists. Below
+  Normal their rows and cards shrink too, so more meetings and tasks fit on a
+  screen. Tiles, buttons, pop-ups, the desk controls, the keyboard and the clocks
+  always stay at Normal.
 - **Features**: "N on". Opens the Features screen.
 
 Settings are saved about 5 seconds after your last change. Wait a few seconds
