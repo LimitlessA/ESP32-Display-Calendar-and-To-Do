@@ -94,7 +94,7 @@ void updateClocks() {
 void buildAll() {
   theme_select(g_settings.theme);
   appliedTheme = g_settings.theme;
-  text_size_apply(g_settings.textSize);
+  text_size_apply(g_settings.textSize, g_settings.tileSize);
 
   lv_disp_t *disp = lv_disp_get_default();
   lv_theme_t *th = lv_theme_default_init(disp, c(theme().accent), c(theme().good), theme().dark, F_16);
@@ -264,7 +264,7 @@ void autoUpdate() {
 
 // Settings that change how screens are built, so every screen is rebuilt.
 bool needsRebuild(const Settings &a, const Settings &b) {
-  return a.theme != b.theme || a.textSize != b.textSize || memcmp(a.layouts, b.layouts, sizeof(a.layouts)) != 0 ||
+  return a.theme != b.theme || a.textSize != b.textSize || a.tileSize != b.tileSize || memcmp(a.layouts, b.layouts, sizeof(a.layouts)) != 0 ||
          a.quickAdd != b.quickAdd || a.countdowns != b.countdowns || a.dates != b.dates ||
          a.conflicts != b.conflicts || a.leaveBy != b.leaveBy || a.focus != b.focus ||
          a.meetTimer != b.meetTimer || a.costMeter != b.costMeter || a.costRate != b.costRate ||

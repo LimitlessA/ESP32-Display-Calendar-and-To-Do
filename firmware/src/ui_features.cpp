@@ -322,6 +322,7 @@ lv_obj_t *textColumn(lv_obj_t *parent, int i, int w) {
 
 // The grid: a tap toggles, holding opens the options (and the layout).
 void buildGrid() {
+  const FontCap cap(kTextLarge);  // all tiles fit one screen (no scrolling) up to Large text
   const Theme &t = theme();
   lv_obj_t *grid = mk_box(body, 0, 0);
   lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
@@ -359,6 +360,7 @@ void buildGrid() {
 
 // Options for one feature: on/off, its setting and its layout.
 void showDialog(int i) {
+  const FontCap cap(kTextLarge);  // the options rows and layout buttons fit up to Large text
   close_overlay(&dialog);
   dialogSub = nullptr;
   dialogFeature = i;

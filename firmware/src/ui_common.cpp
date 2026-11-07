@@ -57,17 +57,29 @@ void one_line(lv_obj_t *label, int w) {
   lv_obj_set_height(label, lv_font_get_line_height(lv_obj_get_style_text_font(label, LV_PART_MAIN)));
 }
 
-static uint8_t listSize = kTextNormal;  // the chosen text size; fixed parts always use Normal
+static uint8_t listSize = kTextNormal, tileSize = kTextNormal;  // the two Text size choices
 
-void text_size_apply(uint8_t textSize) {
-  listSize = textSize < kTextSizes ? textSize : kTextNormal;
-  fonts_select(kTextNormal);
+void text_size_apply(uint8_t lists, uint8_t tiles) {
+  listSize = lists < kTextSizes ? lists : kTextNormal;
+  tileSize = tiles >= kTextNormal && tiles < kTextSizes ? tiles : kTextNormal;
+  fonts_select(tileSize);
 }
 
 ListText::ListText() : saved(textSizeNow) { fonts_select(listSize); }
 ListText::~ListText() { fonts_select(saved); }
-FixedText::FixedText() : saved(textSizeNow) { fonts_select(kTextNormal); }
+FixedText::FixedText() : saved(textSizeNow) { fonts_select(tileSize); }
 FixedText::~FixedText() { fonts_select(saved); }
+
+FontCap::FontCap(uint8_t maxSize) : saved(textSizeNow) {
+  if (saved > maxSize) fonts_select(maxSize);
+  textSizeNow = saved;  // font_upto and nested caps still see the chosen size
+}
+
+FontCap::~FontCap() { fonts_select(saved); }
+
+const lv_font_t *font_upto(FontRole role, uint8_t maxSize) {
+  return kFontTable[textSizeNow < maxSize ? textSizeNow : maxSize][role];
+}
 
 const lv_font_t *font_at(FontRole role, uint8_t textSize) {
   return kFontTable[textSize < kTextSizes ? textSize : kTextNormal][role];

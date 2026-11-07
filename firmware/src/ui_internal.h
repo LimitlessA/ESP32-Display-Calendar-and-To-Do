@@ -51,14 +51,25 @@ int tw(int px);
 int text_w(const lv_font_t *font, const char *text);
 // Keeps a label on one line w pixels wide, ending in "..." when it does not fit.
 void one_line(lv_obj_t *label, int w);
+// The font for a role at the current text size, but no bigger than at maxSize;
+// for boxes that only fit so much, like the desk bar on Home.
+const lv_font_t *font_upto(FontRole role, uint8_t maxSize);
 // The font for a role at any text size (the Text size preview).
 const lv_font_t *font_at(FontRole role, uint8_t textSize);
-// The text size setting changes only the lists (Home columns, Week, Tasks,
-// meeting details, the Accounts list). Everything else (header, tiles, cards, the
-// desk, pop-ups, keyboard) always uses Normal, so fixed boxes never look empty or
-// overflow. text_size_apply() sets Normal as the default; build list content
-// inside a ListText, and anything fixed inside it (the desk dock) in a FixedText.
-void text_size_apply(uint8_t textSize);
+// While one lives, F_12 ... F_34B are no bigger than at maxSize: for whole screens
+// that must fit one page (Settings, Features). { FontCap cap(kTextLarge); ... }
+struct FontCap {
+  explicit FontCap(uint8_t maxSize);
+  ~FontCap();
+  uint8_t saved;
+};
+// Two text sizes (Theme > Text size): one for the lists (Home columns, Week,
+// Tasks, meeting details, the Accounts and Wi-Fi lists), XXS to XL, and one for
+// everything else (header, tiles, cards, the desk, pop-ups), Normal to XL only, so
+// fixed boxes never look empty. text_size_apply() selects the tiles size as the
+// default; build list content inside a ListText, and anything fixed inside a list
+// (the desk bar on Home) in a FixedText.
+void text_size_apply(uint8_t lists, uint8_t tiles);
 struct ListText {
   ListText();
   ~ListText();

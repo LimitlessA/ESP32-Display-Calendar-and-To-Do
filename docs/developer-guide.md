@@ -193,13 +193,16 @@ tab of the Theme picker (a slider with a live preview, `font_at()`). It changes 
 the Home columns (and the date chips and overlap banner above them), Week, Tasks, the
 meeting text on the details screen, and the Accounts and Wi-Fi lists. Everything else
 (header, Settings tiles, Features cards, the desk screen and the Home desk bar,
-pop-ups, timers, summary and review screens, the keyboard) always uses Normal, so
-fixed boxes never look empty or overflow (Andrei's choice, 2026-11-07).
+pop-ups, timers, summary and review screens) uses `Settings::tileSize` ("Tiles,
+buttons and pop-ups" on the same tab: 3 Normal, 4 L, 5 XL, saved as "tileSize"), which
+never goes below Normal, so fixed boxes never look empty (Andrei's choice, 2026-11-07).
+Settings, the Features grid and its options window still cap at L (`FontCap`), and
+the Home desk bar caps some labels with `font_upto()`.
 
 Screens never name a font file: they use the roles `F_12` ... `F_34B` from
 `ui_internal.h` (named after their size at Normal), and `kFontTable` in
 `ui_common.cpp` maps each role to a font for each size. `buildAll()` calls
-`text_size_apply()`, which selects Normal, and rebuilds every screen.
+`text_size_apply()`, which selects the tiles size, and rebuilds every screen.
 
 - List content is built inside `const ListText lists;` (a scope that selects the
   chosen size); a fixed part built inside a list (the desk bar on Home) goes in a
@@ -218,7 +221,8 @@ Screens never name a font file: they use the roles `F_12` ... `F_34B` from
 - Helpers: `tw(px)` grows a text width with the size, `text_w()` measures a text,
   `one_line()` keeps a label on one line ending in "...".
 - Check list screens at every size: `SIM_TEXT_SIZE=0 .sim/sim out/` renders them all
-  at XXS (5 for XL) after `sim/build.sh` has built the simulator.
+  at XXS (5 for XL) after `sim/build.sh` has built the simulator; `SIM_TILE_SIZE=4`
+  sets the tiles size.
 
 ## The code convention
 

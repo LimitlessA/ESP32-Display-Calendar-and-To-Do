@@ -61,7 +61,8 @@ struct Settings {
   bool use24h = true;
   uint8_t refreshMinutes = 3;   // polls are cheap: an unchanged feed is a few bytes
   uint8_t theme = 0;            // index into the theme table in theme.h
-  uint8_t textSize = 3;         // 0 XXS, 1 XS, 2 S, 3 Normal, 4 L, 5 XL (Theme > Text size)
+  uint8_t textSize = 3;         // lists: 0 XXS, 1 XS, 2 S, 3 Normal, 4 L, 5 XL (Theme > Text size)
+  uint8_t tileSize = 3;         // tiles, buttons, pop-ups: 3 Normal, 4 L, 5 XL (Theme > Text size)
   String timezone = DEFAULT_TZ;  // POSIX TZ: kept from the last sync, used from start-up
   String updateUrl = DEFAULT_UPDATE_URL;  // manifest for updates, empty = upload only
   bool autoUpdate = true;       // install new firmware by itself while nobody uses the display

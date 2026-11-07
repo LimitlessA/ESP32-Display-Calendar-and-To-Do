@@ -381,8 +381,9 @@ Open it with the sliders icon. It is a dashboard.
   changes as you drag. When you let go, the lists change to that size: the Home
   columns, Week, Tasks, the meeting details and the Accounts and Wi-Fi lists. Below
   Normal their rows and cards shrink too, so more meetings and tasks fit on a
-  screen. Tiles, buttons, pop-ups, the desk controls, the keyboard and the clocks
-  always stay at Normal.
+  screen. Under the slider, **Tiles, buttons and pop-ups** (Normal, L or XL) sets
+  the size of everything else: Settings, Features, the desk controls, pop-ups and
+  the summary screens. The keyboard and the big clocks keep their size.
 - **Features**: "N on". Opens the Features screen.
 
 Settings are saved about 5 seconds after your last change. Wait a few seconds
