@@ -121,6 +121,7 @@ String toJson(const Settings &s, bool backup = false) {
   doc["syncMinutes"] = s.refreshMinutes;
   doc["theme"] = s.theme;
   doc["textSize2"] = s.textSize;
+  doc["tileSize"] = s.tileSize;
   doc["updateUrl"] = s.updateUrl;
   doc["timezone"] = s.timezone;
   doc["autoUpdate"] = s.autoUpdate;
@@ -207,6 +208,7 @@ bool fromJson(const String &json, Settings &s) {
   // "textSize2" replaces "textSize" (0-4), which had no XXS; the old key is
   // read one step up so a chosen size stays the same.
   s.textSize = min<uint8_t>(5, doc["textSize2"] | ((uint8_t)(doc["textSize"] | (int)d.textSize - 1) + 1));
+  s.tileSize = constrain((int)(doc["tileSize"] | (int)d.tileSize), 3, 5);
   s.updateUrl = doc["updateUrl"] | d.updateUrl;
   s.timezone = doc["timezone"] | d.timezone;
   s.autoUpdate = doc["autoUpdate"] | d.autoUpdate;

@@ -423,12 +423,14 @@ void accounts_refresh() {
 
   const lv_coord_t scroll = lv_obj_get_scroll_y(list);
   lv_obj_clean(list);
-  group(kGroupGoogle);
-  for (uint8_t i = 0; i < g_settings.accounts.size(); i++) {
-    const Account &a = g_settings.accounts[i];
-    const AccountStatus st = googleStatus(i);
-    const bool bad = st.error.length() > 0;
-    item(Kind::Google, i, a.color, a.label, bad ? String(kNeedsAttention) : st.email.length() ? st.email : String(kNotSynced), bad);
+  {
+    const ListText lists;  // the list follows the text size; the detail panel is fixed
+    group(kGroupGoogle);
+    for (uint8_t i = 0; i < g_settings.accounts.size(); i++) {
+      const Account &a = g_settings.accounts[i];
+      const AccountStatus st = googleStatus(i);
+      const bool bad = st.error.length() > 0;
+      item(Kind::Google, i, a.color, a.label, bad ? String(kNeedsAttention) : st.email.length() ? st.email : String(kNotSynced), bad);
   }
   group(kGroupIcs);
   for (uint8_t i = 0; i < g_settings.ics.size(); i++) {
@@ -456,6 +458,7 @@ void accounts_refresh() {
   on_click(add, showAdd);
   lv_obj_update_layout(list);
   lv_obj_scroll_to_y(list, scroll, LV_ANIM_OFF);  // keep the place across the minute refresh
+  }
 
   lv_obj_clean(detail);
   if (sel.kind == Kind::Google) googleDetail(sel.index);

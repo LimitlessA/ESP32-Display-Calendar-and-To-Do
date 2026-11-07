@@ -185,6 +185,7 @@ lv_obj_t *tasks_create() {
 }
 
 void tasks_refresh() {
+  const ListText lists;
   const Theme &t = theme();
   lv_obj_clean(nav);
   lv_obj_clean(panel);

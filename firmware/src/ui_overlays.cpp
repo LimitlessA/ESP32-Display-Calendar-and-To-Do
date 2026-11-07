@@ -33,7 +33,9 @@ constexpr const char *kThemeTitle = "Theme";
 // Tabs: the colors and the text size.
 constexpr const char *kTabColors = "Colors";
 constexpr const char *kTabTextSize = "Text size";
-constexpr const char *kTextSizeHint = "Drag to change the size of all text";
+constexpr const char *kListsLabel = "Calendar, tasks and lists";
+constexpr const char *kTilesLabel = "Tiles, buttons and pop-ups";
+constexpr const char *kTileSizes[] = {"Normal", "L", "XL"};  // tile sizes are text sizes 3-5
 constexpr const char *kTextSizeTicks[kTextSizes] = {"XXS", "XS", "S", "Normal", "L", "XL"};
 constexpr const char *kSmallA = "A";
 constexpr const char *kPreviewCaption = "PREVIEW";
@@ -44,6 +46,8 @@ constexpr const char *kPreviewMeta = "Meet \xC2\xB7 Work calendar";
 constexpr const char *kPreviewTask1 = "Order desk cable tray";
 constexpr const char *kPreviewTask1Due = "Due today";
 constexpr const char *kPreviewTask2 = "Call the bank";
+constexpr const char *kPreviewTile = "Night mode";  // a Settings tile, in the tiles size
+constexpr const char *kPreviewTileSub = "22:00 - 07:00";
 constexpr int kSliderW = 230;
 constexpr int kPreviewW = 330;
 constexpr const char *kDone = "Done";
@@ -239,11 +243,12 @@ void ota_dialog_tick() {
 namespace {
 
 // Saves a new theme or text size; every screen is rebuilt, then the picker reopens.
-void applyLook(int theme, int textSize) {
+void applyLook(int theme, int textSize, int tileSize = -1) {
   closeLayer(&themeLayer);
   Settings s = g_settings;
   if (theme >= 0) s.theme = (uint8_t)theme;
   if (textSize >= 0) s.textSize = (uint8_t)textSize;
+  if (tileSize >= 0) s.tileSize = (uint8_t)tileSize;
   ui_save_settings(s);  // rebuilds every screen in the new colors and fonts
   theme_picker_show();
 }
@@ -326,9 +331,8 @@ void textSizeTab(lv_obj_t *card) {
   lv_obj_t *left = clearBox(body);
   lv_obj_set_flex_grow(left, 1);
   set_flex(left, LV_FLEX_FLOW_COLUMN, 10, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_t *hint = mk_label(left, &font_14, t.muted, kTextSizeHint);
-  lv_obj_set_width(hint, 664 - kPreviewW - 22);
-  lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
+  lv_obj_t *lists = mk_label(left, &font_14b, t.text, kListsLabel);
+  lv_obj_set_width(lists, 664 - kPreviewW - 22);
   lv_obj_t *row = clearBox(left);
   set_flex(row, LV_FLEX_FLOW_ROW, 14, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   mk_label(row, &font_14b, t.text, kSmallA);
@@ -354,6 +358,16 @@ void textSizeTab(lv_obj_t *card) {
     const int v = lv_slider_get_value(lv_event_get_target(e));
     if (v != g_settings.textSize) lv_async_call([](void *p) { applyLook(-1, (int)(intptr_t)p); }, (void *)(intptr_t)v);
   }, LV_EVENT_RELEASED, nullptr);
+
+  // Under it: the size of everything else (Normal, L or XL), applied on a tap.
+  lv_obj_t *tiles = mk_label(left, &font_14b, t.text, kTilesLabel);
+  lv_obj_set_width(tiles, 664 - kPreviewW - 22);
+  lv_obj_set_style_pad_top(tiles, 10, 0);
+  mk_segmented(left, kTileSizes, 3, g_settings.tileSize - kTextNormal, 86, [](int i, void *) {
+    if (i + kTextNormal != g_settings.tileSize) {
+      lv_async_call([](void *p) { applyLook(-1, -1, (int)(intptr_t)p); }, (void *)(intptr_t)(i + kTextNormal));
+    }
+  });
 
   // Right: a meeting and two tasks in the chosen size.
   previewCount = 0;
@@ -386,6 +400,12 @@ void textSizeTab(lv_obj_t *card) {
     previewLabel(col, kF14b, t.text, task[0]);
     if (task[1]) previewLabel(col, kF12, t.warnFg, task[1]);
   }
+  lv_obj_t *tile = mk_box(prev, t.panel, 12);
+  lv_obj_set_size(tile, kPreviewW - 24, LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_all(tile, 10, 0);
+  set_flex(tile, LV_FLEX_FLOW_COLUMN, 0, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  mk_label(tile, font_at(kF14b, g_settings.tileSize), t.text, kPreviewTile);
+  mk_label(tile, font_at(kF12, g_settings.tileSize), t.muted, kPreviewTileSub);
   showTextSize(g_settings.textSize);
 }
 

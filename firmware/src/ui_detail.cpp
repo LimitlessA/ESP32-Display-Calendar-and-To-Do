@@ -78,36 +78,39 @@ lv_obj_t *detail_create() {
   lv_obj_t *scr = mk_screen();
   mk_back_header(scr, kBack, Screen::Home);
 
-  lv_obj_t *card = mk_box(scr, t.card, 18);
-  lv_obj_set_pos(card, PAD, HEADER_H + PAD);
-  lv_obj_set_size(card, SCREEN_W - 2 * PAD - 220 - PAD, SCREEN_H - HEADER_H - 2 * PAD);
-  lv_obj_set_style_pad_hor(card, 24, 0);
-  lv_obj_set_style_pad_ver(card, 22, 0);
-  set_flex(card, LV_FLEX_FLOW_COLUMN, 14, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-
-  lv_obj_t *top = mk_box(card, 0, 0);
-  lv_obj_set_style_bg_opa(top, LV_OPA_TRANSP, 0);
-  lv_obj_set_width(top, lv_pct(100));
-  set_flex(top, LV_FLEX_FLOW_ROW, 10);
-  dot = mk_dot(top, t.accent, 10);
-  calLabel = mk_label(top, F_14, t.muted, "");
-  lv_obj_set_flex_grow(calLabel, 1);
-  untilLabel = mk_label(top, F_14B, t.accent, "");
-
-  title = mk_label(card, F_34B, t.text, "");
-  lv_obj_set_width(title, lv_pct(100));
-  lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
-
-  infoRow(card, ICON_CLOCK, &whenLabel);
-  locRow = infoRow(card, ICON_PIN, &locLabel);
-  travelRow = infoRow(card, ICON_CAR, &travelLabel);
-  peopleRow = infoRow(card, ICON_USERS, &peopleLabel);
-
-  descLabel = mk_label(card, F_14, t.muted, "");
-  lv_obj_set_width(descLabel, lv_pct(100));
-  lv_label_set_long_mode(descLabel, LV_LABEL_LONG_DOT);
-  lv_obj_set_flex_grow(descLabel, 1);
-  lv_obj_set_style_text_line_space(descLabel, 4, 0);
+  {
+    const ListText lists;  // the meeting text follows the text size; the buttons are fixed
+    lv_obj_t *card = mk_box(scr, t.card, 18);
+    lv_obj_set_pos(card, PAD, HEADER_H + PAD);
+    lv_obj_set_size(card, SCREEN_W - 2 * PAD - 220 - PAD, SCREEN_H - HEADER_H - 2 * PAD);
+    lv_obj_set_style_pad_hor(card, 24, 0);
+    lv_obj_set_style_pad_ver(card, 22, 0);
+    set_flex(card, LV_FLEX_FLOW_COLUMN, 14, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+  
+    lv_obj_t *top = mk_box(card, 0, 0);
+    lv_obj_set_style_bg_opa(top, LV_OPA_TRANSP, 0);
+    lv_obj_set_width(top, lv_pct(100));
+    set_flex(top, LV_FLEX_FLOW_ROW, 10);
+    dot = mk_dot(top, t.accent, 10);
+    calLabel = mk_label(top, F_14, t.muted, "");
+    lv_obj_set_flex_grow(calLabel, 1);
+    untilLabel = mk_label(top, F_14B, t.accent, "");
+  
+    title = mk_label(card, F_34B, t.text, "");
+    lv_obj_set_width(title, lv_pct(100));
+    lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
+  
+    infoRow(card, ICON_CLOCK, &whenLabel);
+    locRow = infoRow(card, ICON_PIN, &locLabel);
+    travelRow = infoRow(card, ICON_CAR, &travelLabel);
+    peopleRow = infoRow(card, ICON_USERS, &peopleLabel);
+  
+    descLabel = mk_label(card, F_14, t.muted, "");
+    lv_obj_set_width(descLabel, lv_pct(100));
+    lv_label_set_long_mode(descLabel, LV_LABEL_LONG_DOT);
+    lv_obj_set_flex_grow(descLabel, 1);
+    lv_obj_set_style_text_line_space(descLabel, 4, 0);
+  }
 
   lv_obj_t *side = mk_box(scr, 0, 0);
   lv_obj_set_style_bg_opa(side, LV_OPA_TRANSP, 0);

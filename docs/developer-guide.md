@@ -189,30 +189,40 @@ feature: add the setting, add a row, and add the screens.
 ### Text size
 
 `Settings::textSize` (0 XXS, 1 XS, 2 S, 3 Normal, 4 L, 5 XL; saved as "textSize2") is chosen on the Text size
-tab of the Theme picker (a slider with a live preview, `font_at()`). Screens never name a font file: they use the roles `F_12` ... `F_34B`
-from `ui_internal.h` (named after their size at Normal), and `kFontTable` in
-`ui_common.cpp` maps each role to a font for each size. `buildAll()` calls
-`fonts_select()` and rebuilds every screen, like a theme change.
+tab of the Theme picker (a slider with a live preview, `font_at()`). It changes **only the lists**:
+the Home columns (and the date chips and overlap banner above them), Week, Tasks, the
+meeting text on the details screen, and the Accounts and Wi-Fi lists. Everything else
+(header, Settings tiles, Features cards, the desk screen and the Home desk bar,
+pop-ups, timers, summary and review screens) uses `Settings::tileSize` ("Tiles,
+buttons and pop-ups" on the same tab: 3 Normal, 4 L, 5 XL, saved as "tileSize"), which
+never goes below Normal, so fixed boxes never look empty (Andrei's choice, 2026-11-07).
+Settings, the Features grid and its options window still cap at L (`FontCap`), and
+the Home desk bar caps some labels with `font_upto()`.
 
+Screens never name a font file: they use the roles `F_12` ... `F_34B` from
+`ui_internal.h` (named after their size at Normal), and `kFontTable` in
+`ui_common.cpp` maps each role to a font for each size. `buildAll()` calls
+`text_size_apply()`, which selects the tiles size, and rebuilds every screen.
+
+- List content is built inside `const ListText lists;` (a scope that selects the
+  chosen size); a fixed part built inside a list (the desk bar on Home) goes in a
+  `const FixedText fixed;`. New list screens need a `ListText` in their refresh.
+- In a `ListText`, below Normal rows and cards shrink too: `fonts_select()` sets
+  `g_ui_scale` (72, 80, 90 % for XXS, XS, S; 100 % from Normal up) and `sz(px)` scales
+  a size given at Normal; `TOUCH` (never below 34 px) follows it. Give list rows,
+  cards and gaps as `sz(n)`. `HEADER_H`, `PAD` and `GAP` are fixed.
+- Every role shrinks below Normal, headings and bold text included (`font_12b` is a
+  12 px Bold, compressed, for that). The on-screen keyboards use `font_16` directly.
 - `font_72` and `font_150` (the big clocks and timers) are used directly and never
   change. 10, 18 and 20 px Regular were added only for XXS, L and XL, and are
   compressed to fit the flash.
 - `F_20B` and smaller carry the icons; 26 and 34 px have none, so the table never
   maps an icon role to them.
 - Helpers: `tw(px)` grows a text width with the size, `text_w()` measures a text,
-  `one_line()` keeps a label on one line ending in "...", `font_upto()` caps one
-  label, and `FontCap cap(kTextLarge);` caps a whole screen (Settings, the Features grid and
-  its options window cap at Large, since they must fit one screen).
-- Below Normal the layout shrinks too, so more fits on screen: `fonts_select()` sets
-  `g_ui_scale` (72, 80, 90 % for XXS, XS, S; 100 % from Normal up) and `sz(px)` scales
-  a size given at Normal. `HEADER_H`, `PAD`, `GAP` and `TOUCH` (never below 34 px) are
-  `sz()` macros, so anything built from them must be a `#define` or computed at build
-  time, not a `constexpr`. Give new rows, cards and gaps as `sz(n)`.
-- Every role shrinks below Normal, headings and bold text included (`font_12b` is a
-  12 px Bold, compressed, for that). The on-screen keyboards use `font_16` directly,
-  so their keys keep one size.
-- Check new screens at every size: `SIM_TEXT_SIZE=5 .sim/sim out/` renders them all
-  at Extra large after `sim/build.sh` has built the simulator.
+  `one_line()` keeps a label on one line ending in "...".
+- Check list screens at every size: `SIM_TEXT_SIZE=0 .sim/sim out/` renders them all
+  at XXS (5 for XL) after `sim/build.sh` has built the simulator; `SIM_TILE_SIZE=4`
+  sets the tiles size.
 
 ## The code convention
 

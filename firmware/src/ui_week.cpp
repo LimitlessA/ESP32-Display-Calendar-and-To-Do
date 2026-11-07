@@ -104,6 +104,7 @@ void week_on_show() {
 }
 
 void week_refresh() {
+  const ListText lists;
   const Theme &t = theme();
   lv_obj_clean(cols);
   if (!viewWeek) {

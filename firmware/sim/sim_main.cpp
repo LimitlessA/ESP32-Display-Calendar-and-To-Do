@@ -506,6 +506,7 @@ int main(int argc, char **argv) {
            {"Family (iCloud)", "webcal://p23-caldav.icloud.com/published/2/xyz", 0xE57CD8}};
   s.wifiSsid = "Popescu-5G";
   if (getenv("SIM_TEXT_SIZE")) s.textSize = atoi(getenv("SIM_TEXT_SIZE"));  // 0-5, see Settings::textSize
+  if (getenv("SIM_TILE_SIZE")) s.tileSize = atoi(getenv("SIM_TILE_SIZE"));  // 3-5, see Settings::tileSize
   sim_set_settings(s);
   sampleData();
 
