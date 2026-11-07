@@ -1,6 +1,7 @@
 // Stand-ins for the device modules so the real UI code runs on a PC with
 // sample data. Touch actions update the sample data the same way sync does.
 #include <algorithm>
+#include <map>
 #include <vector>
 
 #include "audio.h"
@@ -195,6 +196,14 @@ bool storage_ok() { return true; }
 uint64_t storage_free_bytes() { return 7200000000ULL; }
 bool storage_write(const char *, const String &) { return true; }
 bool storage_read(const char *, String &) { return false; }
+static std::map<String, String> g_flash;
+bool flash_write(const char *key, const String &data) { g_flash[key] = data; return true; }
+bool flash_read(const char *key, String &out) {
+  auto it = g_flash.find(key);
+  if (it == g_flash.end()) return false;
+  out = it->second;
+  return true;
+}
 
 void ui_set_backlight(uint8_t) {}
 time_t ui_now() { return g_sim_now; }

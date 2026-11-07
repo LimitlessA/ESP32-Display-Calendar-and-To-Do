@@ -242,8 +242,12 @@ Can't decide? On Tasks, tap **Pick for me**.
 ## Procrastination radar
 
 - The display remembers how often a task's due date was moved or missed.
-- A task counts as **stuck** after 3 moves by default (2 to 10 in the options).
-- A: stuck tasks glow and show a count like "6x" and "Moved 6 times since 12 Oct".
+  Only tasks **with a due date** can be put off; tasks without one never show.
+- A missed due date counts once, and every full week a task then stays overdue
+  counts once more. So a task left 3 weeks overdue is stuck right away.
+- Moving a task to a later day counts once (unless that day was already missed).
+- A task counts as **stuck** after 3 by default (2 to 10 in the options).
+- A: stuck tasks glow and show a count like "6x" and "Put off 6 times since 12 Oct".
 - B: once a day, when the screen has been idle for a minute on Home, a popup
   says "YOU KEEP MOVING THIS ONE". You pick **Do 5 minutes now** (starts a
   5-minute focus timer), **Split it** (opens quick add), **Pick a fixed day**
@@ -251,9 +255,8 @@ Can't decide? On Tasks, tap **Pick for me**.
 - C: a **Radar** button on Tasks shows tasks as bubbles. Closer to the middle
   means more moves. Tap one to deal with it.
 - **Drop it finishes the task in Google Tasks.** There is an Undo.
-- The counts are saved on the SD card. **Not sure** what happens without a card.
-  The code only writes them to the card, so they are probably lost when the
-  display restarts.
+- The counts are saved in the display's own flash (up to 64 tasks), so they
+  survive restarts and updates, with or without an SD card.
 
 ## Countdowns, birthdays and holidays
 
@@ -592,7 +595,6 @@ With a card the display keeps:
 - **A backup of your settings** in `/calendar/settings.json`, including Wi-Fi and
   account details. If the flash is erased (for example by a clean reflash), the
   display reads it back at the next start.
-- **The radar counts** (`/radar.txt`).
 
 The Settings DEVICE tile shows free space or "No SD card".
 

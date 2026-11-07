@@ -1,6 +1,7 @@
 // Procrastination radar (mockup row "pr"): remembers how often each task was
 // pushed back. A: stuck tasks glow with a move count, B: a nudge popup once a
-// day, C: a radar view from the Tasks screen.
+// day, C: a radar view from the Tasks screen. The counts live in the chip's
+// own flash, so they survive restarts and updates with or without a TF card.
 #include <math.h>
 
 #include <algorithm>
@@ -14,11 +15,12 @@ namespace {
 
 // ---- Texts and settings ------------------------------------------------------
 
-constexpr const char *kFile = "/radar.txt";
+constexpr const char *kFlashKey = "radar";
+constexpr const char *kOldFile = "/radar.txt";   // SD copy from older versions, read once
 constexpr const char *kBadge = "%d\xC3\x97";  // 6x
-constexpr const char *kMovedSince = "Moved %d times since %s";
+constexpr const char *kMovedSince = "Put off %d times since %s";
 constexpr const char *kNudgeHead = "YOU KEEP MOVING THIS ONE";
-constexpr const char *kNudgeBody = "Moved %d times since %s. What would help?";
+constexpr const char *kNudgeBody = "Put off %d times since %s. What would help?";
 constexpr const char *kDo5 = "Do 5 minutes now";
 constexpr const char *kSplit = "Split it";
 constexpr const char *kFixDay = "Pick a fixed day";
@@ -32,13 +34,15 @@ constexpr const char *kFixed = "Fixed for %s. This one won't count as a move.";
 constexpr const char *kDropped = "Dropped: %s";
 constexpr const char *kUndo = "Undo";
 constexpr const char *kRadarTitle = "Procrastination radar";
-constexpr const char *kRadarHint = "Closer to the middle = moved more often. Tap one to deal with it.";
-constexpr const char *kRadarEmpty = "Nothing stuck. Tasks you keep moving show up here.";
+constexpr const char *kRadarHint = "Closer to the middle = put off more often. Tap one to deal with it.";
+constexpr const char *kRadarEmpty = "Nothing stuck. Tasks you keep moving or leave overdue show up here.";
 constexpr const char *kStuck = "STUCK";
 constexpr const char *kClose = "Close";
 constexpr uint32_t kNudgeIdleMs = 60000;     // B: only when nobody has touched the screen for a minute
 constexpr uint32_t kNudgeCheckMs = 30000;
 constexpr long kForgetAfterDays = 14;        // finished tasks leave the file after this
+constexpr long kOverdueStepDays = 7;         // each week a task stays overdue counts as one more
+constexpr size_t kMaxEntries = 64;           // keeps the saved list to a few KB of flash
 constexpr int RADAR = 380;                   // C: diameter
 const uint32_t kBubbleColors[] = {0xF5A524, 0xFF8A65, 0xE57CD8, 0x6C8CFF, 0x4FD1C5, 0x7BD88F};
 
@@ -68,7 +72,7 @@ String keyOf(const Task &t) { return String((int)t.account) + ":" + t.id; }
 void load() {
   loaded = true;
   String text;
-  if (!storage_read(kFile, text)) return;
+  if (!flash_read(kFlashKey, text) && !storage_read(kOldFile, text)) return;
   int pos = 0;
   while (pos < (int)text.length()) {
     int end = text.indexOf('\n', pos);
@@ -95,14 +99,60 @@ void load() {
   }
 }
 
+// Tasks without a due date and no moves teach the radar nothing; the rest are
+// kept by most moves, then most recently seen.
+void trim() {
+  for (auto it = entries.begin(); it != entries.end();) {
+    if (!it->second.moves && !it->second.lastDue.length()) {
+      it = entries.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  while (entries.size() > kMaxEntries) {
+    auto worst = entries.begin();
+    for (auto it = entries.begin(); it != entries.end(); ++it) {
+      const Entry &a = it->second, &b = worst->second;
+      if (a.moves < b.moves || (a.moves == b.moves && a.lastSeenDay < b.lastSeenDay)) worst = it;
+    }
+    entries.erase(worst);
+  }
+}
+
 void save() {
+  trim();
   String text;
   for (const auto &kv : entries) {
     const Entry &e = kv.second;
     text += kv.first + "\t" + String((int)e.moves) + "\t" + String((long)e.firstSeen) + "\t" + e.lastDue + "\t" +
             e.countedDue + "\t" + String(e.lastSeenDay) + "\t" + String(e.nudgedDay) + "\n";
   }
-  storage_write(kFile, text);
+  flash_write(kFlashKey, text);
+}
+
+// Noon on a yyyy-MM-dd due day, 0 when there is none.
+time_t dueTime(const String &key) {
+  if (key.length() < 10) return 0;
+  struct tm tm = {};
+  tm.tm_year = key.substring(0, 4).toInt() - 1900;
+  tm.tm_mon = key.substring(5, 7).toInt() - 1;
+  tm.tm_mday = key.substring(8, 10).toInt();
+  tm.tm_hour = 12;
+  tm.tm_isdst = -1;
+  return mktime(&tm);
+}
+
+// Moves seen, plus one for every full week the task has stayed overdue, so a
+// task left lying for weeks counts as put off even if nobody touched it.
+int movesOf(const Task &t, const Entry *e) {
+  if (!e) return 0;
+  int n = e->moves;
+  const time_t due = dueTime(t.dueKey);
+  if (due && clock_valid()) {
+    const long late = day_number(ui_now()) - day_number(due);
+    if (late > 0) n += late / kOverdueStepDays;
+  }
+  return n;
 }
 
 const Entry *find(const Task &t) {
@@ -114,7 +164,15 @@ String since(const Entry &e) {
   return fmt_date_short(e.firstSeen).substring(4);  // "2 Oct"
 }
 
-bool stuck(const Entry *e) { return e && e->moves >= g_settings.radarMoves; }
+// The due day is about to change: keep the overdue weeks as real moves.
+void keepOverdueWeeks(Entry &e) {
+  const time_t due = dueTime(e.lastDue);
+  if (!due || !clock_valid()) return;
+  const long late = day_number(ui_now()) - day_number(due);
+  if (late > 0) e.moves += late / kOverdueStepDays;
+}
+
+bool stuck(const Task &t, const Entry *e) { return e && movesOf(t, e) >= g_settings.radarMoves; }
 
 // The next such weekday, a week ahead when it is today (0 = Sunday).
 time_t nextWeekday(int wday) {
@@ -131,7 +189,10 @@ void closePopup() { close_overlay(&popup); }
 void fixDay(time_t day) {
   const String key = day_key(day);
   auto it = entries.find(keyOf(popupTask));
-  if (it != entries.end()) it->second.lastDue = key;  // a promise, not a move
+  if (it != entries.end()) {
+    keepOverdueWeeks(it->second);
+    it->second.lastDue = key;  // a promise, not a move
+  }
   save();
   sync_set_task_due(popupTask, key);
   toast(strf(kFixed, fmt_date_short(day).c_str()));
@@ -176,13 +237,17 @@ void radar_update() {
   for (const Task &t : g_snap.tasks) {
     auto it = entries.find(keyOf(t));
     if (it == entries.end()) {
+      // Only tasks with a due date can be put off; the list is sorted by due
+      // date, so when it is full the most urgent tasks already have a place.
+      if (!t.dueKey.length() || entries.size() >= kMaxEntries) continue;
+      // Seen for the first time; an overdue one already counts from its due day.
       Entry e;
-      e.firstSeen = now;
+      const time_t due = dueTime(t.dueKey);
+      e.firstSeen = due && due < now ? due : now;
       e.lastDue = t.dueKey;
       e.lastSeenDay = today;
-      entries[keyOf(t)] = e;
+      it = entries.emplace(keyOf(t), e).first;
       changed = true;
-      continue;
     }
     Entry &e = it->second;
     if (e.lastSeenDay != today) {
@@ -195,6 +260,7 @@ void radar_update() {
       changed = true;
     }
     if (t.dueKey != e.lastDue) {
+      keepOverdueWeeks(e);
       e.lastDue = t.dueKey;
       changed = true;
     }
@@ -216,18 +282,16 @@ void radar_update() {
   if (changed) save();
 }
 
-int radar_moves(const Task &t) {
-  const Entry *e = find(t);
-  return e ? e->moves : 0;
-}
+int radar_moves(const Task &t) { return movesOf(t, find(t)); }
 
-bool radar_stuck(const Task &t) { return g_settings.radar && stuck(find(t)); }
+bool radar_stuck(const Task &t) { return g_settings.radar && stuck(t, find(t)); }
 
 // A: an orange glow and a move count on the task card.
 String radar_mark(lv_obj_t *card, const Task &t) {
   if (!g_settings.radar || g_settings.layout(Layout::Radar) != 0) return "";
   const Entry *e = find(t);
-  if (!stuck(e)) return "";
+  if (!stuck(t, e)) return "";
+  const int moves = movesOf(t, e);
   const Theme &th = theme();
   lv_obj_set_style_radius(card, 12, 0);
   lv_obj_set_style_border_color(card, c(th.accent), 0);
@@ -238,8 +302,8 @@ String radar_mark(lv_obj_t *card, const Task &t) {
   lv_obj_t *badge = mk_box(card, th.accent, 10);
   lv_obj_set_style_pad_hor(badge, 8, 0);
   lv_obj_set_style_pad_ver(badge, 2, 0);
-  mk_label(badge, F_12, th.onAccent, strf(kBadge, (int)e->moves).c_str());
-  return strf(kMovedSince, (int)e->moves, since(*e).c_str());
+  mk_label(badge, F_12, th.onAccent, strf(kBadge, moves).c_str());
+  return strf(kMovedSince, moves, since(*e).c_str());
 }
 
 // B, and a tap in C: what to do about a task you keep moving.
@@ -263,7 +327,7 @@ void radar_nudge_show(const Task &t) {
   lv_obj_t *title = mk_label(card, F_26B, th.text, t.title.c_str());
   lv_obj_set_width(title, 492);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
-  mk_label(card, F_14, th.muted, strf(kNudgeBody, (int)e->moves, since(*e).c_str()).c_str());
+  mk_label(card, F_14, th.muted, strf(kNudgeBody, movesOf(t, e), since(*e).c_str()).c_str());
 
   lv_obj_t *buttons = mk_box(card, 0, 0);
   lv_obj_set_style_bg_opa(buttons, LV_OPA_TRANSP, 0);
@@ -312,9 +376,9 @@ void radar_tick() {
   int bestMoves = 0;
   for (const Task &t : g_snap.tasks) {
     const Entry *e = find(t);
-    if (stuck(e) && e->nudgedDay != today && e->moves > bestMoves) {
+    if (stuck(t, e) && e->nudgedDay != today && movesOf(t, e) > bestMoves) {
       best = &t;
-      bestMoves = e->moves;
+      bestMoves = movesOf(t, e);
     }
   }
   if (!best) return;

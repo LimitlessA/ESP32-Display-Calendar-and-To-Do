@@ -375,6 +375,13 @@ static void renderVariants(const char *dir) {
     g_sim.version++;
     tick();
   }
+  // "Renew car insurance" left overdue for three weeks: 1 missed + 3 weeks = stuck.
+  const String insuranceDue = taskById("t1").dueKey;
+  for (Task &t : g_sim.tasks) {
+    if (t.id == "t1") t.dueKey = "2026-10-08";
+  }
+  g_sim.version++;
+  tick();
   for (uint8_t v = 0; v < 3; v++) {
     snprintf(name, sizeof(name), "r13-radar-%c", abc[v]);
     setLayout(Layout::Radar, v);
@@ -387,6 +394,11 @@ static void renderVariants(const char *dir) {
   ui_show(Screen::Tasks);
   setLayout(Layout::Radar, 0);
   render(dir, "r13-radar-tasks");
+  for (Task &t : g_sim.tasks) {
+    if (t.id == "t1") t.dueKey = insuranceDue;
+  }
+  g_sim.version++;
+  tick();
 
   // Smart desk: a morning of sitting and standing, so the timeline has history.
   Settings desk = g_settings;
