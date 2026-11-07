@@ -753,7 +753,7 @@ Found while writing these documents. None were changed in the code.
 - The `spiffs` partition seems unused.
 - `Layout::Features` is stored but unused.
 - Per-meeting reminder overrides and snoozes are kept in RAM only.
-- The radar counts are saved only to the SD card.
+- The radar counts are saved in NVS (namespace `store`, key `radar`, at most 64 tasks); an old `/radar.txt` on the SD card is read once.
 - Meeting cost counts `guests` (attendees who are not the organiser), at least 1.
 - `settings.json` on the SD card holds secrets in plain text.
 - The sync interval route accepts 1 to 60 minutes, but the display and page offer

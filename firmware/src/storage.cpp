@@ -1,5 +1,8 @@
+#include <Preferences.h>
 #include <SD.h>
 #include <SPI.h>
+
+#include <memory>
 
 #include "config.h"
 #include "storage.h"
@@ -67,4 +70,27 @@ bool storage_read(const char *path, String &out) {
   out = f.readString();
   f.close();
   return true;
+}
+
+bool flash_write(const char *key, const String &data) {
+  Preferences prefs;
+  if (!prefs.begin("store", false)) return false;
+  const bool ok = prefs.putBytes(key, data.c_str(), data.length()) == data.length();
+  prefs.end();
+  return ok;
+}
+
+bool flash_read(const char *key, String &out) {
+  Preferences prefs;
+  if (!prefs.begin("store", true)) return false;
+  const size_t len = prefs.getBytesLength(key);
+  bool ok = false;
+  if (len > 0) {
+    std::unique_ptr<char[]> buf(new char[len + 1]);
+    ok = prefs.getBytes(key, buf.get(), len) == len;
+    buf[len] = 0;
+    if (ok) out = buf.get();
+  }
+  prefs.end();
+  return ok;
 }
