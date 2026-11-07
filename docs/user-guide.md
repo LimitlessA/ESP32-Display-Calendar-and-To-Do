@@ -291,7 +291,7 @@ Nothing is sent to the phone.
   phone too.
 - A: "Welcome back" summary of what changed (only after you were away for 15
   minutes or more), with **Show my day**.
-- B: Privacy mode. While you are away, only the dim clock and date show: no
+- B: Privacy mode. While you are away, only the dim clock, date and "Locked" show: no
   meetings, tasks, reminders or pop-ups. Everything comes back as soon as your
   phone does (reminders you missed show then if the meeting has not started
   yet). No phone with you? Tap the clock 5 times quickly (within 3 seconds) to
