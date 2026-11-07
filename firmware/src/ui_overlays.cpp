@@ -125,7 +125,7 @@ void reminder_show(const Event &ev) {
   lv_obj_set_style_text_letter_space(w, 1, 0);
   mk_label(col, F_14, t.muted, ev.calendar.c_str());
 
-  lv_obj_t *title = mk_label(card, F_34B, t.text, ev.title.c_str());
+  lv_obj_t *title = mk_label(card, F_34B, t.text, event_title(ev).c_str());
   lv_obj_set_width(title, 500);
   lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
   String meta = fmt_time(ev.start / 1000) + " - " + fmt_time(ev.end / 1000);
